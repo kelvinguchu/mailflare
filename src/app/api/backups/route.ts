@@ -1,7 +1,4 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
-import { getDb } from "@/db";
-import { backups } from "@/db/schema";
 import { assertAdmin } from "@/lib/auth/admin";
 import { requireUser } from "@/lib/auth/cookies";
 import { getD1ExportConfigurationStatus } from "@/lib/backups/export";
@@ -9,12 +6,10 @@ import {
 	createBackupRecord,
 	getBackupSettings,
 	listBackups,
+	startBackupWorkflow,
 	updateBackupSettings,
 } from "@/lib/backups/service";
-import {
-	BackupWorkflowUnavailableError,
-	getBackupWorkflowBinding,
-} from "@/lib/backups/utils";
+import { BackupWorkflowUnavailableError } from "@/lib/backups/utils";
 import { getEnv } from "@/lib/cloudflare";
 import { parseBackupSettingsInput } from "./utils";
 
@@ -57,21 +52,8 @@ export async function PUT(request: Request) {
 export async function POST(request: Request) {
 	try {
 		const { env, user } = await requireAdmin(request);
-		const workflow = getBackupWorkflowBinding(env);
 		const backupId = await createBackupRecord(env, "manual", user.id);
-		try {
-			await workflow.create({
-				id: `database-backup-${backupId}`,
-				params: { backupId, force: true },
-			});
-		} catch (error) {
-			const message = error instanceof Error ? error.message : "Failed to start backup";
-			await getDb(env)
-				.update(backups)
-				.set({ status: "failed", error: message, completedAt: new Date() })
-				.where(eq(backups.id, backupId));
-			throw error;
-		}
+		await startBackupWorkflow(env, backupId);
 		return NextResponse.json({ backupId }, { status: 202 });
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "Failed to start backup";

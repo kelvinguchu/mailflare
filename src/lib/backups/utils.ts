@@ -35,6 +35,10 @@ export function getUtcDayBounds(now: Date): { start: number; end: number } {
 	return { start, end: start + 86_400_000 };
 }
 
+export function getScheduledBackupRecordId(now: Date): string {
+	return `bak_scheduled_${now.toISOString().slice(0, 10)}`;
+}
+
 export function createBackupFilename(now: Date): string {
 	return `cc-mail-${now.toISOString().replace(/[:.]/g, "-")}.json`;
 }

@@ -14,7 +14,7 @@ CC Mail needs these runtime values:
 
 - `CF_TOKEN` — a scoped Cloudflare API token with Zone Read, Email Routing Edit, Email Sending Edit, and Email Routing Rules Write access for the domains you will connect. This is separate from the token Cloudflare uses to deploy the app.
 - `CF_EMAIL_WORKER_NAME` — the deployed Worker name. It must match the Worker name exactly so CC Mail can create Email Routing rules.
-- `CF_AID` — the Cloudflare account ID. This is optional for normal mail use but required for database backups.
+- `CF_AID` — the Cloudflare account ID retained for compatibility with existing deployments.
 
 You can use a legacy Global API Key instead of `CF_TOKEN` by setting both `CF_API_KEY` and `CF_EMAIL`.
 
@@ -69,11 +69,9 @@ Cloudflare service bindings use a literal Worker name and cannot inherit the top
 
 Manual and scheduled backups use the `DATABASE_BACKUP_WORKFLOW` binding declared in `wrangler.jsonc`. Deploy the complete Worker with `npm run deploy` whenever this binding is added or changed.
 
-Backups require:
+The Worker checks the automatic-backup settings at 02:00 UTC each day. Enable automatic backups from **Admin settings > Backups** and select the daily, weekly, or monthly frequency there.
 
-- `CF_AID`
-- `D1_DATABASE_ID`
-- `D1_BACKUP_TOKEN`, or a `CF_TOKEN` that is also allowed to export the D1 database
+Backup data is read through the `DB` binding and written through the `BUCKET` binding. No Cloudflare API token is required for the backup itself.
 
 ## Updating CC Mail
 

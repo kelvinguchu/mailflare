@@ -23,6 +23,10 @@
 		"nodejs_compat",
 		"global_fetch_strictly_public"
 	],
+	"triggers": {
+		// Check the configured daily, weekly, or monthly backup schedule at 02:00 UTC.
+		"crons": ["0 2 * * *"],
+	},
 	"assets": {
 		"binding": "ASSETS",
 		"directory": ".open-next/assets",
@@ -57,7 +61,6 @@
 			"name": "mailflare-database-backup",
 			"binding": "DATABASE_BACKUP_WORKFLOW",
 			"class_name": "DatabaseBackupWorkflow",
-			// Enable a schedule after configuring a D1 export token.
 		},
 	],
 	"ratelimits": [

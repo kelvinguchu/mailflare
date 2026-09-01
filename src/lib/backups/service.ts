@@ -3,7 +3,13 @@ import { getDb } from "@/db";
 import { backups, backupSettings } from "@/db/schema";
 import { newId } from "@/lib/ids";
 import type { BackupScheduleType } from "./types";
-import { BACKUP_SETTINGS_ID, getUtcDayBounds, isBackupDue } from "./utils";
+import {
+	BACKUP_SETTINGS_ID,
+	getBackupWorkflowBinding,
+	getScheduledBackupRecordId,
+	getUtcDayBounds,
+	isBackupDue,
+} from "./utils";
 
 export async function getBackupSettings(env: CloudflareEnv) {
 	const db = getDb(env);
@@ -51,7 +57,36 @@ export async function createScheduledBackupIfDue(env: CloudflareEnv, now: Date):
 		)
 		.limit(1);
 	if (existing.length) return null;
-	return createBackupRecord(env, "scheduled");
+
+	// The UTC date is the idempotency key. If overlapping scheduler invocations
+	// race after the check above, D1's primary key allows only one record.
+	const id = getScheduledBackupRecordId(now);
+	const inserted = await getDb(env)
+		.insert(backups)
+		.values({
+			id,
+			trigger: "scheduled",
+			createdAt: now,
+		})
+		.onConflictDoNothing({ target: backups.id })
+		.returning({ id: backups.id });
+	return inserted[0]?.id ?? null;
+}
+
+export async function startBackupWorkflow(env: CloudflareEnv, backupId: string): Promise<void> {
+	try {
+		await getBackupWorkflowBinding(env).create({
+			id: `database-backup-${backupId}`,
+			params: { backupId, force: true },
+		});
+	} catch (error) {
+		const message = error instanceof Error ? error.message : "Failed to start backup";
+		await getDb(env)
+			.update(backups)
+			.set({ status: "failed", error: message, completedAt: new Date() })
+			.where(eq(backups.id, backupId));
+		throw error;
+	}
 }
 
 export async function updateBackupSettings(

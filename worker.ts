@@ -14,6 +14,7 @@ import {
 	getAccountForwardingDestination,
 	MAILFLARE_FORWARDED_HEADER,
 } from "./src/lib/email/account-forwarding";
+import { runScheduledBackup } from "./src/lib/backups/scheduler";
 export { RealtimeHub } from "./src/lib/realtime/hub";
 export { DatabaseBackupWorkflow } from "./src/lib/backups/workflow";
 
@@ -68,6 +69,10 @@ export default {
 			console.error("Inbound enqueue failed", err);
 			message.setReject("Processing failed");
 		}
+	},
+
+	async scheduled(controller: ScheduledController, env: CloudflareEnv) {
+		await runScheduledBackup(env, new Date(controller.scheduledTime));
 	},
 
 	async queue(batch: MessageBatch, env: CloudflareEnv): Promise<void> {

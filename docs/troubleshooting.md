@@ -43,7 +43,7 @@ Do not commit that account-specific ID to a reusable public repository.
 
 Deploy the complete Worker with `npm run deploy`. A local Next.js server or a source-only update does not provision the `DATABASE_BACKUP_WORKFLOW` binding.
 
-Also confirm that `CF_AID` and `D1_DATABASE_ID` are set, and that `D1_BACKUP_TOKEN` or `CF_TOKEN` can export the database.
+Also confirm that the `DB` and `BUCKET` bindings exist. Scheduled backups run only when automatic backups are enabled under **Admin settings > Backups**.
 
 ## Inbound mail is not arriving
 

@@ -56,10 +56,10 @@ Acceptance criteria:
 
 ### 1.1 Repair scheduled backup execution
 
-- [ ] Add a real scheduled trigger or another reliable scheduler.
-- [ ] Make the scheduled handler start `DatabaseBackupWorkflow` without duplicating an already-due backup.
-- [ ] Record success and failure in an observable location.
-- [ ] Add tests for daily, weekly and monthly due-date calculations.
+- [x] Add a real scheduled trigger or another reliable scheduler.
+- [x] Make the scheduled handler start `DatabaseBackupWorkflow` without duplicating an already-due backup.
+- [x] Record success and failure in an observable location.
+- [x] Add tests for daily, weekly and monthly due-date calculations.
 
 Acceptance criteria:
 
@@ -463,3 +463,4 @@ The migration should then preserve behavior first and improve architecture secon
 | --- | --- | --- | --- |
 | 2026-09-01 | Initial production-readiness assessment | Checklist created; no readiness item marked complete yet. | Source review, `npm run typecheck`, `npm run lint`, existing six tests, and dependency audit. |
 | 2026-09-01 | 0.1 — Recoverable source checkpoint | Reviewed customization committed and copied to a private GitHub repository. | Commit `8f4aaa9`; tag `cc-mail-baseline-2026-09-01`; private remote `kelvinguchu/cc-mail-calibercode`; real `.dev.vars` confirmed ignored; typecheck and six tests passed; lint completed with zero errors and 58 recorded warnings. |
+| 2026-09-01 | 1.1 — Scheduled backup execution | Added a 02:00 UTC Cron Trigger, a scheduled Worker handler, UTC-date idempotency, structured logs, and administrator-visible failure records; enabled daily backups with 30-day retention. | Production version `4b9f94c6-7e9a-4f4c-aacb-911788cb38b4`; ten tests and typecheck passed; backup `bak_scheduled_2026-09-01` completed and wrote 15,767 bytes to R2; a repeated same-day invocation was skipped and D1 retained one scheduled record. |
