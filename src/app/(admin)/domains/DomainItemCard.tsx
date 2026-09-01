@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import type { UseMutationResult } from "@tanstack/react-query";
 import {
   Check,
   X,
@@ -8,8 +9,16 @@ import {
   Globe2,
   Trash2,
 } from "lucide-react";
+import type { DnsStatusSummary, Domain } from "./types";
 
-export default function DomainItemCard({ item, dns, remove, loadDns }: any) {
+type DomainItemCardProps = {
+  item: Domain;
+  dns?: DnsStatusSummary;
+  remove: UseMutationResult<void, Error, string>;
+  loadDns: (id: string) => Promise<void>;
+};
+
+export default function DomainItemCard({ item, dns, remove, loadDns }: DomainItemCardProps) {
 
   return (
     <div

@@ -1,7 +1,6 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { domains, mailboxAccess, mailboxes } from "@/db/schema";
-import { isTeamMailboxSharingEnabled } from "@/lib/mailboxes/access-utils";
 import type { NewMessageNotification } from "./types";
 
 export function getSessionTokenFromRequest(request: Request): string | undefined {
@@ -31,7 +30,7 @@ export async function getMailboxNotificationUserIds(
 		.innerJoin(domains, eq(mailboxes.domainId, domains.id))
 		.where(eq(mailboxes.id, mailboxId))
 		.limit(1);
-	const sharedUserIds = mailboxRows[0]?.type === "shared" && await isTeamMailboxSharingEnabled(db)
+	const sharedUserIds = mailboxRows[0]?.type === "shared"
 		? (await db
 			.select({ userId: mailboxAccess.userId })
 			.from(mailboxAccess)
@@ -56,7 +55,7 @@ export async function notifyUsersOfNewMessage(
 	await Promise.allSettled(
 		userIds.map((userId) => {
 			const hub = env.REALTIME.getByName(userId);
-			return hub.fetch("https://mailflare-realtime/notify", {
+			return hub.fetch("https://cc-mail-realtime/notify", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(payload),

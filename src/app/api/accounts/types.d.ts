@@ -23,6 +23,8 @@ export type CreateUserAccountInput = {
 	username: string;
 	domainId: string;
 	password: string;
+	name?: string;
+	senderName?: string;
 	role: "admin" | "user";
 };
 

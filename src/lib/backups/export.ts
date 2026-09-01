@@ -1,7 +1,7 @@
 import type { DatabaseBackupDocument, DatabaseBackupTable, DatabaseRecord } from "./types";
 import { mergeLegacyMessageBodies } from "./utils";
 
-const BACKUP_TABLES: DatabaseBackupTable[] = ["users", "domains", "mailboxes", "mailbox_access", "contacts", "folders", "api_keys", "messages", "message_attachments", "outbound_jobs", "routing_rules", "webhooks", "webhook_deliveries", "sessions", "audit_logs", "backup_settings", "backups", "app_settings", "license_settings"];
+const BACKUP_TABLES: DatabaseBackupTable[] = ["users", "domains", "mailboxes", "mailbox_access", "contacts", "folders", "api_keys", "messages", "message_attachments", "outbound_jobs", "routing_rules", "webhooks", "webhook_deliveries", "sessions", "audit_logs", "backup_settings", "backups", "app_settings"];
 const INSERT_BATCH_SIZE = 50;
 
 export function getD1ExportConfigurationStatus(_env?: CloudflareEnv) {
@@ -34,8 +34,8 @@ export async function restoreDatabaseRecords(db: D1Database, content: ArrayBuffe
 
 function parseDatabaseBackup(content: ArrayBuffer): DatabaseBackupDocument {
 	let value: unknown;
-	try { value = JSON.parse(new TextDecoder().decode(content)); } catch { throw new Error("The selected file is not a valid Mailflare backup"); }
-	if (!isDatabaseBackupDocument(value)) throw new Error("The selected file is not a valid Mailflare backup");
+	try { value = JSON.parse(new TextDecoder().decode(content)); } catch { throw new Error("The selected file is not a valid CC Mail backup"); }
+	if (!isDatabaseBackupDocument(value)) throw new Error("The selected file is not a valid CC Mail backup");
 	return value;
 }
 

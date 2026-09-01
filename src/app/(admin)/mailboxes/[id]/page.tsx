@@ -114,12 +114,16 @@ export default function MailboxSettingsPage() {
           <CardTitle>Account</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 pt-5">
-          {mailbox.data ? (
+          {mailbox.data?.type === "shared" ? (
             <MailboxAvatarForm
               mailboxId={mailbox.data.id}
               hasAvatar={!!mailbox.data.hasAvatar}
               name={mailbox.data.displayName || mailbox.data.localPart}
             />
+          ) : mailbox.data ? (
+            <p className="rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-800">
+              This personal mailbox uses its owner&apos;s account profile picture.
+            </p>
           ) : (
             <Skeleton className="h-24 w-24 rounded-full" />
           )}
@@ -172,7 +176,7 @@ export default function MailboxSettingsPage() {
           <CardHeader className="py-0">
             <CardTitle>Shared access</CardTitle>
             <CardDescription>
-              Team members added here can read, send, organize, and manage mail in this inbox.
+              Members added here can read, send, organize, and manage mail in this inbox.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-5">
@@ -202,7 +206,7 @@ export default function MailboxSettingsPage() {
             ))}
             {sharedAccess.data && sharedAccess.data.members.length === 0 && (
               <p className="rounded-2xl bg-neutral-50 px-4 py-3 text-sm text-neutral-500">
-                No Team members have access yet.
+                No members have access yet.
               </p>
             )}
             {sharedAccess.isError && (

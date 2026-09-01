@@ -1,14 +1,12 @@
 <p align="center">
-  <img src="/public/icon-96.png" alt="Mailflare" width="72" />
+  <img src="/public/cc-mail-logo.png" alt="CC Mail" width="96" />
 </p>
 
-# Mailflare
+# CC Mail
 
-Mailflare is a self-hosted email inbox for custom domains, built on Cloudflare.
+CC Mail is a self-hosted email inbox for custom domains, built on Cloudflare.
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/hieunc229/mailflare)
-
-![Mailflare inbox](/screenshot.png)
+![CC Mail inbox](/screenshot.png)
 
 ## What you can do
 
@@ -23,25 +21,32 @@ Mailflare is a self-hosted email inbox for custom domains, built on Cloudflare.
 
 ## How it works
 
-Mailflare runs in your Cloudflare account. Email Routing delivers incoming messages to the app, while Cloudflare's email service handles outgoing messages. Your mail data stays in your own D1 database and attachments are stored in your own R2 bucket.
+CC Mail runs in your Cloudflare account. Email Routing delivers incoming messages to the app, while Cloudflare's email service handles outgoing messages. Your mail data stays in your own D1 database and attachments are stored in your own R2 bucket.
 
 ## How much does it cost?
 
-You can setup Mailflare and receive email for free
+You can set up CC Mail and receive email for free.
 
 A [Paid Worker](https://developers.cloudflare.com/workers/platform/pricing/) plan ($5/month) is required to send email (and it's recommend to have a smooth experience)
 
 ## Deploy
 
-The easiest way to get started is with the **Deploy to Cloudflare** button above. You will need:
+Deploy this repository from your controlled source checkout. You will need:
 
 - A Cloudflare account.
 - A domain managed by Cloudflare.
-- A Cloudflare API token that Mailflare can use to configure email routing.
+- A Cloudflare API token that CC Mail can use to configure email routing.
 
-After deployment, open your Mailflare URL and follow the first-run setup. The setup checks your Cloudflare configuration, creates the initial account, and helps you connect your first domain.
+Install dependencies, configure `wrangler.jsonc`, apply the migrations, and deploy:
 
-See the [deployment guide](docs/deployment.md) for required permissions, manual deployment, backups, updates, and custom Worker names.
+```bash
+npm install
+npm run deploy:with-migrations
+```
+
+After deployment, open your CC Mail URL and follow the first-run setup. The setup checks your Cloudflare configuration, creates the initial account, and helps you connect your first domain.
+
+See the [deployment guide](docs/deployment.md) for required permissions, deployment, backups, and custom Worker names.
 
 ## Local development
 
@@ -49,6 +54,7 @@ See the [deployment guide](docs/deployment.md) for required permissions, manual 
 cp .dev.vars.example .dev.vars
 npm install
 npm run db:migrate:local
+npm test
 npm run dev
 ```
 
@@ -62,4 +68,4 @@ Add your Cloudflare credentials to `.dev.vars`, then open [http://localhost:3000
 
 ## License
 
-See [LICENSE](LICENSE).
+CC Mail is based on Mailflare. See [LICENSE](LICENSE).

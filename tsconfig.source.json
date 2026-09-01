@@ -1,0 +1,15 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"incremental": false,
+		"plugins": []
+	},
+	"include": [
+		"next-env.d.ts",
+		"worker.ts",
+		"worker-utils.ts",
+		"src/**/*.ts",
+		"src/**/*.tsx"
+	],
+	"exclude": ["node_modules", ".next", ".open-next", ".wrangler"]
+}

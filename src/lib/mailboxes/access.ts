@@ -1,8 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import type { AppDatabase } from "@/db";
-import { domains, mailboxAccess, mailboxes } from "@/db/schema";
+import { domains, mailboxAccess, mailboxes, users } from "@/db/schema";
 import type { SessionUser } from "@/lib/auth/types";
-import { isTeamMailboxSharingEnabled } from "./access-utils";
 import type { MailboxAccessLevel, MailboxPermission } from "./types";
 
 const permissionRank: Record<MailboxPermission, number> = {
@@ -26,7 +25,7 @@ export async function getMailboxAccessLevel(
 
 	const isOwner = mailbox.userId === user.id;
 	if (isOwner) return buildAccess(mailbox, "full_access", true);
-	if (mailbox.type !== "shared" || !(await isTeamMailboxSharingEnabled(db))) return null;
+	if (mailbox.type !== "shared") return null;
 
 	const [delegatedAccess] = await db
 		.select({ permission: mailboxAccess.permission })
@@ -51,7 +50,8 @@ export async function listAccessibleMailboxes(db: AppDatabase, user: Pick<Sessio
 		autoReplySubject: mailboxes.autoReplySubject,
 		autoReplyBody: mailboxes.autoReplyBody,
 		useAllDomains: mailboxes.useAllDomains,
-			avatarKey: mailboxes.avatarKey,
+			mailboxAvatarKey: mailboxes.avatarKey,
+			ownerAvatarKey: users.avatarKey,
 			type: mailboxes.type,
 			disabled: mailboxes.disabled,
 			createdAt: mailboxes.createdAt,
@@ -59,19 +59,19 @@ export async function listAccessibleMailboxes(db: AppDatabase, user: Pick<Sessio
 		})
 		.from(mailboxes)
 		.innerJoin(domains, eq(mailboxes.domainId, domains.id))
+		.innerJoin(users, eq(mailboxes.userId, users.id))
 		.where(and(eq(mailboxes.userId, user.id), eq(mailboxes.disabled, false)));
 	const owned = ownedRows
 		.map((row) => {
-			const { avatarKey, ...mailbox } = row;
+			const { mailboxAvatarKey, ownerAvatarKey, ...mailbox } = row;
 			return {
 				...mailbox,
-				hasAvatar: !!avatarKey,
+				hasAvatar: row.type === "personal" ? !!ownerAvatarKey : !!mailboxAvatarKey,
 				permission: "full_access" as MailboxPermission,
 				isPrimary: `${row.localPart}@${row.hostname}` === user.email,
 			};
 		});
 
-	if (!(await isTeamMailboxSharingEnabled(db))) return owned;
 	const sharedRows = await db
 		.select({
 			id: mailboxes.id,

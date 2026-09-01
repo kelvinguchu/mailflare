@@ -1,21 +1,19 @@
 # Deployment and configuration
 
-This guide covers Cloudflare deployment, runtime configuration, database backups, and application updates.
+This guide covers Cloudflare deployment, runtime configuration, and database backups.
 
-## One-click deployment
+## Deployment
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/hieunc229/mailflare)
-
-The deployment flow reads `wrangler.jsonc`, provisions the required Worker bindings, builds the OpenNext Worker, applies D1 migrations, and deploys the app.
+Deploy from your controlled source checkout. The deployment flow reads `wrangler.jsonc`, provisions the required Worker bindings, builds the OpenNext Worker, applies D1 migrations, and deploys the app.
 
 Keep `wrangler.jsonc` committed. Do not commit `.dev.vars`; enter secrets during Cloudflare setup or keep them in a local `.dev.vars` file.
 
 ## Required configuration
 
-Mailflare needs these runtime values:
+CC Mail needs these runtime values:
 
 - `CF_TOKEN` — a scoped Cloudflare API token with Zone Read, Email Routing Edit, Email Sending Edit, and Email Routing Rules Write access for the domains you will connect. This is separate from the token Cloudflare uses to deploy the app.
-- `CF_EMAIL_WORKER_NAME` — the deployed Worker name. It must match the Worker name exactly so Mailflare can create Email Routing rules.
+- `CF_EMAIL_WORKER_NAME` — the deployed Worker name. It must match the Worker name exactly so CC Mail can create Email Routing rules.
 - `CF_AID` — the Cloudflare account ID. This is optional for normal mail use but required for database backups.
 
 You can use a legacy Global API Key instead of `CF_TOKEN` by setting both `CF_API_KEY` and `CF_EMAIL`.
@@ -30,7 +28,7 @@ Paste only the token value into `CF_TOKEN`; do not include `Bearer` and do not u
 
 ## First-run setup
 
-Open `/setup` after deployment. Mailflare checks the required runtime configuration and initializes an empty D1 database. It never applies later migrations to an existing database from the setup page.
+Open `/setup` after deployment. CC Mail checks the required runtime configuration and initializes an empty D1 database. It never applies later migrations to an existing database from the setup page.
 
 Use the normal migration command when updating an existing installation:
 
@@ -77,29 +75,6 @@ Backups require:
 - `D1_DATABASE_ID`
 - `D1_BACKUP_TOKEN`, or a `CF_TOKEN` that is also allowed to export the D1 database
 
-## Updating Mailflare
+## Updating CC Mail
 
-The **Update Mailflare** button in the admin dashboard dispatches `.github/workflows/update.yml` in the installation repository. The workflow merges the latest upstream source, applies pending D1 migrations, and pushes the updated source. A connected Cloudflare Git integration can then build and deploy the change.
-
-Configure these Worker values:
-
-- `GITHUB_UPDATE_TOKEN` — a fine-grained GitHub token for the installation repository with Actions write permission.
-- `GITHUB_UPDATE_REPO` — the installation repository in `owner/repository` format.
-- `GITHUB_UPDATE_REF` — an optional update branch. The repository's default branch is used when omitted.
-
-Configure these GitHub Actions repository secrets:
-
-- `CLOUDFLARE_API_TOKEN` — a Cloudflare token allowed to read and migrate D1.
-- `CLOUDFLARE_ACCOUNT_ID` — the Cloudflare account ID.
-- `MAILFLARE_UPSTREAM_TOKEN` — required only when the upstream repository is private.
-
-Optional repository variables:
-
-- `MAILFLARE_UPSTREAM_REPOSITORY` — the upstream repository. Defaults to `hieunc229/mailflare`.
-- `MAILFLARE_UPSTREAM_BRANCH` — the upstream branch. Defaults to `main`.
-
-If an older installation contains a failing updater, copy the latest `.github/workflows/update.yml` into that installation once. An updater that cannot read upstream cannot update its own workflow.
-
-## Branding license
-
-Activate a purchased Pro or Team key from **Admin → Licenses**. Mailflare sends the key to Paymug and stores only a one-way hash and the activation state. Apply all D1 migrations before activating a license.
+There is no automatic upstream updater. Review and merge chosen changes into your controlled repository, run the D1 migrations, test the application, and deploy from that repository. This prevents an upstream update from overwriting local customizations.

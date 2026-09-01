@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getDb } from "@/db";
-import { mailboxes } from "@/db/schema";
+import { mailboxes, users } from "@/db/schema";
 import { requireUser } from "@/lib/auth/cookies";
 import { getEnv } from "@/lib/cloudflare";
 import { getMailboxAccessLevel } from "@/lib/mailboxes/access";
@@ -22,13 +22,19 @@ export async function GET(request: Request, { params }: MailboxAvatarRouteParams
 	if (!access?.canRead) return new Response("Not found", { status: 404 });
 
 	const [mailbox] = await db
-		.select({ avatarKey: mailboxes.avatarKey })
+		.select({
+			avatarKey: mailboxes.avatarKey,
+			ownerAvatarKey: users.avatarKey,
+			type: mailboxes.type,
+		})
 		.from(mailboxes)
+		.innerJoin(users, eq(mailboxes.userId, users.id))
 		.where(eq(mailboxes.id, id))
 		.limit(1);
-	if (!mailbox?.avatarKey) return new Response("Not found", { status: 404 });
+	const avatarKey = mailbox?.type === "personal" ? mailbox.ownerAvatarKey : mailbox?.avatarKey;
+	if (!avatarKey) return new Response("Not found", { status: 404 });
 
-	const object = await env.BUCKET.get(mailbox.avatarKey);
+	const object = await env.BUCKET.get(avatarKey);
 	if (!object) return new Response("Not found", { status: 404 });
 
 	const headers = new Headers();
@@ -47,6 +53,12 @@ export async function POST(request: Request, { params }: MailboxAvatarRouteParam
 	const access = await getMailboxAccessLevel(db, user, id);
 	if (!access?.canManage) {
 		return NextResponse.json({ error: "Mailbox not found" }, { status: 404 });
+	}
+	if (access.mailbox.type === "personal") {
+		return NextResponse.json(
+			{ error: "Personal mailboxes use the account profile picture" },
+			{ status: 400 },
+		);
 	}
 
 	let form: FormData;

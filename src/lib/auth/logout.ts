@@ -1,14 +1,10 @@
-import { authFetch, clearClientSessionToken } from "@/lib/auth/client";
+import { authFetch, notifyAuthSessionChanged } from "@/lib/auth/client";
 
 export async function logoutClientSession(): Promise<void> {
-	try {
-		await authFetch("/api/auth/logout", {
-			method: "POST",
-			redirectOnUnauthorized: false,
-		});
-	} catch {
-		// Local logout must complete even when the server request is unavailable.
-	} finally {
-		clearClientSessionToken();
-	}
+	const response = await authFetch("/api/auth/logout", {
+		method: "POST",
+		redirectOnUnauthorized: false,
+	});
+	if (!response.ok) throw new Error("Could not log out");
+	notifyAuthSessionChanged(false);
 }

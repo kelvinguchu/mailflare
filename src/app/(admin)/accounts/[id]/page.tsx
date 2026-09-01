@@ -7,23 +7,30 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { ManagedAccount } from "./types";
+import type { ManagedAccount, ManagedMailbox } from "./types";
 import {
 	fetchManagedAccount,
+	fetchManagedMailboxes,
 	saveManagedAccount,
 	uploadManagedAccountAvatar,
+	updateManagedMailboxName,
 } from "./utils";
 
 export default function AccountDetailsPage() {
 	const { id } = useParams<{ id: string }>();
 	const [account, setAccount] = useState<ManagedAccount | null>(null);
+	const [mailboxes, setMailboxes] = useState<ManagedMailbox[]>([]);
 	const [saving, setSaving] = useState(false);
+	const [savingMailboxId, setSavingMailboxId] = useState<string | null>(null);
 	const [message, setMessage] = useState<string | null>(null);
 	const [avatarVersion, setAvatarVersion] = useState(0);
 
 	useEffect(() => {
-		void fetchManagedAccount(id)
-			.then(setAccount)
+		void Promise.all([fetchManagedAccount(id), fetchManagedMailboxes(id)])
+			.then(([nextAccount, nextMailboxes]) => {
+				setAccount(nextAccount);
+				setMailboxes(nextMailboxes);
+			})
 			.catch((error) => setMessage(error instanceof Error ? error.message : "Unable to load account"));
 	}, [id]);
 
@@ -49,6 +56,19 @@ export default function AccountDetailsPage() {
 			setAvatarVersion(Date.now());
 		} catch (error) {
 			setMessage(error instanceof Error ? error.message : "Unable to update avatar");
+		}
+	}
+
+	async function saveSenderName(mailbox: ManagedMailbox) {
+		setSavingMailboxId(mailbox.id);
+		setMessage(null);
+		try {
+			await updateManagedMailboxName(mailbox.id, mailbox.displayName?.trim() || mailbox.localPart);
+			setMessage(`Sender name updated for ${mailbox.localPart}@${mailbox.hostname}`);
+		} catch (error) {
+			setMessage(error instanceof Error ? error.message : "Unable to update sender name");
+		} finally {
+			setSavingMailboxId(null);
 		}
 	}
 
@@ -84,7 +104,7 @@ export default function AccountDetailsPage() {
 					<Label htmlFor="account-name">Name</Label>
 					<Input id="account-name" value={account.name} onChange={(event) => setAccount({ ...account, name: event.target.value })} />
 				</div>
-				{account.canForwardEmail && <div className="space-y-2">
+				<div className="space-y-2">
 					<Label htmlFor="forwarding-email">Forwarding email (optional)</Label>
 					<Input
 						id="forwarding-email"
@@ -96,7 +116,7 @@ export default function AccountDetailsPage() {
 					<p className="text-xs leading-5 text-neutral-500">
 						Incoming mail will also be sent to this verified Cloudflare Email Routing destination.
 					</p>
-				</div>}
+				</div>
 				<label className="flex items-center gap-3 text-sm">
 					<Checkbox checked={!account.disabled} onChange={(event) => setAccount({ ...account, disabled: !event.target.checked })} />
 					Account enabled
@@ -104,6 +124,33 @@ export default function AccountDetailsPage() {
 				<Button onClick={() => void saveDetails()} disabled={saving || !account.name.trim()}>
 					{saving ? "Saving..." : "Save details"}
 				</Button>
+			</section>
+			<section className="space-y-5 rounded-3xl bg-white p-6">
+				<div>
+					<h2 className="text-lg font-semibold text-neutral-900">Sender identities</h2>
+					<p className="mt-1 text-sm text-neutral-500">Only administrators can change the names recipients see.</p>
+				</div>
+				{mailboxes.length === 0 && <p className="text-sm text-neutral-500">No mailboxes are assigned to this account.</p>}
+				{mailboxes.map((mailbox) => {
+					const address = `${mailbox.localPart}@${mailbox.hostname}`;
+					return (
+						<div key={mailbox.id} className="space-y-3 rounded-2xl border border-neutral-100 p-4">
+							<div className="space-y-2">
+								<Label htmlFor={`sender-name-${mailbox.id}`}>Sender name for {address}</Label>
+								<Input
+									id={`sender-name-${mailbox.id}`}
+									value={mailbox.displayName ?? ""}
+									onChange={(event) => setMailboxes((items) => items.map((item) => item.id === mailbox.id ? { ...item, displayName: event.target.value } : item))}
+									maxLength={100}
+								/>
+								<p className="text-xs text-neutral-500">Preview: {mailbox.displayName?.trim() || mailbox.localPart} &lt;{address}&gt;</p>
+							</div>
+							<Button type="button" onClick={() => void saveSenderName(mailbox)} disabled={savingMailboxId === mailbox.id}>
+								{savingMailboxId === mailbox.id ? "Saving..." : "Save sender name"}
+							</Button>
+						</div>
+					);
+				})}
 			</section>
 			{message && <p className="text-sm text-neutral-500">{message}</p>}
 		</div>

@@ -16,16 +16,11 @@ export function AuthGuard({ children, mode = "protected", requireMailbox, requir
 
 		async function checkSession() {
 			try {
-				const cookieResponse = await fetch("/api/auth/me", {
+				const response = await authFetch("/api/auth/me", {
 					cache: "no-store",
+					redirectOnUnauthorized: false,
 					signal: AbortSignal.timeout(5_000),
 				});
-				const response = cookieResponse.ok || cookieResponse.status !== 401
-					? cookieResponse
-					: await authFetch("/api/auth/me", {
-						redirectOnUnauthorized: false,
-						signal: AbortSignal.timeout(5_000),
-					});
 				if (cancelled) return;
 
 				if (!response.ok) {

@@ -379,25 +379,9 @@ export const backupSettings = sqliteTable("backup_settings", {
 
 export const appSettings = sqliteTable("app_settings", {
 	id: text("id").primaryKey(),
-	appName: text("app_name").notNull().default("Mailflare"),
+	appName: text("app_name").notNull().default("CC Mail"),
+	companyName: text("company_name").notNull().default(""),
 	iconKey: text("icon_key"),
-	updatedAt: integer("updated_at", { mode: "timestamp" })
-		.notNull()
-		.$defaultFn(() => new Date()),
-});
-
-export const licenseSettings = sqliteTable("license_settings", {
-	id: text("id").primaryKey(),
-	instanceId: text("instance_id").notNull().unique(),
-	instanceUrl: text("instance_url"),
-	licenseKeyHash: text("license_key_hash"),
-	plan: text("plan", { enum: ["community", "pro", "team"] }).notNull().default("community"),
-	state: text("state", { enum: ["inactive", "active", "invalid", "expired", "deactivated"] })
-		.notNull()
-		.default("inactive"),
-	features: text("features").notNull().default("[]"),
-	activatedAt: integer("activated_at", { mode: "timestamp" }),
-	validatedAt: integer("validated_at", { mode: "timestamp" }),
 	updatedAt: integer("updated_at", { mode: "timestamp" })
 		.notNull()
 		.$defaultFn(() => new Date()),
@@ -450,5 +434,4 @@ export const schema = {
 	backupSettings,
 	backups,
 	appSettings,
-	licenseSettings,
 };

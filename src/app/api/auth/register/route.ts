@@ -5,7 +5,8 @@ import { getDb } from "@/db";
 import { mailboxes, users } from "@/db/schema";
 import { hashPassword } from "@/lib/auth/password";
 import { hasAdminAccount } from "@/lib/auth/setup";
-import { createSession, SESSION_COOKIE } from "@/lib/auth/session";
+import { createSession } from "@/lib/auth/session";
+import { createAuthenticatedResponse } from "@/lib/auth/http-response";
 import { newId } from "@/lib/ids";
 import { firstRunRegisterSchema } from "@/lib/validators";
 import { addDomainForUser } from "@/lib/domains/service";
@@ -80,14 +81,5 @@ export async function POST(request: Request) {
 	}
 
 	const token = await createSession(env, userId);
-	const response = NextResponse.json({ ok: true, token, redirect: "/inbox" });
-	response.headers.set("Cache-Control", "no-store");
-	response.cookies.set(SESSION_COOKIE, token, {
-		httpOnly: true,
-		secure: process.env.NODE_ENV === "production",
-		sameSite: "lax",
-		path: "/",
-		maxAge: 60 * 60 * 24 * 30,
-	});
-	return response;
+	return createAuthenticatedResponse(token, "/inbox");
 }

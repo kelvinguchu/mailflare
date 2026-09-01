@@ -12,10 +12,7 @@ import {
 	fetchMailboxOptions,
 	SELECTED_MAILBOX_STORAGE_KEY,
 } from "./mailbox-provider-utils";
-import {
-	AUTH_SESSION_CHANGED_EVENT,
-	getClientSessionToken,
-} from "@/lib/auth/client";
+import { AUTH_SESSION_CHANGED_EVENT } from "@/lib/auth/client";
 
 export type MailboxOption = {
 	id: string;
@@ -55,11 +52,10 @@ export function MailboxProvider({ children }: { children: ReactNode }) {
 
 	useEffect(() => {
 		let cancelled = false;
-		const sessionToken = getClientSessionToken();
 
 		fetchMailboxOptions()
 			.then((items) => {
-				if (cancelled || sessionToken !== getClientSessionToken()) return;
+				if (cancelled) return;
 				setMailboxes(items);
 
 				const storedId = localStorage.getItem(SELECTED_MAILBOX_STORAGE_KEY);
@@ -79,7 +75,7 @@ export function MailboxProvider({ children }: { children: ReactNode }) {
 			})
 			.catch(() => {})
 			.finally(() => {
-				if (!cancelled && sessionToken === getClientSessionToken()) setIsLoading(false);
+				if (!cancelled) setIsLoading(false);
 			});
 
 		return () => {

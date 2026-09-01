@@ -4,7 +4,8 @@ import { getEnv } from "@/lib/cloudflare";
 import { getDb } from "@/db";
 import { users } from "@/db/schema";
 import { verifyPassword } from "@/lib/auth/password";
-import { createSession, SESSION_COOKIE } from "@/lib/auth/session";
+import { createSession } from "@/lib/auth/session";
+import { createAuthenticatedResponse } from "@/lib/auth/http-response";
 import { loginSchema } from "@/lib/validators";
 import { allowLoginAttempt } from "@/lib/auth/rate-limit";
 import { verifyTurnstileToken } from "@/lib/auth/turnstile";
@@ -46,18 +47,5 @@ export async function POST(request: Request) {
 
 	const token = await createSession(env, user.id);
 	await recordAuthActivity(env, { action: "auth.login", userId: user.id, request });
-	const response = NextResponse.json({
-		ok: true,
-		token,
-		redirect: "/inbox",
-	});
-	response.headers.set("Cache-Control", "no-store");
-	response.cookies.set(SESSION_COOKIE, token, {
-		httpOnly: true,
-		secure: process.env.NODE_ENV === "production",
-		sameSite: "lax",
-		path: "/",
-		maxAge: 60 * 60 * 24 * 30,
-	});
-	return response;
+	return createAuthenticatedResponse(token, "/inbox");
 }

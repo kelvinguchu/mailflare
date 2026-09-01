@@ -14,7 +14,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
 		const nextBranding = await fetchBranding();
 		setBranding(nextBranding);
 		setIconVersion(Date.now());
-		if (document.title === "Mailflare" || document.title === branding.appName) {
+		if (document.title === "CC Mail" || document.title === branding.appName) {
 			document.title = nextBranding.appName;
 		}
 	}
@@ -26,7 +26,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
 	return (
 		<BrandingContext.Provider value={{
 			...branding,
-			iconUrl: branding.hasCustomIcon ? `/api/branding/icon?v=${iconVersion}` : "/icon-96.png",
+			iconUrl: branding.hasCustomIcon ? `/api/branding/icon?v=${iconVersion}` : "/cc-mail-logo.png",
 			refreshBranding,
 		}}>
 			{children}
@@ -37,7 +37,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
 export function useBranding() {
 	return useContext(BrandingContext) ?? {
 		...DEFAULT_BRANDING,
-		iconUrl: "/icon-96.png",
+		iconUrl: "/cc-mail-logo.png",
 		refreshBranding: async () => undefined,
 	};
 }

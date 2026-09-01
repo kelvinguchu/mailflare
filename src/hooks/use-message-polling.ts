@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import {
 	AUTH_SESSION_CHANGED_EVENT,
-	getClientSessionToken,
+	authFetch,
 } from "@/lib/auth/client";
+import type { AuthSessionChangedDetail } from "@/lib/auth/client-types";
 import type {
 	MessageRealtimeState,
 	NewMessageEvent,
@@ -27,6 +28,7 @@ export function useMessagePolling(): MessageRealtimeState {
 		let fallbackTimer: number | null = null;
 		let reconnectAttempt = 0;
 		let stopped = false;
+		let sessionActive = false;
 
 		function dispatchMessagesChanged() {
 			window.dispatchEvent(new Event("mailflare:messages-changed"));
@@ -49,8 +51,21 @@ export function useMessagePolling(): MessageRealtimeState {
 			);
 		}
 
-		function scheduleReconnect() {
-			if (stopped || !getClientSessionToken()) return;
+		async function scheduleReconnect() {
+			if (stopped || !sessionActive) return;
+			try {
+				const response = await authFetch("/api/auth/me", {
+					cache: "no-store",
+					redirectOnUnauthorized: false,
+				});
+				if (!response.ok) {
+					sessionActive = false;
+					return;
+				}
+			} catch {
+				// A transient network failure should use the normal reconnect backoff.
+			}
+			if (stopped || !sessionActive) return;
 			startFallbackRefresh();
 			const delay = getReconnectDelay(reconnectAttempt);
 			reconnectAttempt += 1;
@@ -59,7 +74,7 @@ export function useMessagePolling(): MessageRealtimeState {
 
 		function connect() {
 			clearConnectionTimers();
-			if (stopped || !getClientSessionToken()) return;
+			if (stopped || !sessionActive) return;
 
 			socket = new WebSocket(getRealtimeWebSocketUrl());
 			socket.onopen = () => {
@@ -77,10 +92,11 @@ export function useMessagePolling(): MessageRealtimeState {
 				showBrowserNewMessageNotification(event);
 			};
 			socket.onerror = () => socket?.close();
-			socket.onclose = scheduleReconnect;
+			socket.onclose = () => void scheduleReconnect();
 		}
 
-		function restartForSessionChange() {
+		function restartForSessionChange(event: Event) {
+			sessionActive = (event as CustomEvent<AuthSessionChangedDetail>).detail.authenticated;
 			if (socket) {
 				socket.onclose = null;
 				socket.close(1000, "Session changed");
@@ -89,11 +105,25 @@ export function useMessagePolling(): MessageRealtimeState {
 			clearConnectionTimers();
 			reconnectAttempt = 0;
 			setNotification(null);
-			if (getClientSessionToken()) connect();
+			if (sessionActive) connect();
+		}
+
+		async function connectForExistingSession() {
+			try {
+				const response = await authFetch("/api/auth/me", {
+					cache: "no-store",
+					redirectOnUnauthorized: false,
+				});
+				if (stopped || !response.ok) return;
+				sessionActive = true;
+				connect();
+			} catch {
+				// Public pages and temporary network failures do not need realtime polling.
+			}
 		}
 
 		window.addEventListener(AUTH_SESSION_CHANGED_EVENT, restartForSessionChange);
-		connect();
+		void connectForExistingSession();
 
 		return () => {
 			stopped = true;

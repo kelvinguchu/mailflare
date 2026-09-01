@@ -12,7 +12,7 @@ const MAXIMUM_DATA_WAIT = 10_000;
 
 export function LoadingTransition({ children, ready }: LoadingTransitionProps) {
 	const branding = useBranding();
-	const startedAt = useRef(Date.now());
+	const startedAt = useRef(0);
 	const [progress, setProgress] = useState(8);
 	const [loaderVisible, setLoaderVisible] = useState(true);
 	const [contentVisible, setContentVisible] = useState(false);
@@ -22,6 +22,10 @@ export function LoadingTransition({ children, ready }: LoadingTransitionProps) {
 	const [dataWaitExpired, setDataWaitExpired] = useState(false);
 	const loadingIds = useRef(new Set<string>());
 	const fetchingQueries = useIsFetching();
+
+	useEffect(() => {
+		startedAt.current = Date.now();
+	}, []);
 
 	const reportLoading = useCallback((id: string, loading: boolean) => {
 		if (loading) loadingIds.current.add(id);
@@ -89,9 +93,9 @@ export function LoadingTransition({ children, ready }: LoadingTransitionProps) {
 					<div className="flex w-64 flex-col items-center gap-6">
 						<img
 							src={iconUrl}
-							onError={() => setIconUrl("/icon-96.png")}
+							onError={() => setIconUrl("/cc-mail-logo.png")}
 							alt={`${branding.appName} icon`}
-							className="h-20 w-20 rounded-2xl object-contain"
+							className="h-20 w-36 object-contain"
 						/>
 						<div className="w-full">
 							<div className="h-1.5 overflow-hidden rounded-full bg-blue-100">

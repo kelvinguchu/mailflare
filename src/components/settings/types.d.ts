@@ -9,7 +9,6 @@ export type ProfileFormResponse = {
 		name: string;
 		resetEmail: string | null;
 		forwardingEmail: string | null;
-		canForwardEmail: boolean;
 	};
 	error?: unknown;
 };
@@ -20,7 +19,6 @@ export type AccountSettingsResponse = {
 		name: string;
 		resetEmail: string | null;
 		forwardingEmail: string | null;
-		canForwardEmail: boolean;
 	};
 	error?: unknown;
 };

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { authFetch, getClientSessionToken } from "@/lib/auth/client";
+import { authFetch } from "@/lib/auth/client";
 import { getHomeActions, heroMessages, sidebarItems } from "./utils";
 import { ArrowRight, Inbox, Mail, Search, ShieldCheck } from "lucide-react";
 import { useBranding } from "@/components/branding-provider";
@@ -14,7 +14,6 @@ export default function HomePage() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!getClientSessionToken()) return;
 
     authFetch("/api/auth/me", { redirectOnUnauthorized: false })
       .then((response) => {
@@ -39,10 +38,7 @@ export default function HomePage() {
           className="flex items-center gap-3"
           aria-label="Email Platform home"
         >
-          <img src={branding.iconUrl} height={32} width={32} alt="" />
-          <span className="text-base font-semibold tracking-tight">
-            {branding.appName}
-          </span>
+			<img src="/ccmail_logo_full.png" alt={branding.appName} className="h-9 w-auto max-w-44 object-contain object-left" />
         </Link>
 
         {/* <nav className="hidden items-center gap-6 text-sm font-medium text-neutral-600 md:flex">

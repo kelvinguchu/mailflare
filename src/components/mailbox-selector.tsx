@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CalendarDays, Check, LogOut, Settings, ShieldCheck, UserRound, UsersRound } from "lucide-react";
+import { CalendarDays, Check, LogOut, Settings, ShieldCheck, UsersRound } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSelectedMailbox } from "@/components/mailbox-provider";
 import { useMessageCounts } from "@/hooks/use-message-counts";
@@ -171,10 +171,14 @@ export function MailboxSelector() {
 		? mailboxAvatarUrls[selectedMailbox.id]
 		: undefined;
 	const selectedHasAvatar = selectedMailbox
-		? !!selectedMailbox.hasAvatar || !!selectedMailboxAvatarUrl
+		? selectedMailbox.type === "personal"
+			? hasAvatar
+			: !!selectedMailbox.hasAvatar || !!selectedMailboxAvatarUrl
 		: hasAvatar;
 	const selectedAvatarUrl = selectedMailbox
-		? selectedMailboxAvatarUrl ?? `/api/mailboxes/${selectedMailbox.id}/avatar`
+		? selectedMailbox.type === "personal"
+			? avatarUrl
+			: selectedMailboxAvatarUrl ?? `/api/mailboxes/${selectedMailbox.id}/avatar`
 		: avatarUrl;
 	const otherMailboxes = mailboxes.filter((mailbox) => mailbox.id !== selectedMailbox?.id);
 	const adminActive = isAdminPath(pathname);
@@ -265,7 +269,7 @@ export function MailboxSelector() {
 										key={mailbox.id}
 										mailbox={mailbox}
 										unread={mailboxCount?.unread ?? 0}
-										avatarUrl={mailboxAvatarUrls[mailbox.id]}
+										avatarUrl={mailbox.type === "personal" ? avatarUrl : mailboxAvatarUrls[mailbox.id]}
 										onSelect={() => {
 											setSelectedMailbox(mailbox);
 											setOpen(false);

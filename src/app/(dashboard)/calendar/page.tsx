@@ -16,6 +16,9 @@ type CalendarEvent = {
   attendees: string;
 };
 
+type CalendarEventsResponse = { events?: CalendarEvent[] };
+type CalendarEventResponse = { event?: CalendarEvent };
+
 export default function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [title, setTitle] = useState("");
@@ -32,7 +35,7 @@ export default function CalendarPage() {
     void authFetch(
       `/api/calendar/events?start=${start.toISOString()}&end=${end.toISOString()}`,
     )
-      .then((response) => response.json())
+			.then((response) => response.json() as Promise<CalendarEventsResponse>)
       .then((data) => setEvents(data.events ?? []));
   }, []);
   async function addEvent() {
@@ -57,8 +60,9 @@ export default function CalendarPage() {
         }),
       },
     );
-    const data = await response.json();
-    if (response.ok) {
+		const data = await response.json() as CalendarEventResponse;
+		if (response.ok && data.event) {
+			const savedEvent = data.event;
       setEvents((items) =>
         editing
           ? items.map((event) =>
@@ -74,7 +78,7 @@ export default function CalendarPage() {
                   }
                 : event,
             )
-          : [...items, data.event].sort((a, b) =>
+					: [...items, savedEvent].sort((a, b) =>
               a.startsAt.localeCompare(b.startsAt),
             ),
       );

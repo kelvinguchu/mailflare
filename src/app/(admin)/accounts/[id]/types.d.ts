@@ -6,7 +6,6 @@ export type ManagedAccount = {
 	disabled: boolean;
 	canManageMailboxes: boolean;
 	forwardingEmail: string | null;
-	canForwardEmail: boolean;
 	hasAvatar: boolean;
 };
 
@@ -30,13 +29,3 @@ export type DomainOption = ManagedDomain;
 export type AccountMailboxItem = ManagedMailbox;
 
 export type AccountDetailResponse = ManagedAccountResponse;
-
-export type AccountMailboxAccessItem = ManagedMailbox & {
-	mailboxId: string;
-	permission?: "read_only" | "send_as" | "send_on_behalf" | "full_access";
-};
-
-export type AccountMailboxAccessResponse = {
-	mailboxes: AccountMailboxAccessItem[];
-	error?: string;
-};

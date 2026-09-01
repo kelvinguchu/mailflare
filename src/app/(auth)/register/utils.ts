@@ -1,4 +1,4 @@
-import { persistAuthSession } from "@/lib/auth/client";
+import { readAuthSessionResponse } from "@/lib/auth/client";
 import type {
 	DomainSetupResult,
 	RegisterResult,
@@ -61,6 +61,6 @@ export async function submitRegistration(
 
 	return {
 		ok: res.ok,
-		data: (await persistAuthSession(res)) as RegisterResult,
+		data: (await readAuthSessionResponse(res)) as RegisterResult,
 	};
 }

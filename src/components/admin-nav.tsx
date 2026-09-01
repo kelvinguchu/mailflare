@@ -4,16 +4,16 @@ import {
   DatabaseBackup,
   Globe2,
   Activity,
+	KeyRound,
   Mail,
   Settings,
   Palette,
-  BadgeDollarSign,
   Users,
+	Webhook,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NavItem } from "./components-nav";
 import { SidebarFooter } from "./sidebar-footer";
-import { useBranding } from "./branding-provider";
 import { SidebarHeader } from "./sidebar-header";
 import { useSidebar } from "./sidebar-state";
 
@@ -41,26 +41,21 @@ const sections = [
     label: "Product",
     links: [
       { href: "/branding", label: "Branding", icon: Palette },
-      { href: "/licenses", label: "Licenses", icon: BadgeDollarSign },
-      // { href: "/api-keys", label: "API Keys", icon: KeyRound },
-      // { href: "/webhooks", label: "Webhooks", icon: Webhook }
+			{ href: "/api-keys", label: "API Keys", icon: KeyRound },
+			{ href: "/webhooks", label: "Webhooks", icon: Webhook },
     ],
   },
 ];
 
 export function AdminNav({ className }: { className?: string }) {
-  const branding = useBranding();
   const { minimal } = useSidebar();
 
   return (
     <nav className={cn("flex min-h-full flex-col gap-1", className)}>
-      <SidebarHeader href="/inbox" label="Admin" />
+      <SidebarHeader href="/inbox" />
       <div className={cn("space-y-4", minimal && "space-y-2")}>
         {sections.map((section) => {
-          const links = section.links.filter(
-            (link) =>
-              link.href !== "/branding" || branding.canCustomizeBranding,
-          );
+          const links = section.links;
           if (links.length === 0) return null;
 
           return (

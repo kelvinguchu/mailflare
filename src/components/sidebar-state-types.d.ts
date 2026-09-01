@@ -12,5 +12,4 @@ export type SidebarProviderProps = {
 
 export type SidebarHeaderProps = {
 	href: string;
-	label?: string;
 };

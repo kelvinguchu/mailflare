@@ -3,13 +3,12 @@ import { getDb } from "@/db";
 import { appSettings } from "@/db/schema";
 import { APP_SETTINGS_ID } from "@/lib/branding/service";
 import { getEnvAsync } from "@/lib/cloudflare";
-import { getLicenseEntitlements } from "@/lib/licenses/service";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 async function getDefaultIcon(env: CloudflareEnv): Promise<Response> {
-	const asset = await env.ASSETS.fetch("https://mailflare.local/icon-96.png");
+	const asset = await env.ASSETS.fetch("https://cc-mail.local/cc-mail-logo.png");
 	return new Response(await asset.arrayBuffer(), {
 		status: asset.status,
 		statusText: asset.statusText,
@@ -19,7 +18,6 @@ async function getDefaultIcon(env: CloudflareEnv): Promise<Response> {
 
 export async function GET(request: Request) {
 	const env = await getEnvAsync();
-	if (!(await getLicenseEntitlements(env)).canCustomizeBranding) return getDefaultIcon(env);
 	try {
 		const [settings] = await getDb(env)
 			.select({ iconKey: appSettings.iconKey })

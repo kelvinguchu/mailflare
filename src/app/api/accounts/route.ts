@@ -7,17 +7,18 @@ import { newId } from "@/lib/ids";
 import { createUserAccountSchema } from "@/lib/validators";
 import { ensureEmailRoutingRuleToWorker } from "@/lib/cloudflare-api";
 import { ensureMailboxDomainRouting } from "@/lib/mailboxes/domain-addresses";
+import { getBranding } from "@/lib/branding/service";
 import type { CreateUserAccountInput } from "./types";
 import {
 	accountListItemFromUser,
 	getDomainForAdmin,
 	getExistingMailbox,
 	listAccountsForAdmin,
-	requireTeamAdmin,
+	requireAdmin,
 } from "./utils";
 
 export async function GET(request: Request) {
-	const access = await requireTeamAdmin(request);
+	const access = await requireAdmin(request);
 	if (access.error) return access.error;
 	const rows = await listAccountsForAdmin(getDb(access.env));
 	return NextResponse.json({
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-	const access = await requireTeamAdmin(request);
+	const access = await requireAdmin(request);
 	if (access.error) return access.error;
 
 	const parsed = createUserAccountSchema.safeParse(await request.json());
@@ -40,6 +41,9 @@ export async function POST(request: Request) {
 	if (!domain) return NextResponse.json({ error: "Domain not found" }, { status: 404 });
 	const username = input.username.toLowerCase().trim();
 	const email = `${username}@${domain.hostname}`;
+	const name = input.name?.trim() || username;
+	const branding = await getBranding(access.env);
+	const senderName = input.senderName?.trim() || (branding.companyName ? `${name} from ${branding.companyName}` : name);
 	const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email)).limit(1);
 	if (existing) return NextResponse.json({ error: "Email already registered" }, { status: 409 });
 	const mailbox = await getExistingMailbox(db, domain.id, username);
@@ -54,7 +58,7 @@ export async function POST(request: Request) {
 				id: userId,
 				email,
 				passwordHash: hashPassword(input.password),
-				name: username,
+				name,
 				role: input.role,
 				createdByUserId: access.user!.id,
 			})
@@ -73,7 +77,7 @@ export async function POST(request: Request) {
 			userId,
 			domainId: domain.id,
 			localPart: username,
-			displayName: username,
+			displayName: senderName,
 		});
 		await ensureMailboxDomainRouting(access.env, db, { id: mailboxId, domainId: domain.id, localPart: username, useAllDomains: true });
 

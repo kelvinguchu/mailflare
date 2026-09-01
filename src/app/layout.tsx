@@ -14,16 +14,16 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-	title: "Mailflare",
-	description: "Multi-tenant email on Cloudflare",
-	icons: { icon: "/api/branding/icon" },
+	title: "CC Mail",
+	description: "CC Mail — business email powered by Cloudflare",
+	icons: { icon: "/favicon.ico" },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
 	return (
 		<html lang="en">
 			<head>
-				<link rel="icon" href="/api/branding/icon"></link>
+				<link rel="icon" href="/favicon.ico" type="image/x-icon"></link>
 			</head>
 			<body className={`${geistSans.variable} ${geistMono.variable} antialiased light`}>
 				<Providers>{children}</Providers>

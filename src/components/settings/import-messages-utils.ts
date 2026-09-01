@@ -1,4 +1,3 @@
-import { getAuthHeaders } from "@/lib/auth/client";
 import type { ImportMessagesResult, ImportProgressHandler } from "./import-messages-types";
 
 export async function importMessageFiles(
@@ -17,7 +16,7 @@ export async function importMessageFiles(
 	return new Promise((resolve, reject) => {
 		const request = new XMLHttpRequest();
 		request.open("POST", "/api/import/messages");
-		getAuthHeaders().forEach((value, key) => request.setRequestHeader(key, value));
+		request.withCredentials = true;
 		request.upload.onprogress = (event) => {
 			if (event.lengthComputable) onProgress?.(Math.round((event.loaded / event.total) * 70));
 		};

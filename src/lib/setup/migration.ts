@@ -19,6 +19,9 @@ const MIGRATION_NAMES = [
 	"0018_add_mailbox_domain_aliases.sql",
 	"0019_merge_message_bodies.sql",
 	"0020_add_calendar_templates_schedule.sql",
+	"0023_rebrand_default_app_name.sql",
+	"0024_rename_app_to_cc_mail.sql",
+	"0025_remove_license_settings.sql",
 ];
 
 const INITIAL_SCHEMA_SQL = `
@@ -65,8 +68,8 @@ INSERT OR IGNORE INTO backup_settings (id, enabled, schedule_type, retention_ena
 CREATE TABLE IF NOT EXISTS backups (id text PRIMARY KEY NOT NULL, status text DEFAULT 'queued' NOT NULL, trigger text NOT NULL, r2_key text, filename text, size integer, error text, created_by_user_id text REFERENCES users(id) ON DELETE set null, created_at integer NOT NULL, started_at integer, completed_at integer);
 CREATE INDEX IF NOT EXISTS backups_created_idx ON backups(created_at);
 CREATE INDEX IF NOT EXISTS backups_status_idx ON backups(status);
-CREATE TABLE IF NOT EXISTS app_settings (id text PRIMARY KEY NOT NULL, app_name text DEFAULT 'Mailflare' NOT NULL, icon_key text, updated_at integer NOT NULL);
-INSERT OR IGNORE INTO app_settings (id, app_name, updated_at) VALUES ('default', 'Mailflare', unixepoch());
+CREATE TABLE IF NOT EXISTS app_settings (id text PRIMARY KEY NOT NULL, app_name text DEFAULT 'CC Mail' NOT NULL, icon_key text, updated_at integer NOT NULL);
+INSERT OR IGNORE INTO app_settings (id, app_name, updated_at) VALUES ('default', 'CC Mail', unixepoch());
 CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL);
 `;
 
@@ -78,7 +81,7 @@ export async function migrateCleanDatabase(db: D1Database): Promise<boolean> {
 		const tableNames = new Set(existing.results.map((table) => table.name));
 		if (tableNames.has("users") && tableNames.has("domains")) return false;
 		throw new Error(
-			"The D1 database is not empty, but the Mailflare schema is incomplete. Apply the committed D1 migrations before continuing setup.",
+			"The D1 database is not empty, but the CC Mail schema is incomplete. Apply the committed D1 migrations before continuing setup.",
 		);
 	}
 

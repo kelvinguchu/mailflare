@@ -1,12 +1,12 @@
 # API and integrations
 
-Mailflare exposes APIs for domain management and sending email. Authentication and mailbox permissions still apply to these routes.
+CC Mail exposes APIs for domain management and sending email. Authentication and mailbox permissions still apply to these routes.
 
 ## Domain management
 
-Adding or removing a domain from Mailflare also updates Cloudflare Email Routing and sending resources.
+Adding or removing a domain from CC Mail also updates Cloudflare Email Routing and sending resources.
 
-| Mailflare route | Purpose |
+| CC Mail route | Purpose |
 | --- | --- |
 | `GET /api/domains` | List connected domains |
 | `POST /api/domains` | Connect a domain and configure Cloudflare |
@@ -40,6 +40,6 @@ The dashboard composer accepts up to 10 attachments, with a 10 MB limit per file
 
 ## Real-time updates
 
-Mailflare uses a Durable Object WebSocket hub to notify connected users after an inbound message is stored. Mailbox owners, the domain administrator, and delegated users receive events for mailboxes they can access.
+CC Mail uses a Durable Object WebSocket hub to notify connected users after an inbound message is stored. Mailbox owners, the domain administrator, and delegated users receive events for mailboxes they can access.
 
 The `REALTIME` binding and its migration are declared in `wrangler.jsonc`. When a WebSocket is temporarily unavailable, the app retries the connection and uses a slower refresh until it recovers.

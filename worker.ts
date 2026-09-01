@@ -1,4 +1,3 @@
-// @ts-ignore — generated at build time
 import { default as nextHandler } from "./.open-next/worker.js";
 import {
 	processInboundMessage,
@@ -32,7 +31,7 @@ export default {
 			}
 
 			const hub = env.REALTIME.getByName(user.id);
-			return hub.fetch(new Request("https://mailflare-realtime/connect", request));
+			return hub.fetch(new Request("https://cc-mail-realtime/connect", request));
 		}
 
 		return nextHandler.fetch(request, env, ctx);

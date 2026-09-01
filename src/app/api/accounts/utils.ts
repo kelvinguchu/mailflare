@@ -4,7 +4,6 @@ import type { getDb } from "@/db";
 import { domains, mailboxes, users } from "@/db/schema";
 import { assertAdmin } from "@/lib/auth/admin";
 import { requireUser } from "@/lib/auth/cookies";
-import { getLicenseEntitlements } from "@/lib/licenses/service";
 import { getEnv } from "@/lib/cloudflare";
 
 type Db = ReturnType<typeof getDb>;
@@ -68,18 +67,11 @@ export function accountListItemFromUser(user: {
 	};
 }
 
-export async function requireTeamAdmin(request: Request) {
+export async function requireAdmin(request: Request) {
 	const env = getEnv();
 	try {
 		const user = await requireUser(env, request);
 		assertAdmin(user);
-		if (!(await getLicenseEntitlements(env)).canManageAccounts) {
-			return {
-				env,
-				user,
-				error: NextResponse.json({ error: "A Team license is required to manage accounts" }, { status: 403 }),
-			};
-		}
 		return { env, user, error: null };
 	} catch {
 		return { env, user: null, error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };

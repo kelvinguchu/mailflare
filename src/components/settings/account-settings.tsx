@@ -72,8 +72,7 @@ export function AccountSettings() {
 				</CardContent>
 			</Card>
 
-			{user.canForwardEmail && (
-				<Card className="rounded-3xl border-0 bg-white px-6">
+			<Card className="rounded-3xl border-0 bg-white px-6">
 					<CardHeader>
 						<CardTitle>Forwarding email</CardTitle>
 						<CardDescription>Send a copy of incoming messages to another email address.</CardDescription>
@@ -81,8 +80,7 @@ export function AccountSettings() {
 					<CardContent className="pb-6">
 						<ForwardingEmailForm initialForwardingEmail={user.forwardingEmail ?? ""} />
 					</CardContent>
-				</Card>
-			)}
+			</Card>
 
 			<Card className="rounded-3xl border-0 bg-white px-6">
 				<CardHeader>

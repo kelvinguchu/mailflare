@@ -92,6 +92,8 @@ export const createUserAccountSchema = z.object({
 	username: z.string().trim().min(1).max(64).regex(/^[a-zA-Z0-9._%+-]+$/),
 	domainId: z.string().min(1),
 	password: z.string().min(8).max(128),
+	name: z.string().trim().min(1).max(100).optional(),
+	senderName: z.string().trim().min(1).max(100).optional(),
 	role: z.enum(["admin", "user"]).default("user"),
 });
 

@@ -21,9 +21,13 @@ export async function PUT(request: Request) {
 
 	const form = await request.formData();
 	const appName = String(form.get("appName") ?? "").trim();
+	const companyName = String(form.get("companyName") ?? "").trim();
 	const iconValue = form.get("icon");
 	if (!appName || appName.length > 60) {
 		return NextResponse.json({ error: "App name must be between 1 and 60 characters" }, { status: 400 });
+	}
+	if (companyName.length > 100) {
+		return NextResponse.json({ error: "Company name must be 100 characters or fewer" }, { status: 400 });
 	}
 	const icon = isBrandingIcon(iconValue) && iconValue.size > 0 ? iconValue : null;
 	if (icon && !BRANDING_ICON_TYPES.includes(icon.type)) {
@@ -34,10 +38,9 @@ export async function PUT(request: Request) {
 	}
 
 	try {
-		return NextResponse.json(await updateBranding(env, { appName, icon }));
+		return NextResponse.json(await updateBranding(env, { appName, companyName, icon }));
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "Unable to update branding";
-		const status = /license is required/i.test(message) ? 403 : 500;
-		return NextResponse.json({ error: message }, { status });
+		return NextResponse.json({ error: message }, { status: 500 });
 	}
 }

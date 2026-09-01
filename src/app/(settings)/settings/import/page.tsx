@@ -225,7 +225,7 @@ export default function SettingsImportPage() {
           </div>
           {/* <p className="text-xs leading-5 text-neutral-500">
             Select Folders to import every source IMAP folder into matching
-            Mailflare folders.
+            CC Mail folders.
           </p> */}
         </div>
         {/* </CardContent>
@@ -380,7 +380,7 @@ export default function SettingsImportPage() {
                 <p className="rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 text-xs leading-5 text-neutral-500">
                   IMAP imports selected source sections automatically. Folders
                   are discovered from the source account and imported into
-                  matching new or existing Mailflare folders.
+                  matching new or existing CC Mail folders.
                 </p>
                 <Button
                   type="submit"

@@ -1,6 +1,6 @@
 import type { BulkMessageAction } from "@/app/api/messages/bulk/types";
 import type { MessageDirection } from "@/hooks/types";
-import { IconNode } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 export type MessageActionsProps = {
 	messageId: string;
@@ -38,5 +38,5 @@ export type BlockMessageContactInput = {
 export type MoveMessageActionItem = {
 	action: BulkMessageAction;
 	label: string;
-	icon: any
+	icon: LucideIcon;
 };
