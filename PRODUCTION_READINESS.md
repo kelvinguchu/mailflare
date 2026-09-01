@@ -28,11 +28,11 @@ Status:
 
 ### 0.1 Create a recoverable source checkpoint
 
-- [ ] Review the current working tree and separate intentional CC Mail changes from generated or accidental files.
-- [ ] Confirm that no secrets are tracked.
-- [ ] Commit the current working application as a named baseline.
-- [ ] Push the baseline to a private remote or otherwise create an off-machine copy.
-- [ ] Tag the deployed baseline so its source can be matched to production.
+- [x] Review the current working tree and separate intentional CC Mail changes from generated or accidental files.
+- [x] Confirm that no secrets are tracked.
+- [x] Commit the current working application as a named baseline.
+- [x] Push the baseline to a private remote or otherwise create an off-machine copy.
+- [x] Tag the deployed baseline so its source can be matched to production.
 
 Acceptance criteria:
 
@@ -462,3 +462,4 @@ The migration should then preserve behavior first and improve architecture secon
 | Date | Item | Result | Verification |
 | --- | --- | --- | --- |
 | 2026-09-01 | Initial production-readiness assessment | Checklist created; no readiness item marked complete yet. | Source review, `npm run typecheck`, `npm run lint`, existing six tests, and dependency audit. |
+| 2026-09-01 | 0.1 — Recoverable source checkpoint | Reviewed customization committed and copied to a private GitHub repository. | Commit `8f4aaa9`; tag `cc-mail-baseline-2026-09-01`; private remote `kelvinguchu/cc-mail-calibercode`; real `.dev.vars` confirmed ignored; typecheck and six tests passed; lint completed with zero errors and 58 recorded warnings. |
