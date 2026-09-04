@@ -1,5 +1,6 @@
 import { default as nextHandler } from "./.open-next/worker.js";
 import {
+	createInboundDeliveryKey,
 	processInboundMessage,
 	storeRawToR2,
 	type InboundQueueMessage,
@@ -57,11 +58,14 @@ export default {
 					}
 				}
 			}
-			const rawR2Key = await storeRawToR2(env, message.from, message.to, message.raw);
+			const raw = await new Response(message.raw).arrayBuffer();
+			const deliveryKey = await createInboundDeliveryKey(message.from, message.to, raw);
+			const rawR2Key = await storeRawToR2(env, message.from, message.to, raw, deliveryKey);
 			const payload: InboundQueueMessage = {
 				from: message.from,
 				to: message.to,
 				rawR2Key,
+				deliveryKey,
 				headers: Object.fromEntries(message.headers),
 			};
 			await env.INBOUND_QUEUE.send(payload);

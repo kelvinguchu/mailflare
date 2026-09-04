@@ -141,10 +141,12 @@ Acceptance criteria:
 
 ### 2.3 Add inbound idempotency
 
-- [ ] Derive a stable delivery identity from Cloudflare delivery metadata and/or message content.
-- [ ] Add an appropriate uniqueness constraint.
-- [ ] Make attachment storage resumable or safely repeatable.
-- [ ] Ensure notification or webhook failure does not duplicate the stored message.
+Status: `[x]` Inbound deliveries now use a SHA-256 identity derived from the normalized SMTP envelope and raw message bytes, with deterministic R2 keys and one atomic D1 message/attachment batch.
+
+- [x] Derive a stable delivery identity from Cloudflare delivery metadata and/or message content.
+- [x] Add an appropriate uniqueness constraint.
+- [x] Make attachment storage resumable or safely repeatable.
+- [x] Ensure notification or webhook failure does not duplicate the stored message.
 
 Acceptance criteria:
 
@@ -472,3 +474,4 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-04 | 1.2 — Complete D1 backup coverage | Introduced backup format v2 with all 21 application tables, v1 normalization, schema and live-catalog drift guards, versioned filenames, and R2 format metadata. | Production version `7df1a716-20a3-49a7-b9ff-6b8e7fbad303`; 17 tests and typecheck passed; lint completed with zero errors and the same 58 warnings; Workflow `c0ed832b-6602-4783-a9df-5ffe03b14165` stored verified backup `bak_verify_v2_20260904` (17,211 bytes) in R2; production returned HTTP 200. |
 | 2026-09-04 | 1.4 — Failure-safe restore implementation | Added a 10 MiB limit, format/schema/value/R2 preflight checks, isolated staging tables, a pre-restore R2 recovery snapshot, one atomic live D1 batch, deliberate global session invalidation, and a recovery runbook. The item remains in progress until the full staging drill can run. | Production version `bd89a829-e388-48b2-9780-6d1c3ed8edab`; 21 tests and typecheck passed; lint completed with zero errors and the same 58 warnings; isolated OpenNext build and Wrangler dry run passed; production returned HTTP 200. |
 | 2026-09-04 | 1.3 — Independent R2 backup bundles | Added backup format v3 with per-backup copies of raw `.eml`, attachment, profile, mailbox and branding objects; size, ETag and available-checksum validation; whole-prefix retention/deletion; and R2 rollback from the pre-restore recovery bundle. Version 1 and 2 backups remain restorable through legacy live references. | Production version `fd6a1de2-dd9d-450d-bdbe-c38f54509c8a`; 27 tests, typecheck, lint, isolated OpenNext build and Wrangler dry run passed; Workflow `495d7fcb-dc6a-4be4-a78b-8c41f408dfc9` completed backup `bak_verify_v3_20260904` with a 27,561-byte manifest and five independent objects totaling 1,102,098 bytes; D1 recorded 1,129,659 bytes and production returned HTTP 200. No restore drill was run. |
+| 2026-09-04 | 2.3 — Inbound idempotency | Added a content-derived delivery identity independent of `Message-ID`, a nullable unique D1 constraint, deterministic raw and attachment R2 keys, atomic message/attachment inserts, legacy queue-payload compatibility and post-commit notification/webhook isolation. | Pre-migration backup `bak_pre_idempotency_20260904` completed with six independent R2 objects; migration `0027_add_inbound_delivery_key.sql` applied successfully; production version `e8d47ad1-b17c-46cf-8d73-5d594b5a6976`; 32 tests, typecheck, lint, isolated OpenNext build and Wrangler dry run passed; production returned HTTP 200. Duplicate replay was verified deterministically in tests; no synthetic email was inserted into the production inbox. |

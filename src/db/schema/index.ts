@@ -192,6 +192,7 @@ export const messages = sqliteTable(
 		textBody: text("text_body"),
 		htmlBody: text("html_body"),
 		rawR2Key: text("raw_r2_key"),
+		inboundDeliveryKey: text("inbound_delivery_key"),
 		status: text("status").notNull().default("received"),
 		read: integer("read", { mode: "boolean" }).notNull().default(false),
 		starred: integer("starred", { mode: "boolean" }).notNull().default(false),
@@ -205,6 +206,7 @@ export const messages = sqliteTable(
 		index("messages_user_created_idx").on(t.userId, t.createdAt),
 		index("messages_mailbox_idx").on(t.mailboxId),
 		index("messages_folder_idx").on(t.folderId),
+		uniqueIndex("messages_inbound_delivery_key_idx").on(t.inboundDeliveryKey),
 	],
 );
 
