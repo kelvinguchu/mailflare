@@ -3,6 +3,7 @@ import { getDb } from "@/db";
 import { backups, backupSettings } from "@/db/schema";
 import { newId } from "@/lib/ids";
 import type { BackupScheduleType } from "./types";
+import { deleteBackupBundle } from "./objects";
 import {
 	BACKUP_SETTINGS_ID,
 	getBackupWorkflowBinding,
@@ -112,7 +113,7 @@ export async function deleteBackup(env: CloudflareEnv, id: string): Promise<bool
 	if (backup.status === "queued" || backup.status === "running") {
 		throw new Error("A backup in progress cannot be deleted");
 	}
-	if (backup.r2Key) await env.BUCKET.delete(backup.r2Key);
+	await deleteBackupBundle(env.BUCKET, backup.id);
 	await db.delete(backups).where(eq(backups.id, id));
 	return true;
 }

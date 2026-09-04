@@ -2,14 +2,10 @@ import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloud
 import { and, eq, inArray, lt } from "drizzle-orm";
 import { getDb } from "@/db";
 import { backups } from "@/db/schema";
-import { exportDatabaseRecords } from "./export";
-import { DATABASE_BACKUP_FORMAT, DATABASE_BACKUP_VERSION } from "./format";
+import { createBackupBundle } from "./bundle";
+import { deleteBackupBundle } from "./objects";
 import { createScheduledBackupIfDue, getBackupSettings } from "./service";
 import type { BackupWorkflowParams } from "./types";
-import {
-	BACKUP_PREFIX,
-	createBackupFilename,
-} from "./utils";
 
 export class DatabaseBackupWorkflow extends WorkflowEntrypoint<CloudflareEnv, BackupWorkflowParams> {
 	async run(event: Readonly<WorkflowEvent<BackupWorkflowParams>>, step: WorkflowStep) {
@@ -32,20 +28,23 @@ export class DatabaseBackupWorkflow extends WorkflowEntrypoint<CloudflareEnv, Ba
 					.where(eq(backups.id, backupId));
 			});
 
-			const stored = await step.do("Store backup in R2", async () => {
-				const content = await exportDatabaseRecords(this.env.DB);
-				const filename = createBackupFilename(new Date());
-				const r2Key = `${BACKUP_PREFIX}/${backupId}/${filename}`;
-				const object = await this.env.BUCKET.put(r2Key, content, {
-					httpMetadata: { contentType: "application/json" },
-					customMetadata: {
-						backupId,
-						backupFormat: DATABASE_BACKUP_FORMAT,
-						backupVersion: String(DATABASE_BACKUP_VERSION),
-					},
-				});
-				return { filename, r2Key, size: object.size };
-			});
+			const stored = await step.do(
+				"Store backup bundle in R2",
+				{ timeout: "30 minutes" },
+				async () => {
+					const bundle = await createBackupBundle(this.env, backupId, {
+						purpose: "database-backup",
+					});
+					return {
+						filename: bundle.filename,
+						r2Key: bundle.r2Key,
+						size: bundle.totalSize,
+						manifestSize: bundle.manifestSize,
+						objectCount: bundle.objectCount,
+						objectSize: bundle.objectSize,
+					};
+				},
+			);
 
 			await step.do("Complete backup", async () => {
 				await getDb(this.env)
@@ -88,7 +87,7 @@ export class DatabaseBackupWorkflow extends WorkflowEntrypoint<CloudflareEnv, Ba
 				),
 			);
 		for (const backup of expired) {
-			if (backup.r2Key) await this.env.BUCKET.delete(backup.r2Key);
+			await deleteBackupBundle(this.env.BUCKET, backup.id);
 			await db.delete(backups).where(eq(backups.id, backup.id));
 		}
 		return { deleted: expired.length };

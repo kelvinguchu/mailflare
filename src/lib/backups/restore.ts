@@ -1,31 +1,28 @@
-import type { DatabaseBackupDocument, DatabaseBackupTable, DatabaseRecord } from "./types";
+import type {
+	DatabaseBackupDocument,
+	DatabaseBackupTable,
+	DatabaseRecord,
+	NormalizedDatabaseBackupDocument,
+} from "./types";
 import {
 	BACKUP_TABLES,
-	DATABASE_BACKUP_FORMAT,
-	DATABASE_BACKUP_VERSION,
 	MAX_DATABASE_RESTORE_BYTES,
 } from "./format";
 import {
 	assertDatabaseBackupCoverage,
-	exportDatabaseRecords,
 	parseDatabaseBackup,
 } from "./export";
-import { BACKUP_PREFIX } from "./utils";
+import { createBackupBundle } from "./bundle";
+import {
+	deleteBackupBundle,
+	restoreDatabaseBackupObjects,
+	rollbackDatabaseBackupObjects,
+	validateDatabaseBackupObjects,
+} from "./objects";
 
 const D1_MAX_BOUND_PARAMETERS = 100;
 const MAX_STAGING_INSERT_STATEMENTS = 700;
 const STAGING_BATCH_SIZE = 25;
-const R2_HEAD_CONCURRENCY = 6;
-const MAX_RESTORE_OBJECT_REFERENCES = 5_000;
-
-const R2_REFERENCE_COLUMNS = {
-	users: ["avatar_key"],
-	mailboxes: ["avatar_key"],
-	messages: ["raw_r2_key"],
-	message_attachments: ["r2_key"],
-	backups: ["r2_key"],
-	app_settings: ["icon_key"],
-} satisfies Partial<Record<DatabaseBackupTable, readonly string[]>>;
 
 export type TableColumn = {
 	name: string;
@@ -45,6 +42,7 @@ type RecoveryBackup = {
 	filename: string;
 	r2Key: string;
 	size: number;
+	document: DatabaseBackupDocument;
 };
 
 export type DatabaseRestoreResult = {
@@ -62,7 +60,7 @@ export async function restoreDatabaseRecords(
 	await assertDatabaseBackupCoverage(env.DB);
 	const tableColumns = await getLiveTableColumns(env.DB);
 	const selectedColumns = validateDatabaseBackupColumns(document, tableColumns);
-	await assertReferencedObjectsExist(env.BUCKET, document);
+	await validateDatabaseBackupObjects(env.BUCKET, document);
 
 	// This snapshot is made before staging or live mutation. It remains in R2
 	// and in backup history whether the restore transaction succeeds or fails.
@@ -72,16 +70,39 @@ export async function restoreDatabaseRecords(
 		BACKUP_TABLES.map((table) => [table, `_cc_restore_${restoreId}_${table}`]),
 	) as Record<DatabaseBackupTable, string>;
 
+	const mutatedObjectKeys: string[] = [];
 	try {
 		await createStagingTables(env.DB, stagingTables);
 		await loadStagingTables(env.DB, document, stagingTables, selectedColumns);
-		const finalStatements = createFinalRestoreStatements(
-			document,
-			stagingTables,
-			selectedColumns,
-			recovery,
-		);
-		await executeAtomicRestoreBatch(env.DB, finalStatements);
+		try {
+			await restoreDatabaseBackupObjects(
+				env.BUCKET,
+				document,
+				(sourceKey) => mutatedObjectKeys.push(sourceKey),
+			);
+			const finalStatements = createFinalRestoreStatements(
+				document,
+				stagingTables,
+				selectedColumns,
+				recovery,
+			);
+			await executeAtomicRestoreBatch(env.DB, finalStatements);
+		} catch (error) {
+			try {
+				await rollbackDatabaseBackupObjects(env.BUCKET, mutatedObjectKeys, recovery.document);
+			} catch (rollbackError) {
+				console.error(JSON.stringify({
+					event: "database_restore_object_rollback_failed",
+					recoveryBackupId: recovery.id,
+					error: rollbackError instanceof Error ? rollbackError.message : "Unknown rollback error",
+				}));
+				throw new Error(
+					`Restore failed and R2 rollback needs intervention. Recovery backup: ${recovery.id}`,
+					{ cause: error },
+				);
+			}
+			throw error;
+		}
 		return { recoveryBackupId: recovery.id, sessionsInvalidated: true };
 	} finally {
 		try {
@@ -115,7 +136,7 @@ async function getLiveTableColumns(
 }
 
 export function validateDatabaseBackupColumns(
-	document: DatabaseBackupDocument,
+	document: NormalizedDatabaseBackupDocument,
 	tableColumns: Record<DatabaseBackupTable, TableColumn[]>,
 ): Record<DatabaseBackupTable, string[]> {
 	const selected = {} as Record<DatabaseBackupTable, string[]>;
@@ -180,66 +201,29 @@ function invalidColumnTypeError(table: DatabaseBackupTable, column: string): Err
 	return new Error(`Backup contains an invalid value for ${table}.${column}`);
 }
 
-async function assertReferencedObjectsExist(bucket: R2Bucket, document: DatabaseBackupDocument): Promise<void> {
-	const keys = new Set<string>();
-	for (const [table, columns] of Object.entries(R2_REFERENCE_COLUMNS) as Array<[
-		DatabaseBackupTable,
-		readonly string[],
-	]>) {
-		for (const row of document.tables[table]) {
-			for (const column of columns) {
-				const value = row[column];
-				if (typeof value === "string" && value.length > 0) keys.add(value);
-			}
-		}
-	}
-
-	if (keys.size > MAX_RESTORE_OBJECT_REFERENCES) {
-		throw new Error(`Backup references too many R2 objects (maximum ${MAX_RESTORE_OBJECT_REFERENCES})`);
-	}
-	const objectKeys = [...keys];
-	const missing: string[] = [];
-	for (let index = 0; index < objectKeys.length; index += R2_HEAD_CONCURRENCY) {
-		const chunk = objectKeys.slice(index, index + R2_HEAD_CONCURRENCY);
-		const results = await Promise.all(chunk.map((key) => bucket.head(key)));
-		for (let resultIndex = 0; resultIndex < results.length; resultIndex += 1) {
-			if (!results[resultIndex]) missing.push(chunk[resultIndex] ?? "unknown");
-		}
-	}
-	if (missing.length > 0) {
-		const preview = missing.slice(0, 5).join(", ");
-		const remainder = missing.length > 5 ? ` and ${missing.length - 5} more` : "";
-		throw new Error(`Backup references missing R2 object(s): ${preview}${remainder}`);
-	}
-}
-
 async function createRecoveryBackup(
 	env: Pick<CloudflareEnv, "DB" | "BUCKET">,
 ): Promise<RecoveryBackup> {
 	const id = `bak_restore_${crypto.randomUUID().replaceAll("-", "")}`;
-	const timestamp = new Date().toISOString().replaceAll(":", "-").replaceAll(".", "-");
-	const filename = `cc-mail-v${DATABASE_BACKUP_VERSION}-pre-restore-${timestamp}.json`;
-	const r2Key = `${BACKUP_PREFIX}/${id}/${filename}`;
-	const content = await exportDatabaseRecords(env.DB);
-	const object = await env.BUCKET.put(r2Key, content, {
-		httpMetadata: { contentType: "application/json" },
-		customMetadata: {
-			backupId: id,
-			backupFormat: DATABASE_BACKUP_FORMAT,
-			backupVersion: String(DATABASE_BACKUP_VERSION),
-			backupPurpose: "pre-restore-recovery",
-		},
+	const bundle = await createBackupBundle(env, id, {
+		purpose: "pre-restore-recovery",
 	});
-	const recovery = { id, filename, r2Key, size: object.size };
+	const recovery = {
+		id,
+		filename: bundle.filename,
+		r2Key: bundle.r2Key,
+		size: bundle.totalSize,
+		document: bundle.document,
+	};
 	try {
 		await env.DB.prepare(recoveryBackupInsertSql()).bind(...recoveryBackupValues(recovery)).run();
 	} catch (error) {
 		try {
-			await env.BUCKET.delete(r2Key);
+			await deleteBackupBundle(env.BUCKET, id);
 		} catch (cleanupError) {
 			console.error(JSON.stringify({
-				event: "database_restore_recovery_object_cleanup_failed",
-				r2Key,
+				event: "database_restore_recovery_bundle_cleanup_failed",
+				backupId: id,
 				error: cleanupError instanceof Error ? cleanupError.message : "Unknown cleanup error",
 			}));
 		}
@@ -261,7 +245,7 @@ async function createStagingTables(
 
 async function loadStagingTables(
 	db: D1Database,
-	document: DatabaseBackupDocument,
+	document: NormalizedDatabaseBackupDocument,
 	stagingTables: Record<DatabaseBackupTable, string>,
 	selectedColumns: Record<DatabaseBackupTable, string[]>,
 ): Promise<void> {
@@ -288,7 +272,7 @@ async function loadStagingTables(
 }
 
 function createFinalRestoreStatements(
-	document: DatabaseBackupDocument,
+	document: NormalizedDatabaseBackupDocument,
 	stagingTables: Record<DatabaseBackupTable, string>,
 	selectedColumns: Record<DatabaseBackupTable, string[]>,
 	recovery: RecoveryBackup,

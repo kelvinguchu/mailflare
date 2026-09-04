@@ -82,11 +82,13 @@ Acceptance criteria:
 
 ### 1.3 Back up R2 objects
 
-- [ ] Define whether backups copy objects or store a complete manifest with an independent R2 versioning strategy.
-- [ ] Preserve raw inbound `.eml` objects.
-- [ ] Preserve attachments.
-- [ ] Preserve profile, mailbox and branding images.
-- [ ] Verify object checksums or sizes during backup and restore.
+Status: `[x]` Production backups now create independent object copies under each backup prefix and record them in a versioned manifest. Restore paths are unit-tested; the full staging restore drill remains tracked by 1.4.
+
+- [x] Define whether backups copy objects or store a complete manifest with an independent R2 versioning strategy.
+- [x] Preserve raw inbound `.eml` objects.
+- [x] Preserve attachments.
+- [x] Preserve profile, mailbox and branding images.
+- [x] Verify object checksums or sizes during backup and restore.
 
 Acceptance criteria:
 
@@ -469,3 +471,4 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-01 | 1.1 — Scheduled backup execution | Added a 02:00 UTC Cron Trigger, a scheduled Worker handler, UTC-date idempotency, structured logs, and administrator-visible failure records; enabled daily backups with 30-day retention. | Production version `4b9f94c6-7e9a-4f4c-aacb-911788cb38b4`; ten tests and typecheck passed; backup `bak_scheduled_2026-09-01` completed and wrote 15,767 bytes to R2; a repeated same-day invocation was skipped and D1 retained one scheduled record. |
 | 2026-09-04 | 1.2 — Complete D1 backup coverage | Introduced backup format v2 with all 21 application tables, v1 normalization, schema and live-catalog drift guards, versioned filenames, and R2 format metadata. | Production version `7df1a716-20a3-49a7-b9ff-6b8e7fbad303`; 17 tests and typecheck passed; lint completed with zero errors and the same 58 warnings; Workflow `c0ed832b-6602-4783-a9df-5ffe03b14165` stored verified backup `bak_verify_v2_20260904` (17,211 bytes) in R2; production returned HTTP 200. |
 | 2026-09-04 | 1.4 — Failure-safe restore implementation | Added a 10 MiB limit, format/schema/value/R2 preflight checks, isolated staging tables, a pre-restore R2 recovery snapshot, one atomic live D1 batch, deliberate global session invalidation, and a recovery runbook. The item remains in progress until the full staging drill can run. | Production version `bd89a829-e388-48b2-9780-6d1c3ed8edab`; 21 tests and typecheck passed; lint completed with zero errors and the same 58 warnings; isolated OpenNext build and Wrangler dry run passed; production returned HTTP 200. |
+| 2026-09-04 | 1.3 — Independent R2 backup bundles | Added backup format v3 with per-backup copies of raw `.eml`, attachment, profile, mailbox and branding objects; size, ETag and available-checksum validation; whole-prefix retention/deletion; and R2 rollback from the pre-restore recovery bundle. Version 1 and 2 backups remain restorable through legacy live references. | Production version `fd6a1de2-dd9d-450d-bdbe-c38f54509c8a`; 27 tests, typecheck, lint, isolated OpenNext build and Wrangler dry run passed; Workflow `495d7fcb-dc6a-4be4-a78b-8c41f408dfc9` completed backup `bak_verify_v3_20260904` with a 27,561-byte manifest and five independent objects totaling 1,102,098 bytes; D1 recorded 1,129,659 bytes and production returned HTTP 200. No restore drill was run. |

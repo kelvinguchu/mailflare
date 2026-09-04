@@ -38,11 +38,11 @@ describe("database backup format", () => {
 
 	it("puts the format version in new backup filenames", () => {
 		expect(createBackupFilename(new Date("2026-09-04T02:00:00.000Z"))).toBe(
-			"cc-mail-v2-2026-09-04T02-00-00-000Z.json",
+			"cc-mail-v3-2026-09-04T02-00-00-000Z.json",
 		);
 	});
 
-	it("normalizes legacy version 1 documents into version 2", () => {
+	it("normalizes legacy version 1 documents into the current format", () => {
 		const document = normalizeDatabaseBackupDocument({
 			format: DATABASE_BACKUP_FORMAT,
 			version: 1,
@@ -51,9 +51,37 @@ describe("database backup format", () => {
 		});
 
 		expect(document.version).toBe(DATABASE_BACKUP_VERSION);
+		expect(document.sourceVersion).toBe(1);
+		expect(document.r2.strategy).toBe("live-references");
 		expect(document.tables.auto_reply_deliveries).toEqual([]);
 		expect(document.tables.email_templates).toEqual([]);
 		expect(document.tables.calendar_events).toEqual([]);
+	});
+
+	it("keeps version 2 backups restorable through live R2 references", () => {
+		const document = normalizeDatabaseBackupDocument({
+			format: DATABASE_BACKUP_FORMAT,
+			version: 2,
+			createdAt: "2026-09-03T00:00:00.000Z",
+			tables: emptyTables(BACKUP_TABLES),
+		});
+
+		expect(document.version).toBe(DATABASE_BACKUP_VERSION);
+		expect(document.sourceVersion).toBe(2);
+		expect(document.r2.strategy).toBe("live-references");
+	});
+
+	it("accepts the current format with an independent R2 manifest", () => {
+		const document = normalizeDatabaseBackupDocument({
+			format: DATABASE_BACKUP_FORMAT,
+			version: DATABASE_BACKUP_VERSION,
+			createdAt: "2026-09-04T00:00:00.000Z",
+			tables: emptyTables(BACKUP_TABLES),
+			r2: { strategy: "independent-copies-v1", objects: [] },
+		});
+
+		expect(document.sourceVersion).toBe(DATABASE_BACKUP_VERSION);
+		expect(document.r2).toEqual({ strategy: "independent-copies-v1", objects: [] });
 	});
 
 	it("merges legacy message body rows while upgrading version 1", () => {
@@ -76,7 +104,7 @@ describe("database backup format", () => {
 		expect(() =>
 			normalizeDatabaseBackupDocument({
 				format: DATABASE_BACKUP_FORMAT,
-				version: 3,
+				version: DATABASE_BACKUP_VERSION + 1,
 				createdAt: "2026-09-01T00:00:00.000Z",
 				tables: emptyTables(BACKUP_TABLES),
 			}),

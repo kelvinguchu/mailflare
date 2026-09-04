@@ -21,8 +21,8 @@ export async function GET(
 		if (!object) return NextResponse.json({ error: "Backup file not found" }, { status: 404 });
 		return new Response(object.body, {
 			headers: {
-				"Content-Type": "application/sql",
-				"Content-Disposition": `attachment; filename="${backup.filename ?? `${backup.id}.sql`}"`,
+				"Content-Type": "application/json",
+				"Content-Disposition": `attachment; filename="${backup.filename ?? `${backup.id}.json`}"`,
 				"Content-Length": String(object.size),
 			},
 		});

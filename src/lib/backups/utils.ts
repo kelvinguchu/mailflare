@@ -45,7 +45,7 @@ export function createBackupFilename(now: Date): string {
 }
 
 /** Moves records from the pre-0019 body table into their message records. */
-export function mergeLegacyMessageBodies(document: DatabaseBackupDocument): void {
+export function mergeLegacyMessageBodies(document: Pick<DatabaseBackupDocument, "tables">): void {
 	const tables = document.tables as Record<string, DatabaseRecord[]>;
 	const bodyRows = tables.message_bodies;
 	if (!bodyRows) return;
