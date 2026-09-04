@@ -26,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { SkeletonRows } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { MAX_DATABASE_RESTORE_BYTES } from "@/lib/backups/format";
 import type { BackupItem, BackupSettings } from "./types";
 import {
   WEEKDAYS,
@@ -112,7 +113,12 @@ export default function BackupsPage() {
             onChange={(event) => {
               const file = event.target.files?.[0];
               event.target.value = "";
-              if (!file || !window.confirm("Restore this backup? This replaces all current database records and may sign you out.")) return;
+              if (!file) return;
+              if (file.size > MAX_DATABASE_RESTORE_BYTES) {
+                window.alert(`Backup files must be ${MAX_DATABASE_RESTORE_BYTES / (1024 * 1024)} MiB or smaller.`);
+                return;
+              }
+              if (!window.confirm("Restore this backup? CC Mail will first save a recovery copy, replace the database in one transaction, and sign out every user.")) return;
               restore.mutate(file);
             }}
           />

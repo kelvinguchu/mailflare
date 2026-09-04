@@ -8,8 +8,6 @@ import {
 } from "./format";
 import { mergeLegacyMessageBodies } from "./utils";
 
-const INSERT_BATCH_SIZE = 50;
-
 export function getD1ExportConfigurationStatus(_env?: CloudflareEnv) {
 	return { configured: true, missing: [] };
 }
@@ -30,21 +28,7 @@ export async function exportDatabaseRecords(db: D1Database): Promise<Uint8Array>
 	return new TextEncoder().encode(JSON.stringify(document));
 }
 
-export async function restoreDatabaseRecords(db: D1Database, content: ArrayBuffer): Promise<void> {
-	const document = parseDatabaseBackup(content);
-	validateDatabaseBackup(document);
-	await assertDatabaseBackupCoverage(db);
-	for (const table of [...BACKUP_TABLES].reverse()) await db.prepare(`DELETE FROM ${table}`).run();
-	for (const table of BACKUP_TABLES) {
-		const rows = document.tables[table];
-		for (let index = 0; index < rows.length; index += INSERT_BATCH_SIZE) {
-			const statements = rows.slice(index, index + INSERT_BATCH_SIZE).map((row) => createInsertStatement(db, table, row));
-			if (statements.length > 0) await db.batch(statements);
-		}
-	}
-}
-
-function parseDatabaseBackup(content: ArrayBuffer): DatabaseBackupDocument {
+export function parseDatabaseBackup(content: ArrayBuffer): DatabaseBackupDocument {
 	let value: unknown;
 	try { value = JSON.parse(new TextDecoder().decode(content)); } catch { throw new Error("The selected file is not a valid CC Mail backup"); }
 	return normalizeDatabaseBackupDocument(value);
@@ -86,24 +70,15 @@ export function normalizeDatabaseBackupDocument(value: unknown): DatabaseBackupD
 	return document;
 }
 
-function createInsertStatement(db: D1Database, table: DatabaseBackupTable, row: DatabaseRecord) {
-	const columns = Object.keys(row);
-	if (columns.length === 0) throw new Error(`Backup contains an invalid ${table} record`);
-	const placeholders = columns.map(() => "?").join(", ");
-	const identifiers = columns.map((column) => `\`${column.replaceAll("`", "``")}\``).join(", ");
-	return db.prepare(`INSERT INTO ${table} (${identifiers}) VALUES (${placeholders})`).bind(...columns.map((column) => row[column]));
-}
-
-function validateDatabaseBackup(document: DatabaseBackupDocument): void {
-	for (const table of BACKUP_TABLES) {
-		validateTableRows(table, document.tables[table]);
-	}
-}
-
 function validateTableRows(table: string, value: unknown): asserts value is DatabaseRecord[] {
 	if (!Array.isArray(value)) throw invalidBackupError();
 	for (const row of value) {
 		if (!isRecord(row)) throw new Error(`Backup contains an invalid ${table} record`);
+		for (const columnValue of Object.values(row)) {
+			if (columnValue !== null && typeof columnValue !== "string" && typeof columnValue !== "number") {
+				throw new Error(`Backup contains an invalid ${table} record`);
+			}
+		}
 	}
 }
 
@@ -115,7 +90,7 @@ function invalidBackupError(): Error {
 	return new Error("The selected file is not a valid CC Mail backup");
 }
 
-async function assertDatabaseBackupCoverage(db: D1Database): Promise<void> {
+export async function assertDatabaseBackupCoverage(db: D1Database): Promise<void> {
 	const result = await db
 		.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name")
 		.all<{ name: string }>();

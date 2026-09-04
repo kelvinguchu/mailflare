@@ -1,5 +1,6 @@
 export const DATABASE_BACKUP_FORMAT = "mailflare-database-backup";
 export const DATABASE_BACKUP_VERSION = 2 as const;
+export const MAX_DATABASE_RESTORE_BYTES = 10 * 1024 * 1024;
 
 // Keep this list in foreign-key insertion order. Restore deletes it in reverse.
 // The schema-coverage test requires every application table to have an entry.

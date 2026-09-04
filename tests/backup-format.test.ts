@@ -82,4 +82,18 @@ describe("database backup format", () => {
 			}),
 		).toThrow("not a valid CC Mail backup");
 	});
+
+	it("rejects non-scalar record values before restoration", () => {
+		const tables = emptyTables(BACKUP_TABLES);
+		tables.users = [{ id: "user_1", name: { nested: "value" } }];
+
+		expect(() =>
+			normalizeDatabaseBackupDocument({
+				format: DATABASE_BACKUP_FORMAT,
+				version: DATABASE_BACKUP_VERSION,
+				createdAt: "2026-09-04T00:00:00.000Z",
+				tables,
+			}),
+		).toThrow("invalid users record");
+	});
 });
