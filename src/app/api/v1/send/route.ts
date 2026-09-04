@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/cloudflare";
 import { authenticateApiKey, requireScope } from "@/lib/api/auth";
 import { sendEmailSchema } from "@/lib/validators";
-import { sendEmail } from "@/lib/email/send";
+import { queueEmail } from "@/lib/email/send";
 import { decodeBase64Content } from "@/lib/email/attachments";
 import { readJsonBody } from "@/lib/http/request";
 import { RequestBodyTooLargeError } from "@/lib/http/errors";
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
 	try {
 		const { attachments, ...fields } = parsed.data;
-		const result = await sendEmail(env, {
+		const result = await queueEmail(env, {
 			userId: auth.userId,
 			...fields,
 			attachments: attachments?.map((attachment) => ({
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
 				disposition: "attachment",
 			})),
 		});
-		return NextResponse.json(result);
+		return NextResponse.json(result, { status: 202 });
 	} catch (err) {
 		const message = err instanceof Error ? err.message : "Send failed";
 		return NextResponse.json({ error: message }, { status: getSendErrorStatus(message) });

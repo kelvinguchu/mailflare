@@ -6,7 +6,7 @@ Audit date: 2026-09-01
 
 Production: `https://mail.calibercode.io`
 
-Last reviewed deployment: `bd89a829-e388-48b2-9780-6d1c3ed8edab`
+Last reviewed deployment: `3edf3ebd-53e7-4e03-af55-8a5f4554bf60`
 
 ## How we will use this file
 
@@ -115,11 +115,13 @@ Acceptance criteria:
 
 ### 2.1 Make outbound sending genuinely asynchronous
 
-- [ ] Separate message creation from provider delivery.
-- [ ] Enqueue an outbound job instead of calling the provider synchronously from the API request.
-- [ ] Return a stable queued message ID to the browser and API client.
-- [ ] Make the queue consumer update the existing job rather than creating another message and job.
-- [ ] Define retryable versus permanent provider failures.
+Status: `[x]` Browser, API, calendar and auto-reply sends now persist one message/job, enqueue only the job reference and let the outbound consumer own provider delivery and final status.
+
+- [x] Separate message creation from provider delivery.
+- [x] Enqueue an outbound job instead of calling the provider synchronously from the API request.
+- [x] Return a stable queued message ID to the browser and API client.
+- [x] Make the queue consumer update the existing job rather than creating another message and job.
+- [x] Define retryable versus permanent provider failures.
 
 Acceptance criteria:
 
@@ -463,6 +465,7 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-01 | Personal mailboxes use the owner account avatar; shared mailboxes retain their own avatar. | Avoid duplicate avatar state and inconsistent rendering. |
 | 2026-09-01 | Reliability work precedes the TanStack Start migration. | Preserve a testable behavioral baseline and avoid migrating known delivery/recovery risks. |
 | 2026-09-04 | `_cf_KV`, `d1_migrations`, and `sqlite_sequence` are classified as database-owned rather than application backup data. | Cloudflare D1, the migration runner, and SQLite recreate or manage these tables; restoring application rows must not overwrite their state. |
+| 2026-09-04 | Outbound queue messages contain only a D1 job ID; provider delivery reads the durable message and R2 attachments in the consumer. | Keep queue payloads small, preserve a stable browser/API message ID and ensure one request creates one message and one job. |
 
 ## Progress log
 
@@ -475,3 +478,4 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-04 | 1.4 — Failure-safe restore implementation | Added a 10 MiB limit, format/schema/value/R2 preflight checks, isolated staging tables, a pre-restore R2 recovery snapshot, one atomic live D1 batch, deliberate global session invalidation, and a recovery runbook. The item remains in progress until the full staging drill can run. | Production version `bd89a829-e388-48b2-9780-6d1c3ed8edab`; 21 tests and typecheck passed; lint completed with zero errors and the same 58 warnings; isolated OpenNext build and Wrangler dry run passed; production returned HTTP 200. |
 | 2026-09-04 | 1.3 — Independent R2 backup bundles | Added backup format v3 with per-backup copies of raw `.eml`, attachment, profile, mailbox and branding objects; size, ETag and available-checksum validation; whole-prefix retention/deletion; and R2 rollback from the pre-restore recovery bundle. Version 1 and 2 backups remain restorable through legacy live references. | Production version `fd6a1de2-dd9d-450d-bdbe-c38f54509c8a`; 27 tests, typecheck, lint, isolated OpenNext build and Wrangler dry run passed; Workflow `495d7fcb-dc6a-4be4-a78b-8c41f408dfc9` completed backup `bak_verify_v3_20260904` with a 27,561-byte manifest and five independent objects totaling 1,102,098 bytes; D1 recorded 1,129,659 bytes and production returned HTTP 200. No restore drill was run. |
 | 2026-09-04 | 2.3 — Inbound idempotency | Added a content-derived delivery identity independent of `Message-ID`, a nullable unique D1 constraint, deterministic raw and attachment R2 keys, atomic message/attachment inserts, legacy queue-payload compatibility and post-commit notification/webhook isolation. | Pre-migration backup `bak_pre_idempotency_20260904` completed with six independent R2 objects; migration `0027_add_inbound_delivery_key.sql` applied successfully; production version `e8d47ad1-b17c-46cf-8d73-5d594b5a6976`; 32 tests, typecheck, lint, isolated OpenNext build and Wrangler dry run passed; production returned HTTP 200. Duplicate replay was verified deterministically in tests; no synthetic email was inserted into the production inbox. |
+| 2026-09-04 | 2.1 — Asynchronous outbound delivery | Split durable message/job creation from Email Service delivery; browser and API sends return `202` with stable message and job IDs; the consumer loads the existing D1 message and R2 attachments, updates that same job, retries transient provider failures up to four attempts and records permanent/exhausted failures without reclassifying webhook or audit errors as send failures. | Production version `3edf3ebd-53e7-4e03-af55-8a5f4554bf60`; Cloudflare Email Sending confirmed enabled for `calibercode.io`; 40 tests and typecheck passed; lint completed with zero errors and 57 pre-existing warnings; isolated OpenNext build and Wrangler dry run passed; production login returned HTTP 200; production had no legacy queued outbound jobs before deployment. No synthetic email was sent. |

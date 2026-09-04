@@ -3,7 +3,7 @@ import { getDb } from "@/db";
 import { autoReplyDeliveries, mailboxes } from "@/db/schema";
 import { formatEmailAddress, normalizeEmailAddress } from "@/lib/email/address";
 import { resolveInboundAddress } from "@/lib/email/routing";
-import { sendEmail } from "@/lib/email/send";
+import { queueEmail } from "@/lib/email/send";
 import { newId } from "@/lib/ids";
 import type { MailboxAutoReplyInput } from "./auto-reply-types";
 
@@ -52,7 +52,7 @@ export async function sendMailboxAutoReply(
 		headers.References = input.incomingMessageId;
 	}
 
-	await sendEmail(env, {
+	await queueEmail(env, {
 		userId: input.userId,
 		mailboxId: input.mailboxId,
 		from: formatEmailAddress(deliveredAddress, mailbox.displayName),

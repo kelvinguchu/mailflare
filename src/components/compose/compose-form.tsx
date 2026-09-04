@@ -189,7 +189,7 @@ export function ComposeForm({
 		setSubject("");
 		setText(applyMailboxSignature("", "", selectedMailbox?.signature));
 		setAttachments([]);
-		setToast({ type: "success", message: "Message sent" });
+		setToast({ type: "success", message: "Message queued" });
 		window.dispatchEvent(new Event("mailflare:messages-changed"));
 	}
 

@@ -5,10 +5,10 @@ import {
 	storeRawToR2,
 	type InboundQueueMessage,
 } from "./src/lib/email/inbound";
-import { processOutboundQueue, type OutboundQueueMessage } from "./src/lib/email/send";
+import { processOutboundQueue } from "./src/lib/email/send";
 import { getDb } from "./src/db";
 import { resolveInboundAddress } from "./src/lib/email/routing";
-import { isInboundQueueMessage } from "./worker-utils";
+import { isInboundQueueMessage, isOutboundQueueMessage } from "./worker-utils";
 import { getUserFromSession } from "./src/lib/auth/session";
 import { getSessionTokenFromRequest } from "./src/lib/realtime/utils";
 import {
@@ -84,8 +84,10 @@ export default {
 			try {
 				if (isInboundQueueMessage(msg.body)) {
 					await processInboundMessage(env, msg.body);
+				} else if (isOutboundQueueMessage(msg.body)) {
+					await processOutboundQueue(env, msg.body, { attempt: msg.attempts });
 				} else {
-					await processOutboundQueue(env, msg.body as OutboundQueueMessage);
+					console.error("Dropping malformed queue message", { id: msg.id });
 				}
 				msg.ack();
 			} catch (err) {

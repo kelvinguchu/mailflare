@@ -5,7 +5,7 @@ import { calendarEvents } from "@/db/schema";
 import { requireUser } from "@/lib/auth/cookies";
 import { getEnv } from "@/lib/cloudflare";
 import { createCalendarInvitation } from "@/lib/calendar/utils";
-import { sendEmail } from "@/lib/email/send";
+import { queueEmail } from "@/lib/email/send";
 import type { CalendarEventInput } from "../types";
 import type { CalendarEventRouteParams } from "./types";
 
@@ -23,7 +23,7 @@ export async function PATCH(request: Request, { params }: CalendarEventRoutePara
 	const attendees = (input.attendees ?? []).map((email) => email.trim()).filter((email) => /^\S+@\S+\.\S+$/.test(email));
 	const event = { ...existing, title: input.title.trim(), description: input.description?.trim() ?? "", location: input.location?.trim() ?? "", attendees: JSON.stringify(attendees), startsAt, endsAt };
 	await db.update(calendarEvents).set({ title: event.title, description: event.description, location: event.location, attendees: event.attendees, startsAt, endsAt, updatedAt: new Date() }).where(eq(calendarEvents.id, eventId));
-	if (attendees.length && existing.mailboxId && input.from) { const file = createCalendarInvitation({ ...event, uid: eventId }); await Promise.all(attendees.map((to) => sendEmail(env, { userId: user.id, mailboxId: existing.mailboxId!, from: input.from!, to, subject: `Updated invitation: ${event.title}`, text: event.description || `This event has been updated: ${event.title}.`, attachments: [{ filename: "invite.ics", type: "text/calendar; charset=utf-8", content: new Uint8Array(file).buffer }] }))); }
+	if (attendees.length && existing.mailboxId && input.from) { const file = createCalendarInvitation({ ...event, uid: eventId }); await Promise.all(attendees.map((to) => queueEmail(env, { userId: user.id, mailboxId: existing.mailboxId!, from: input.from!, to, subject: `Updated invitation: ${event.title}`, text: event.description || `This event has been updated: ${event.title}.`, attachments: [{ filename: "invite.ics", type: "text/calendar; charset=utf-8", content: new Uint8Array(file).buffer }] }))); }
 	return NextResponse.json({ ok: true });
 }
 
