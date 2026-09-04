@@ -5,7 +5,7 @@ import {
 	storeRawToR2,
 	type InboundQueueMessage,
 } from "./src/lib/email/inbound";
-import { processOutboundQueue } from "./src/lib/email/send";
+import { OutboundRetryError, processOutboundQueue } from "./src/lib/email/send";
 import { getDb } from "./src/db";
 import { resolveInboundAddress } from "./src/lib/email/routing";
 import { isInboundQueueMessage, isOutboundQueueMessage } from "./worker-utils";
@@ -92,7 +92,9 @@ export default {
 				msg.ack();
 			} catch (err) {
 				console.error("Queue processing failed", err);
-				msg.retry({ delaySeconds: 10 });
+				msg.retry({
+					delaySeconds: err instanceof OutboundRetryError ? err.delaySeconds : 10,
+				});
 			}
 		}
 	},

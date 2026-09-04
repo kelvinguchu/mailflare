@@ -8,10 +8,15 @@ import { createCalendarInvitation } from "@/lib/calendar/utils";
 import { queueEmail } from "@/lib/email/send";
 import type { CalendarEventInput } from "../types";
 import type { CalendarEventRouteParams } from "./types";
+import {
+	createScopedIdempotencyKey,
+	normalizeIdempotencyKey,
+} from "@/lib/email/outbound-idempotency";
 
 export async function PATCH(request: Request, { params }: CalendarEventRouteParams) {
 	const env = getEnv();
 	const user = await requireUser(env, request);
+	const idempotencyKey = normalizeIdempotencyKey(request.headers.get("Idempotency-Key"));
 	const { eventId } = await params;
 	const input = await request.json() as CalendarEventInput;
 	const startsAt = new Date(input.startsAt);
@@ -23,8 +28,8 @@ export async function PATCH(request: Request, { params }: CalendarEventRoutePara
 	const attendees = (input.attendees ?? []).map((email) => email.trim()).filter((email) => /^\S+@\S+\.\S+$/.test(email));
 	const event = { ...existing, title: input.title.trim(), description: input.description?.trim() ?? "", location: input.location?.trim() ?? "", attendees: JSON.stringify(attendees), startsAt, endsAt };
 	await db.update(calendarEvents).set({ title: event.title, description: event.description, location: event.location, attendees: event.attendees, startsAt, endsAt, updatedAt: new Date() }).where(eq(calendarEvents.id, eventId));
-	if (attendees.length && existing.mailboxId && input.from) { const file = createCalendarInvitation({ ...event, uid: eventId }); await Promise.all(attendees.map((to) => queueEmail(env, { userId: user.id, mailboxId: existing.mailboxId!, from: input.from!, to, subject: `Updated invitation: ${event.title}`, text: event.description || `This event has been updated: ${event.title}.`, attachments: [{ filename: "invite.ics", type: "text/calendar; charset=utf-8", content: new Uint8Array(file).buffer }] }))); }
-	return NextResponse.json({ ok: true });
+	if (attendees.length && existing.mailboxId && input.from) { const file = createCalendarInvitation({ ...event, uid: eventId, stamp: startsAt }); await Promise.all(attendees.map(async (to) => queueEmail(env, { userId: user.id, mailboxId: existing.mailboxId!, from: input.from!, to, subject: `Updated invitation: ${event.title}`, text: event.description || `This event has been updated: ${event.title}.`, attachments: [{ filename: "invite.ics", type: "text/calendar; charset=utf-8", content: new Uint8Array(file).buffer }] }, { idempotencyKey: await createScopedIdempotencyKey("calendar-update", user.id, eventId, idempotencyKey, to) }))); }
+	return NextResponse.json({ ok: true }, { headers: { "Idempotency-Key": idempotencyKey } });
 }
 
 export async function DELETE(_request: Request, { params }: CalendarEventRouteParams) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CalendarDays, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,7 @@ export default function CalendarPage() {
   const [guests, setGuests] = useState("");
   const [editing, setEditing] = useState<CalendarEvent | null>(null);
   const [pendingAction, setPendingAction] = useState<"save" | string | null>(null);
+  const pendingSaveKey = useRef<string | null>(null);
   const { selectedMailbox } = useSelectedMailbox();
   useEffect(() => {
     const start = new Date();
@@ -38,14 +39,22 @@ export default function CalendarPage() {
 			.then((response) => response.json() as Promise<CalendarEventsResponse>)
       .then((data) => setEvents(data.events ?? []));
   }, []);
+  useEffect(() => {
+    pendingSaveKey.current = null;
+  }, [editing?.id, endsAt, guests, selectedMailbox?.id, startsAt, title]);
   async function addEvent() {
     setPendingAction("save");
+    const idempotencyKey = pendingSaveKey.current ?? crypto.randomUUID();
+    pendingSaveKey.current = idempotencyKey;
     try {
     const response = await authFetch(
       editing ? `/api/calendar/events/${editing.id}` : "/api/calendar/events",
       {
         method: editing ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
         body: JSON.stringify({
           title,
           startsAt,
@@ -88,6 +97,7 @@ export default function CalendarPage() {
       setGuests("");
       setEditing(null);
       setAdding(false);
+      pendingSaveKey.current = null;
     }
     } finally {
       setPendingAction(null);

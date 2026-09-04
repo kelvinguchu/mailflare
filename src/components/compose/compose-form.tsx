@@ -40,6 +40,7 @@ export function ComposeForm({
 	const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const attachmentInput = useRef<HTMLInputElement | null>(null);
 	const previousSignature = useRef("");
+	const pendingSendKey = useRef<string | null>(null);
 
 	useEffect(() => {
 		if (!selectedMailbox && mailboxes.length === 1) setSelectedMailbox(mailboxes[0]);
@@ -129,6 +130,10 @@ export function ComposeForm({
 	}, [loadingDraft, selectedMailbox?.id, selectedMailbox?.signature]);
 
 	useEffect(() => {
+		pendingSendKey.current = null;
+	}, [attachments, fromAddr, subject, text, to]);
+
+	useEffect(() => {
 		const bodyContent = text.trim();
 		const signatureOnly = bodyContent === (selectedMailbox?.signature?.trim() ?? "");
 		const hasContent = to.trim() || subject.trim() || (bodyContent && !signatureOnly);
@@ -160,24 +165,36 @@ export function ComposeForm({
 	async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
 		setLoading(true);
-		const res = await authFetch("/api/send", {
-			method: "POST",
-			body: buildSendFormData({
-				attachments,
-				from: fromAddr,
-				to,
-				subject,
-				text,
-				mailboxId: selectedMailbox?.id,
-			}),
-		});
-		const data = (await res.json()) as { messageId?: string; error?: string };
+		const idempotencyKey = pendingSendKey.current ?? crypto.randomUUID();
+		pendingSendKey.current = idempotencyKey;
+		let res: Response;
+		let data: { messageId?: string; error?: string };
+		try {
+			res = await authFetch("/api/send", {
+				method: "POST",
+				headers: { "Idempotency-Key": idempotencyKey },
+				body: buildSendFormData({
+					attachments,
+					from: fromAddr,
+					to,
+					subject,
+					text,
+					mailboxId: selectedMailbox?.id,
+				}),
+			});
+			data = (await res.json()) as { messageId?: string; error?: string };
+		} catch {
+			setLoading(false);
+			setToast({ type: "error", message: "The send request failed. Retry to safely resume it." });
+			return;
+		}
 		setLoading(false);
 
 		if (!res.ok) {
 			setToast({ type: "error", message: data.error ?? "Send failed" });
 			return;
 		}
+		pendingSendKey.current = null;
 
 		if (draftId) {
 			void authFetch(`/api/drafts/${draftId}`, { method: "DELETE" }).finally(() => {

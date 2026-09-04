@@ -6,6 +6,7 @@ import { resolveInboundAddress } from "@/lib/email/routing";
 import { queueEmail } from "@/lib/email/send";
 import { newId } from "@/lib/ids";
 import type { MailboxAutoReplyInput } from "./auto-reply-types";
+import { createScopedIdempotencyKey } from "@/lib/email/outbound-idempotency";
 
 const autoReplyIntervalMs = 24 * 60 * 60 * 1000;
 
@@ -52,15 +53,26 @@ export async function sendMailboxAutoReply(
 		headers.References = input.incomingMessageId;
 	}
 
-	await queueEmail(env, {
-		userId: input.userId,
-		mailboxId: input.mailboxId,
-		from: formatEmailAddress(deliveredAddress, mailbox.displayName),
-		to: recipient,
-		subject: mailbox.autoReplySubject.trim() || "Out of office",
-		text: mailbox.autoReplyBody.trim(),
-		headers,
-	});
+	await queueEmail(
+		env,
+		{
+			userId: input.userId,
+			mailboxId: input.mailboxId,
+			from: formatEmailAddress(deliveredAddress, mailbox.displayName),
+			to: recipient,
+			subject: mailbox.autoReplySubject.trim() || "Out of office",
+			text: mailbox.autoReplyBody.trim(),
+			headers,
+		},
+		{
+			idempotencyKey: await createScopedIdempotencyKey(
+				"auto-reply",
+				input.userId,
+				input.mailboxId,
+				input.sourceMessageId,
+			),
+		},
+	);
 
 	await db
 		.insert(autoReplyDeliveries)

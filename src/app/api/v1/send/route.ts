@@ -7,6 +7,7 @@ import { decodeBase64Content } from "@/lib/email/attachments";
 import { readJsonBody } from "@/lib/http/request";
 import { RequestBodyTooLargeError } from "@/lib/http/errors";
 import { getSendErrorStatus } from "@/app/api/send/error-utils";
+import { IdempotencyConflictError } from "@/lib/email/outbound-idempotency";
 
 export async function POST(request: Request) {
 	const env = getEnv();
@@ -29,19 +30,27 @@ export async function POST(request: Request) {
 
 	try {
 		const { attachments, ...fields } = parsed.data;
-		const result = await queueEmail(env, {
-			userId: auth.userId,
-			...fields,
-			attachments: attachments?.map((attachment) => ({
-				filename: attachment.filename,
-				type: attachment.type,
-				content: decodeBase64Content(attachment.contentBase64),
-				disposition: "attachment",
-			})),
+		const result = await queueEmail(
+			env,
+			{
+				userId: auth.userId,
+				...fields,
+				attachments: attachments?.map((attachment) => ({
+					filename: attachment.filename,
+					type: attachment.type,
+					content: decodeBase64Content(attachment.contentBase64),
+					disposition: "attachment",
+				})),
+			},
+			{ idempotencyKey: request.headers.get("Idempotency-Key") },
+		);
+		return NextResponse.json(result, {
+			status: result.status === "queued" || result.status === "sending" ? 202 : 200,
+			headers: { "Idempotency-Key": result.idempotencyKey },
 		});
-		return NextResponse.json(result, { status: 202 });
 	} catch (err) {
 		const message = err instanceof Error ? err.message : "Send failed";
-		return NextResponse.json({ error: message }, { status: getSendErrorStatus(message) });
+		const status = err instanceof IdempotencyConflictError ? 409 : getSendErrorStatus(message);
+		return NextResponse.json({ error: message }, { status });
 	}
 }

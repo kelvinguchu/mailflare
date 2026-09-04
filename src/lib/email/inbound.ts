@@ -128,6 +128,7 @@ export async function processInboundMessage(
 				deliveredAddress,
 				fromAddress: fromAddr,
 				incomingMessageId: parsed.messageId,
+				sourceMessageId: committed.messageId,
 				headers: payload.headers,
 			});
 		} catch (error) {

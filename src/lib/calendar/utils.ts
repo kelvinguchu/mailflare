@@ -5,6 +5,7 @@ type CalendarInvitationInput = {
 	startsAt: Date;
 	endsAt: Date;
 	uid: string;
+	stamp?: Date;
 	method?: "REQUEST" | "CANCEL";
 };
 
@@ -17,6 +18,6 @@ function formatCalendarDate(value: Date): string {
 }
 
 export function createCalendarInvitation(input: CalendarInvitationInput): Uint8Array {
-	const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//CC Mail//Calendar//EN", "CALSCALE:GREGORIAN", `METHOD:${input.method ?? "REQUEST"}`, "BEGIN:VEVENT", `UID:${input.uid}@calibercode.io`, `DTSTAMP:${formatCalendarDate(new Date())}`, `DTSTART:${formatCalendarDate(input.startsAt)}`, `DTEND:${formatCalendarDate(input.endsAt)}`, `SUMMARY:${escapeCalendarText(input.title)}`, `DESCRIPTION:${escapeCalendarText(input.description)}`, `LOCATION:${escapeCalendarText(input.location)}`, "END:VEVENT", "END:VCALENDAR"];
+	const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//CC Mail//Calendar//EN", "CALSCALE:GREGORIAN", `METHOD:${input.method ?? "REQUEST"}`, "BEGIN:VEVENT", `UID:${input.uid}@calibercode.io`, `DTSTAMP:${formatCalendarDate(input.stamp ?? new Date())}`, `DTSTART:${formatCalendarDate(input.startsAt)}`, `DTEND:${formatCalendarDate(input.endsAt)}`, `SUMMARY:${escapeCalendarText(input.title)}`, `DESCRIPTION:${escapeCalendarText(input.description)}`, `LOCATION:${escapeCalendarText(input.location)}`, "END:VEVENT", "END:VCALENDAR"];
 	return new TextEncoder().encode(lines.join("\r\n"));
 }

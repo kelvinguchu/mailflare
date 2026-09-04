@@ -1,5 +1,6 @@
 export function getSendErrorStatus(message: string): number {
 	if (message === "Mailbox is required") return 400;
+	if (message.startsWith("Idempotency-Key must contain")) return 400;
 	if (
 		message === "Mailbox not found" ||
 		message === "Sender account not found" ||

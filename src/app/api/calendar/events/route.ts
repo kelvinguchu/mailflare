@@ -8,6 +8,10 @@ import { newId } from "@/lib/ids";
 import { queueEmail } from "@/lib/email/send";
 import { createCalendarInvitation } from "@/lib/calendar/utils";
 import type { CalendarEventInput } from "./types";
+import {
+	createScopedIdempotencyKey,
+	normalizeIdempotencyKey,
+} from "@/lib/email/outbound-idempotency";
 
 export async function GET(request: Request) {
 	const env = getEnv();
@@ -22,6 +26,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
 	const env = getEnv();
 	const user = await requireUser(env, request);
+	const idempotencyKey = normalizeIdempotencyKey(request.headers.get("Idempotency-Key"));
 	const input = await request.json() as CalendarEventInput;
 	const startsAt = new Date(input.startsAt);
 	const endsAt = new Date(input.endsAt);
@@ -30,8 +35,9 @@ export async function POST(request: Request) {
 	const event = { id: newId("evt"), userId: user.id, mailboxId: input.mailboxId ?? null, title: input.title.trim(), description: input.description?.trim() ?? "", location: input.location?.trim() ?? "", attendees: JSON.stringify(attendees), startsAt, endsAt };
 	await getDb(env).insert(calendarEvents).values(event);
 	if (attendees.length && input.mailboxId) {
-		const calendarFile = createCalendarInvitation({ ...event, uid: event.id });
-		await Promise.all(attendees.map((to) => queueEmail(env, { userId: user.id, mailboxId: input.mailboxId!, from: input.from ?? "", to, subject: `Invitation: ${event.title}`, text: event.description || `You are invited to ${event.title}.`, attachments: [{ filename: "invite.ics", type: "text/calendar; charset=utf-8", content: new Uint8Array(calendarFile).buffer }] })));
+		const calendarUid = await createScopedIdempotencyKey("calendar-event", user.id, idempotencyKey);
+		const calendarFile = createCalendarInvitation({ ...event, uid: calendarUid, stamp: startsAt });
+		await Promise.all(attendees.map(async (to) => queueEmail(env, { userId: user.id, mailboxId: input.mailboxId!, from: input.from ?? "", to, subject: `Invitation: ${event.title}`, text: event.description || `You are invited to ${event.title}.`, attachments: [{ filename: "invite.ics", type: "text/calendar; charset=utf-8", content: new Uint8Array(calendarFile).buffer }] }, { idempotencyKey: await createScopedIdempotencyKey("calendar-invite", user.id, idempotencyKey, to) })));
 	}
-	return NextResponse.json({ event });
+	return NextResponse.json({ event }, { headers: { "Idempotency-Key": idempotencyKey } });
 }

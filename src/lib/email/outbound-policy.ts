@@ -6,7 +6,8 @@ const RETRYABLE_EMAIL_ERROR_CODES = new Set([
 	"E_RATE_LIMIT_EXCEEDED",
 ]);
 
-export type OutboundFailureDisposition = "retryable" | "permanent";
+export type OutboundFailureDisposition = "retryable" | "permanent" | "ambiguous";
+export type OutboundFailureAction = "retry" | "failed" | "unknown";
 
 export function getOutboundErrorCode(error: unknown): string | null {
 	if (typeof error !== "object" || error === null || !("code" in error)) return null;
@@ -30,8 +31,9 @@ export function classifyOutboundFailure(error: unknown): OutboundFailureDisposit
 		if (status !== null && status >= 400) return "permanent";
 	}
 
-	// Unknown infrastructure failures are retried within the bounded queue policy.
-	return "retryable";
+	// Once provider delivery has started, an unclassified timeout may have happened
+	// after acceptance. Retrying it could send the same email twice.
+	return "ambiguous";
 }
 
 export function shouldRetryOutboundFailure(
@@ -40,4 +42,20 @@ export function shouldRetryOutboundFailure(
 	maxAttempts = MAX_OUTBOUND_DELIVERY_ATTEMPTS,
 ): boolean {
 	return classifyOutboundFailure(error) === "retryable" && attempt < maxAttempts;
+}
+
+export function decideOutboundFailure(
+	error: unknown,
+	attempt: number,
+	providerDeliveryStarted: boolean,
+	maxAttempts = MAX_OUTBOUND_DELIVERY_ATTEMPTS,
+): OutboundFailureAction {
+	const disposition = classifyOutboundFailure(error);
+	if (disposition === "permanent") return "failed";
+	if (providerDeliveryStarted && disposition === "ambiguous") return "unknown";
+	return attempt < maxAttempts ? "retry" : "failed";
+}
+
+export function getOutboundRetryDelaySeconds(attempt: number): number {
+	return Math.min(30 * (2 ** Math.max(0, attempt - 1)), 5 * 60);
 }

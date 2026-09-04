@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { messageAttachments, messages, outboundJobs } from "@/db/schema";
 import { newId } from "@/lib/ids";
@@ -10,9 +10,18 @@ import { createAuditLog } from "@/lib/mailboxes/audit";
 import { storeMessageAttachments, validateAttachments } from "@/lib/email/attachments";
 import type { AttachmentContent } from "@/lib/email/attachment-types";
 import {
+	decideOutboundFailure,
+	getOutboundRetryDelaySeconds,
 	getOutboundErrorCode,
-	shouldRetryOutboundFailure,
+	MAX_OUTBOUND_DELIVERY_ATTEMPTS,
 } from "@/lib/email/outbound-policy";
+import {
+	createOutboundRequestHash,
+	createStoredIdempotencyKey,
+	IdempotencyConflictError,
+	normalizeIdempotencyKey,
+} from "@/lib/email/outbound-idempotency";
+import { claimOutboundDelivery } from "@/lib/email/outbound-claim";
 
 export type SendEmailInput = {
 	userId: string;
@@ -29,7 +38,8 @@ export type SendEmailInput = {
 export type QueuedEmail = {
 	jobId: string;
 	messageId: string;
-	status: "queued";
+	status: "queued" | "sending" | "sent" | "failed";
+	idempotencyKey: string;
 };
 
 type StoredOutboundPayload = {
@@ -38,11 +48,38 @@ type StoredOutboundPayload = {
 
 export type OutboundQueueMessage = { jobId: string };
 
-export async function queueEmail(env: CloudflareEnv, input: SendEmailInput): Promise<QueuedEmail> {
+export class OutboundRetryError extends Error {
+	readonly delaySeconds: number;
+
+	constructor(jobId: string, attempt: number) {
+		super(`Retryable outbound delivery failure for ${jobId}`);
+		this.name = "OutboundRetryError";
+		this.delaySeconds = getOutboundRetryDelaySeconds(attempt);
+	}
+}
+
+export async function queueEmail(
+	env: CloudflareEnv,
+	input: SendEmailInput,
+	options?: { idempotencyKey?: string | null },
+): Promise<QueuedEmail> {
 	const db = getDb(env);
+	const idempotencyKey = normalizeIdempotencyKey(options?.idempotencyKey);
 	const sender = await getAuthorizedSenderAddress(env, input);
 	const attachments = input.attachments ?? [];
 	validateAttachments(attachments);
+	const storedIdempotencyKey = await createStoredIdempotencyKey(input.userId, idempotencyKey);
+	const requestHash = await createOutboundRequestHash({
+		...input,
+		from: sender.fromAddr,
+		mailboxId: sender.mailboxId,
+		attachments,
+	});
+	const existing = await findOutboundJobByIdempotencyKey(env, input.userId, storedIdempotencyKey);
+	if (existing) {
+		return acceptExistingOutboundJob(env, existing, requestHash, idempotencyKey);
+	}
+
 	await upsertContactFromAddress(env, {
 		userId: input.userId,
 		address: input.to,
@@ -74,22 +111,20 @@ export async function queueEmail(env: CloudflareEnv, input: SendEmailInput): Pro
 			messageId,
 			status: "queued",
 			payload: JSON.stringify({ headers: input.headers } satisfies StoredOutboundPayload),
+			idempotencyKey: storedIdempotencyKey,
+			requestHash,
 		});
 	} catch (error) {
 		await Promise.allSettled(storedAttachments.map((attachment) => env.BUCKET.delete(attachment.r2Key)));
 		await db.delete(messages).where(eq(messages.id, messageId));
+		const raced = await findOutboundJobByIdempotencyKey(env, input.userId, storedIdempotencyKey);
+		if (raced) return acceptExistingOutboundJob(env, raced, requestHash, idempotencyKey);
 		throw error;
 	}
 
-	try {
-		await env.OUTBOUND_QUEUE.send({ jobId } satisfies OutboundQueueMessage);
-	} catch (err) {
-		const error = describeOutboundError(err);
-		await markOutboundFailed(env, jobId, messageId, error);
-		throw err;
-	}
+	await enqueueOutboundJob(env, jobId);
 
-	return { jobId, messageId, status: "queued" };
+	return { jobId, messageId, status: "queued", idempotencyKey };
 }
 
 export async function processOutboundQueue(
@@ -103,7 +138,11 @@ export async function processOutboundQueue(
 		console.error("Dropping outbound queue message for an unknown job", { jobId: payload.jobId });
 		return;
 	}
-	if (job.status !== "queued") return;
+	if (job.status === "sent" || job.status === "failed") return;
+	if (job.status === "sending") {
+		await handleInFlightReplay(env, job, options.attempt);
+		return;
+	}
 	if (!job.messageId) {
 		await db
 			.update(outboundJobs)
@@ -130,7 +169,14 @@ export async function processOutboundQueue(
 	try {
 		attachments = await loadOutboundAttachments(env, message.id);
 	} catch (error) {
-		await handleDeliveryFailure(env, job.id, message, error, options.attempt);
+		await handlePreDeliveryFailure(env, job.id, message, error, options.attempt);
+		return;
+	}
+
+	const claimed = await claimOutboundDelivery(env.DB, job.id);
+	if (!claimed) {
+		const [current] = await db.select().from(outboundJobs).where(eq(outboundJobs.id, job.id)).limit(1);
+		if (current?.status === "sending") await handleInFlightReplay(env, current, options.attempt);
 		return;
 	}
 
@@ -146,7 +192,7 @@ export async function processOutboundQueue(
 			attachments: attachments.map(toEmailServiceAttachment),
 		});
 	} catch (error) {
-		await handleDeliveryFailure(env, job.id, message, error, options.attempt);
+		await handleProviderFailure(env, job.id, message, error, options.attempt);
 		return;
 	}
 
@@ -177,6 +223,57 @@ export async function processOutboundQueue(
 	]);
 	if (sideEffects.some((result) => result.status === "rejected")) {
 		console.error("Outbound post-delivery side effect failed", { jobId: job.id });
+	}
+}
+
+type OutboundJob = typeof outboundJobs.$inferSelect;
+
+async function findOutboundJobByIdempotencyKey(
+	env: CloudflareEnv,
+	userId: string,
+	idempotencyKey: string,
+): Promise<OutboundJob | null> {
+	const [job] = await getDb(env)
+		.select()
+		.from(outboundJobs)
+		.where(and(
+			eq(outboundJobs.userId, userId),
+			eq(outboundJobs.idempotencyKey, idempotencyKey),
+		))
+		.limit(1);
+	return job ?? null;
+}
+
+async function acceptExistingOutboundJob(
+	env: CloudflareEnv,
+	job: OutboundJob,
+	requestHash: string,
+	idempotencyKey: string,
+): Promise<QueuedEmail> {
+	if (!job.requestHash || job.requestHash !== requestHash) throw new IdempotencyConflictError();
+	if (!job.messageId) throw new Error("The existing outbound job has no message");
+	if (job.status === "queued") await enqueueOutboundJob(env, job.id);
+	return {
+		jobId: job.id,
+		messageId: job.messageId,
+		status: job.status,
+		idempotencyKey,
+	};
+}
+
+async function enqueueOutboundJob(env: CloudflareEnv, jobId: string): Promise<void> {
+	try {
+		await env.OUTBOUND_QUEUE.send({ jobId } satisfies OutboundQueueMessage);
+		await getDb(env)
+			.update(outboundJobs)
+			.set({ error: null, updatedAt: new Date() })
+			.where(and(eq(outboundJobs.id, jobId), eq(outboundJobs.status, "queued")));
+	} catch (error) {
+		await getDb(env)
+			.update(outboundJobs)
+			.set({ error: "Outbound queue enqueue failed", updatedAt: new Date() })
+			.where(and(eq(outboundJobs.id, jobId), eq(outboundJobs.status, "queued")));
+		throw error;
 	}
 }
 
@@ -232,7 +329,7 @@ function parseStoredOutboundPayload(payload: string): StoredOutboundPayload {
 	return { headers: headers as Record<string, string> };
 }
 
-async function handleDeliveryFailure(
+async function handlePreDeliveryFailure(
 	env: CloudflareEnv,
 	jobId: string,
 	message: typeof messages.$inferSelect,
@@ -240,13 +337,66 @@ async function handleDeliveryFailure(
 	attempt: number,
 ): Promise<void> {
 	const description = describeOutboundError(error);
-	if (shouldRetryOutboundFailure(error, attempt)) {
+	if (decideOutboundFailure(error, attempt, false) === "retry") {
 		await getDb(env)
 			.update(outboundJobs)
 			.set({ error: description, updatedAt: new Date() })
 			.where(eq(outboundJobs.id, jobId));
-		throw new Error(`Retryable outbound delivery failure for ${jobId}`);
+		throw new OutboundRetryError(jobId, attempt);
 	}
+
+	await recordFinalOutboundFailure(env, jobId, message, description);
+}
+
+async function handleProviderFailure(
+	env: CloudflareEnv,
+	jobId: string,
+	message: typeof messages.$inferSelect,
+	error: unknown,
+	attempt: number,
+): Promise<void> {
+	const action = decideOutboundFailure(error, attempt, true);
+	if (action === "retry") {
+		await getDb(env)
+			.update(outboundJobs)
+			.set({
+				status: "queued",
+				deliveryStartedAt: null,
+				error: describeOutboundError(error),
+				updatedAt: new Date(),
+			})
+			.where(and(eq(outboundJobs.id, jobId), eq(outboundJobs.status, "sending")));
+		throw new OutboundRetryError(jobId, attempt);
+	}
+
+	const description = action === "unknown"
+		? "E_DELIVERY_OUTCOME_UNKNOWN"
+		: describeOutboundError(error);
+	await recordFinalOutboundFailure(env, jobId, message, description);
+}
+
+async function handleInFlightReplay(
+	env: CloudflareEnv,
+	job: OutboundJob,
+	attempt: number,
+): Promise<void> {
+	const startedAt = job.deliveryStartedAt?.getTime() ?? 0;
+	const withinGracePeriod = startedAt > 0 && Date.now() - startedAt < 60_000;
+	if (withinGracePeriod && attempt < MAX_OUTBOUND_DELIVERY_ATTEMPTS) {
+		throw new OutboundRetryError(job.id, attempt);
+	}
+	if (job.messageId) {
+		const [message] = await getDb(env).select().from(messages).where(eq(messages.id, job.messageId)).limit(1);
+		if (message) await recordFinalOutboundFailure(env, job.id, message, "E_DELIVERY_OUTCOME_UNKNOWN");
+	}
+}
+
+async function recordFinalOutboundFailure(
+	env: CloudflareEnv,
+	jobId: string,
+	message: typeof messages.$inferSelect,
+	description: string,
+): Promise<void> {
 
 	await markOutboundFailed(env, jobId, message.id, description);
 	const webhookResult = await Promise.allSettled([

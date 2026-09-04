@@ -232,23 +232,33 @@ export const messageAttachments = sqliteTable(
 	(t) => [index("message_attachments_message_idx").on(t.messageId)],
 );
 
-export const outboundJobs = sqliteTable("outbound_jobs", {
-	id: text("id").primaryKey(),
-	userId: text("user_id")
-		.notNull()
-		.references(() => users.id, { onDelete: "cascade" }),
-	messageId: text("message_id").references(() => messages.id, { onDelete: "set null" }),
-	status: text("status", { enum: ["queued", "sent", "failed"] }).notNull().default("queued"),
-	payload: text("payload").notNull(),
-	error: text("error"),
-	scheduledAt: integer("scheduled_at", { mode: "timestamp" }),
-	createdAt: integer("created_at", { mode: "timestamp" })
-		.notNull()
-		.$defaultFn(() => new Date()),
-	updatedAt: integer("updated_at", { mode: "timestamp" })
-		.notNull()
-		.$defaultFn(() => new Date()),
-});
+export const outboundJobs = sqliteTable(
+	"outbound_jobs",
+	{
+		id: text("id").primaryKey(),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		messageId: text("message_id").references(() => messages.id, { onDelete: "set null" }),
+		status: text("status", { enum: ["queued", "sending", "sent", "failed"] })
+			.notNull()
+			.default("queued"),
+		payload: text("payload").notNull(),
+		idempotencyKey: text("idempotency_key"),
+		requestHash: text("request_hash"),
+		deliveryStartedAt: integer("delivery_started_at", { mode: "timestamp" }),
+		attemptCount: integer("attempt_count").notNull().default(0),
+		error: text("error"),
+		scheduledAt: integer("scheduled_at", { mode: "timestamp" }),
+		createdAt: integer("created_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
+		updatedAt: integer("updated_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
+	},
+	(t) => [uniqueIndex("outbound_jobs_user_idempotency_key_idx").on(t.userId, t.idempotencyKey)],
+);
 
 export const emailTemplates = sqliteTable(
 	"email_templates",
