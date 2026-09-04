@@ -1,3 +1,9 @@
+import type {
+	BACKUP_TABLES,
+	DATABASE_BACKUP_FORMAT,
+	DATABASE_BACKUP_VERSION,
+} from "./format";
+
 export type BackupScheduleType = "daily" | "weekly" | "monthly";
 
 export type BackupWorkflowParams = {
@@ -12,6 +18,11 @@ export type BackupWorkflowBinding = {
 	}): Promise<unknown>;
 };
 
-export type DatabaseBackupTable = "users" | "domains" | "mailboxes" | "mailbox_access" | "contacts" | "folders" | "api_keys" | "messages" | "message_attachments" | "outbound_jobs" | "routing_rules" | "webhooks" | "webhook_deliveries" | "sessions" | "audit_logs" | "backup_settings" | "backups" | "app_settings";
+export type DatabaseBackupTable = (typeof BACKUP_TABLES)[number];
 export type DatabaseRecord = Record<string, string | number | null>;
-export type DatabaseBackupDocument = { format: "mailflare-database-backup"; version: 1; createdAt: string; tables: Record<DatabaseBackupTable, DatabaseRecord[]>; };
+export type DatabaseBackupDocument = {
+	format: typeof DATABASE_BACKUP_FORMAT;
+	version: typeof DATABASE_BACKUP_VERSION;
+	createdAt: string;
+	tables: Record<DatabaseBackupTable, DatabaseRecord[]>;
+};

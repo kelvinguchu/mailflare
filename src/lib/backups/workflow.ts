@@ -3,6 +3,7 @@ import { and, eq, inArray, lt } from "drizzle-orm";
 import { getDb } from "@/db";
 import { backups } from "@/db/schema";
 import { exportDatabaseRecords } from "./export";
+import { DATABASE_BACKUP_FORMAT, DATABASE_BACKUP_VERSION } from "./format";
 import { createScheduledBackupIfDue, getBackupSettings } from "./service";
 import type { BackupWorkflowParams } from "./types";
 import {
@@ -37,7 +38,11 @@ export class DatabaseBackupWorkflow extends WorkflowEntrypoint<CloudflareEnv, Ba
 				const r2Key = `${BACKUP_PREFIX}/${backupId}/${filename}`;
 				const object = await this.env.BUCKET.put(r2Key, content, {
 					httpMetadata: { contentType: "application/json" },
-					customMetadata: { backupId },
+					customMetadata: {
+						backupId,
+						backupFormat: DATABASE_BACKUP_FORMAT,
+						backupVersion: String(DATABASE_BACKUP_VERSION),
+					},
 				});
 				return { filename, r2Key, size: object.size };
 			});

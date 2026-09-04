@@ -73,6 +73,8 @@ The Worker checks the automatic-backup settings at 02:00 UTC each day. Enable au
 
 Backup data is read through the `DB` binding and written through the `BUCKET` binding. No Cloudflare API token is required for the backup itself.
 
+Backup format version 2 includes every table registered in the application schema. `_cf_KV`, `d1_migrations`, and `sqlite_sequence` are excluded because Cloudflare D1, the migration runner, and SQLite own them. Before each export, CC Mail rejects any D1 table that has not been classified as application data or database bookkeeping.
+
 ## Updating CC Mail
 
 There is no automatic upstream updater. Review and merge chosen changes into your controlled repository, run the D1 migrations, test the application, and deploy from that repository. This prevents an upstream update from overwriting local customizations.

@@ -6,7 +6,7 @@ Audit date: 2026-09-01
 
 Production: `https://mail.calibercode.io`
 
-Last reviewed deployment: `02fd0835-785a-4125-a41d-fec1460cf801`
+Last reviewed deployment: `7df1a716-20a3-49a7-b9ff-6b8e7fbad303`
 
 ## How we will use this file
 
@@ -69,11 +69,11 @@ Acceptance criteria:
 
 ### 1.2 Include all D1 application data
 
-- [ ] Add `calendar_events` to the backup format.
-- [ ] Add `email_templates` to the backup format.
-- [ ] Add `auto_reply_deliveries` to the backup format.
-- [ ] Compare the backup table list automatically against the application schema.
-- [ ] Version the backup format so future schema changes remain restorable.
+- [x] Add `calendar_events` to the backup format.
+- [x] Add `email_templates` to the backup format.
+- [x] Add `auto_reply_deliveries` to the backup format.
+- [x] Compare the backup table list automatically against the application schema.
+- [x] Version the backup format so future schema changes remain restorable.
 
 Acceptance criteria:
 
@@ -456,6 +456,7 @@ The migration should then preserve behavior first and improve architecture secon
 | --- | --- | --- |
 | 2026-09-01 | Personal mailboxes use the owner account avatar; shared mailboxes retain their own avatar. | Avoid duplicate avatar state and inconsistent rendering. |
 | 2026-09-01 | Reliability work precedes the TanStack Start migration. | Preserve a testable behavioral baseline and avoid migrating known delivery/recovery risks. |
+| 2026-09-04 | `_cf_KV`, `d1_migrations`, and `sqlite_sequence` are classified as database-owned rather than application backup data. | Cloudflare D1, the migration runner, and SQLite recreate or manage these tables; restoring application rows must not overwrite their state. |
 
 ## Progress log
 
@@ -464,3 +465,4 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-01 | Initial production-readiness assessment | Checklist created; no readiness item marked complete yet. | Source review, `npm run typecheck`, `npm run lint`, existing six tests, and dependency audit. |
 | 2026-09-01 | 0.1 — Recoverable source checkpoint | Reviewed customization committed and copied to a private GitHub repository. | Commit `8f4aaa9`; tag `cc-mail-baseline-2026-09-01`; private remote `kelvinguchu/cc-mail-calibercode`; real `.dev.vars` confirmed ignored; typecheck and six tests passed; lint completed with zero errors and 58 recorded warnings. |
 | 2026-09-01 | 1.1 — Scheduled backup execution | Added a 02:00 UTC Cron Trigger, a scheduled Worker handler, UTC-date idempotency, structured logs, and administrator-visible failure records; enabled daily backups with 30-day retention. | Production version `4b9f94c6-7e9a-4f4c-aacb-911788cb38b4`; ten tests and typecheck passed; backup `bak_scheduled_2026-09-01` completed and wrote 15,767 bytes to R2; a repeated same-day invocation was skipped and D1 retained one scheduled record. |
+| 2026-09-04 | 1.2 — Complete D1 backup coverage | Introduced backup format v2 with all 21 application tables, v1 normalization, schema and live-catalog drift guards, versioned filenames, and R2 format metadata. | Production version `7df1a716-20a3-49a7-b9ff-6b8e7fbad303`; 17 tests and typecheck passed; lint completed with zero errors and the same 58 warnings; Workflow `c0ed832b-6602-4783-a9df-5ffe03b14165` stored verified backup `bak_verify_v2_20260904` (17,211 bytes) in R2; production returned HTTP 200. |

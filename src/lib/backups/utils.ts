@@ -1,4 +1,5 @@
 import type { BackupScheduleType, BackupWorkflowBinding, DatabaseBackupDocument, DatabaseRecord } from "./types";
+import { DATABASE_BACKUP_VERSION } from "./format";
 
 export const BACKUP_SETTINGS_ID = "default";
 export const BACKUP_PREFIX = "backups/database";
@@ -40,7 +41,7 @@ export function getScheduledBackupRecordId(now: Date): string {
 }
 
 export function createBackupFilename(now: Date): string {
-	return `cc-mail-${now.toISOString().replace(/[:.]/g, "-")}.json`;
+	return `cc-mail-v${DATABASE_BACKUP_VERSION}-${now.toISOString().replace(/[:.]/g, "-")}.json`;
 }
 
 /** Moves records from the pre-0019 body table into their message records. */
