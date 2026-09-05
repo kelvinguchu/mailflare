@@ -16,6 +16,11 @@ import {
 	MAILFLARE_FORWARDED_HEADER,
 } from "./src/lib/email/account-forwarding";
 import { runScheduledBackup } from "./src/lib/backups/scheduler";
+import {
+	captureDeadLetterMessage,
+	captureFinalOutboundFailure,
+} from "./src/lib/queues/dead-letters";
+import { getDeadLetterSource } from "./src/lib/queues/dead-letter-policy";
 export { RealtimeHub } from "./src/lib/realtime/hub";
 export { DatabaseBackupWorkflow } from "./src/lib/backups/workflow";
 
@@ -80,22 +85,55 @@ export default {
 	},
 
 	async queue(batch: MessageBatch, env: CloudflareEnv): Promise<void> {
+		const deadLetterSource = getDeadLetterSource(batch.queue);
 		for (const msg of batch.messages) {
 			try {
-				if (isInboundQueueMessage(msg.body)) {
+				if (deadLetterSource) {
+					await captureDeadLetterMessage(env, batch.queue, msg);
+				} else if (isInboundQueueMessage(msg.body)) {
 					await processInboundMessage(env, msg.body);
 				} else if (isOutboundQueueMessage(msg.body)) {
 					await processOutboundQueue(env, msg.body, { attempt: msg.attempts });
+					await captureFinalOutboundFailure(env, batch.queue, {
+						id: msg.id,
+						timestamp: msg.timestamp,
+						attempts: msg.attempts,
+						body: msg.body,
+					});
 				} else {
-					console.error("Dropping malformed queue message", { id: msg.id });
+					console.error(JSON.stringify({
+						event: "queue_message_malformed",
+						queue: batch.queue,
+						messageId: msg.id,
+					}));
 				}
 				msg.ack();
 			} catch (err) {
-				console.error("Queue processing failed", err);
+				console.error(JSON.stringify({
+					event: deadLetterSource ? "dead_letter_persistence_failed" : "queue_processing_failed",
+					queue: batch.queue,
+					messageId: msg.id,
+					attempt: msg.attempts,
+					errorCode: getQueueErrorCode(err),
+				}));
 				msg.retry({
-					delaySeconds: err instanceof OutboundRetryError ? err.delaySeconds : 10,
+					delaySeconds: deadLetterSource
+						? 3600
+						: err instanceof OutboundRetryError
+							? err.delaySeconds
+							: 10,
 				});
 			}
 		}
 	},
 } satisfies ExportedHandler<CloudflareEnv>;
+
+function getQueueErrorCode(error: unknown): string {
+	if (typeof error === "object" && error !== null && "code" in error) {
+		const code = (error as { code?: unknown }).code;
+		if (typeof code === "string" && /^E_[A-Z0-9_]{1,96}$/.test(code.toUpperCase())) {
+			return code.toUpperCase();
+		}
+	}
+	return error instanceof OutboundRetryError ? "OUTBOUND_RETRY" : "QUEUE_HANDLER_ERROR";
+}

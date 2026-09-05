@@ -2,6 +2,7 @@
 
 import {
   DatabaseBackup,
+  AlertTriangle,
   Globe2,
   Activity,
 	KeyRound,
@@ -34,6 +35,7 @@ const sections = [
     links: [
       { href: "/accounts", label: "Accounts", icon: Users },
       { href: "/activity", label: "Activity", icon: Activity },
+			{ href: "/delivery-failures", label: "Delivery failures", icon: AlertTriangle },
       { href: "/backups", label: "Backups", icon: DatabaseBackup },
     ],
   },

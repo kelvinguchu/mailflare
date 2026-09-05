@@ -10,6 +10,7 @@ import {
 	DATABASE_BACKUP_VERSION,
 	getUnclassifiedDatabaseTables,
 	LEGACY_V1_BACKUP_TABLES,
+	LEGACY_V2_V3_BACKUP_TABLES,
 } from "./format";
 import {
 	normalizeDatabaseBackupR2,
@@ -50,18 +51,25 @@ export function parseDatabaseBackup(content: ArrayBuffer): NormalizedDatabaseBac
 export function normalizeDatabaseBackupDocument(value: unknown): NormalizedDatabaseBackupDocument {
 	if (!isRecord(value)) throw invalidBackupError();
 	if (value.format !== DATABASE_BACKUP_FORMAT) throw invalidBackupError();
-	if (value.version !== 1 && value.version !== 2 && value.version !== DATABASE_BACKUP_VERSION) throw invalidBackupError();
+	if (value.version !== 1 && value.version !== 2 && value.version !== 3 && value.version !== DATABASE_BACKUP_VERSION) throw invalidBackupError();
 	if (typeof value.createdAt !== "string" || !isRecord(value.tables)) throw invalidBackupError();
 	const sourceVersion = value.version;
 
 	const sourceTables = value.tables;
-	const requiredTables = value.version === 1 ? LEGACY_V1_BACKUP_TABLES : BACKUP_TABLES;
+	const requiredTables = value.version === 1
+		? LEGACY_V1_BACKUP_TABLES
+		: value.version === 2 || value.version === 3
+			? LEGACY_V2_V3_BACKUP_TABLES
+			: BACKUP_TABLES;
 	for (const table of requiredTables) validateTableRows(table, sourceTables[table]);
 
 	const tables = {} as Record<DatabaseBackupTable, DatabaseRecord[]>;
 	for (const table of BACKUP_TABLES) {
 		const rows = sourceTables[table];
-		if (rows === undefined && value.version === 1) {
+		if (
+			rows === undefined &&
+			(value.version === 1 || ((value.version === 2 || value.version === 3) && table === "dead_letter_events"))
+		) {
 			tables[table] = [];
 			continue;
 		}
@@ -75,7 +83,7 @@ export function normalizeDatabaseBackupDocument(value: unknown): NormalizedDatab
 		createdAt: value.createdAt,
 		tables,
 		sourceVersion,
-		r2: sourceVersion === DATABASE_BACKUP_VERSION
+		r2: sourceVersion >= 3
 			? normalizeDatabaseBackupR2(value.r2)
 			: { strategy: "live-references", objects: [] },
 	};

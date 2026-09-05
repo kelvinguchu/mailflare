@@ -24,7 +24,10 @@ const nextConfig: NextConfig = {
 };
 
 export default async function config(): Promise<NextConfig> {
-	// Await the bindings so the first request cannot race Cloudflare initialization.
-	await initOpenNextCloudflareForDev();
+	// The remote binding proxy is development-only. Production builds use the
+	// generated OpenNext Worker bindings and must not require a local API token.
+	if (process.env.NODE_ENV === "development") {
+		await initOpenNextCloudflareForDev();
+	}
 	return nextConfig;
 }

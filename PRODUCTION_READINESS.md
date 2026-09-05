@@ -6,7 +6,7 @@ Audit date: 2026-09-01
 
 Production: `https://mail.calibercode.io`
 
-Last reviewed deployment: `bf4c78ce-f6b8-40bd-990e-19f331cdabcc`
+Last reviewed deployment: `c57e232b-fb4f-40fc-a71c-e3da78df1d47`
 
 ## How we will use this file
 
@@ -159,10 +159,12 @@ Acceptance criteria:
 
 ### 2.4 Add dead-letter handling and replay
 
-- [ ] Configure dead-letter queues for inbound and outbound processing.
-- [ ] Store enough diagnostic context without exposing email contents in logs.
-- [ ] Add an admin view or controlled command to inspect and replay failed jobs.
-- [ ] Alert on sustained queue failures.
+Status: `[x]` Inbound and outbound queues now have dedicated dead-letter queues whose consumers durably capture failures in D1; provider-declared final failures enter the same admin recovery view, and uncertain outbound outcomes remain deliberately non-replayable.
+
+- [x] Configure dead-letter queues for inbound and outbound processing.
+- [x] Store enough diagnostic context without exposing email contents in logs.
+- [x] Add an admin view or controlled command to inspect and replay failed jobs.
+- [x] Alert on sustained queue failures.
 
 Acceptance criteria:
 
@@ -469,6 +471,9 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-04 | `_cf_KV`, `d1_migrations`, and `sqlite_sequence` are classified as database-owned rather than application backup data. | Cloudflare D1, the migration runner, and SQLite recreate or manage these tables; restoring application rows must not overwrite their state. |
 | 2026-09-04 | Outbound queue messages contain only a D1 job ID; provider delivery reads the durable message and R2 attachments in the consumer. | Keep queue payloads small, preserve a stable browser/API message ID and ensure one request creates one message and one job. |
 | 2026-09-04 | An unclassified error after Email Service delivery begins is recorded as `E_DELIVERY_OUTCOME_UNKNOWN` and is not retried. | The current Email Service binding has no caller-supplied provider idempotency key and controls `Message-ID`; suppressing a possible email is safer than knowingly risking a duplicate. Explicit transient provider rejections remain retryable. |
+| 2026-09-05 | Queue dead letters and provider-declared final outbound failures share one durable D1 recovery ledger; logs and the admin API expose only queue/reference IDs, safe error codes, attempts and timestamps. | Preserve replay material without leaking sender, recipient, subject, headers or body into logs or the operational UI. |
+| 2026-09-05 | Manual replay is serialized by a short D1 claim and refuses outbound jobs with an in-flight or unknown provider outcome. | Existing delivery keys and outbound job claims make safe re-enqueue idempotent, while an ambiguous provider response can never be made safely replayable without provider idempotency support. |
+| 2026-09-05 | Database backup format v4 includes dead-letter records and raw R2 messages referenced only by inbound failures; v1-v3 remain restorable. | A failed inbound message must remain recoverable even before it creates a normal `messages` row. |
 
 ## Progress log
 
@@ -483,3 +488,4 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-04 | 2.3 — Inbound idempotency | Added a content-derived delivery identity independent of `Message-ID`, a nullable unique D1 constraint, deterministic raw and attachment R2 keys, atomic message/attachment inserts, legacy queue-payload compatibility and post-commit notification/webhook isolation. | Pre-migration backup `bak_pre_idempotency_20260904` completed with six independent R2 objects; migration `0027_add_inbound_delivery_key.sql` applied successfully; production version `e8d47ad1-b17c-46cf-8d73-5d594b5a6976`; 32 tests, typecheck, lint, isolated OpenNext build and Wrangler dry run passed; production returned HTTP 200. Duplicate replay was verified deterministically in tests; no synthetic email was inserted into the production inbox. |
 | 2026-09-04 | 2.1 — Asynchronous outbound delivery | Split durable message/job creation from Email Service delivery; browser and API sends return `202` with stable message and job IDs; the consumer loads the existing D1 message and R2 attachments, updates that same job, retries transient provider failures up to four attempts and records permanent/exhausted failures without reclassifying webhook or audit errors as send failures. | Production version `3edf3ebd-53e7-4e03-af55-8a5f4554bf60`; Cloudflare Email Sending confirmed enabled for `calibercode.io`; 40 tests and typecheck passed; lint completed with zero errors and 57 pre-existing warnings; isolated OpenNext build and Wrangler dry run passed; production login returned HTTP 200; production had no legacy queued outbound jobs before deployment. No synthetic email was sent. |
 | 2026-09-04 | 2.2 — Outbound idempotency | Added client-supplied or generated idempotency keys, account-scoped hashes at rest, request fingerprints including attachment contents, a D1 uniqueness constraint, one atomic delivery claim, bounded pre-provider and explicit-transient retries, no-resend handling for unknown post-provider outcomes, and stable derived keys for calendar invitations and auto-replies. | Pre-migration backup `bak_pre_outbound_idempotency_20260904` completed with six independent R2 objects and 1,148,939 total bytes; migration `0028_add_outbound_idempotency.sql` passed on a fresh isolated D1 database and production; production version `bf4c78ce-f6b8-40bd-990e-19f331cdabcc`; 51 tests, typecheck, lint, isolated OpenNext build and Wrangler dry run passed; the production unique index was verified, no migrations remained, no jobs were stuck, and production login returned HTTP 200. No synthetic email was sent. An unauthenticated `/api/send` smoke request created no job but returned `500` instead of a clean `401`; response normalization remains a separate auth/API follow-up. |
+| 2026-09-05 | 2.4 — Dead-letter handling and replay | Added dedicated inbound/outbound DLQs, durable idempotent D1 capture, safe structured diagnostics, provider-final-failure capture, an administrator-only failure history and serialized replay action, an app-wide unresolved-failure alert, and backup format v4 coverage for failure payloads and their raw inbound R2 sources. | Pre-migration backup `bak_pre_dead_letters_20260905` completed through Workflow `5199fc14-80e0-4378-8ab5-d75b320032c6` with eight independent R2 objects and 1,432,182 total bytes; migration `0029_add_dead_letter_events.sql` passed on isolated and production D1; production version `c57e232b-fb4f-40fc-a71c-e3da78df1d47`; 58 tests, typecheck, lint, isolated Next/OpenNext builds and Wrangler dry run passed; all four queue consumers and both new queue resources were verified; no migrations remained; production login and the new page returned HTTP 200; the admin API returned 403 without a session; production had zero unresolved failures and all ten outbound jobs were sent. No synthetic email was sent. |

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Globe2, KeyRound, Mail, Palette, Users, Webhook } from "lucide-react";
+import { AlertTriangle, Globe2, KeyRound, Mail, Palette, Users, Webhook } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const sections = [
@@ -32,6 +32,12 @@ const sections = [
 		title: "API Keys",
 		description: "Manage API credentials for programmatic access.",
 		icon: KeyRound,
+	},
+	{
+		href: "/delivery-failures",
+		title: "Delivery failures",
+		description: "Inspect and safely replay mail that exhausted queue retries.",
+		icon: AlertTriangle,
 	},
 	{
 		href: "/webhooks",

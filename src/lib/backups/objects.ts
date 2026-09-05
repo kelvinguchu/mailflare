@@ -38,6 +38,23 @@ export function getReferencedR2Keys(
 			}
 		}
 	}
+	for (const row of document.tables.dead_letter_events) {
+		if (row.source_queue !== "inbound" || typeof row.payload !== "string") continue;
+		try {
+			const payload = JSON.parse(row.payload) as unknown;
+			if (
+				typeof payload === "object" &&
+				payload !== null &&
+				"rawR2Key" in payload &&
+				typeof payload.rawR2Key === "string" &&
+				payload.rawR2Key.length > 0
+			) {
+				keys.add(payload.rawR2Key);
+			}
+		} catch {
+			// Malformed diagnostic payloads cannot be replayed and contain no trusted R2 reference.
+		}
+	}
 	return [...keys].sort();
 }
 

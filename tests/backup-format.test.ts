@@ -8,6 +8,7 @@ import {
 	DATABASE_SYSTEM_TABLES,
 	getUnclassifiedDatabaseTables,
 	LEGACY_V1_BACKUP_TABLES,
+	LEGACY_V2_V3_BACKUP_TABLES,
 } from "../src/lib/backups/format";
 import { normalizeDatabaseBackupDocument } from "../src/lib/backups/export";
 import { createBackupFilename } from "../src/lib/backups/utils";
@@ -38,7 +39,7 @@ describe("database backup format", () => {
 
 	it("puts the format version in new backup filenames", () => {
 		expect(createBackupFilename(new Date("2026-09-04T02:00:00.000Z"))).toBe(
-			"cc-mail-v3-2026-09-04T02-00-00-000Z.json",
+			"cc-mail-v4-2026-09-04T02-00-00-000Z.json",
 		);
 	});
 
@@ -63,12 +64,27 @@ describe("database backup format", () => {
 			format: DATABASE_BACKUP_FORMAT,
 			version: 2,
 			createdAt: "2026-09-03T00:00:00.000Z",
-			tables: emptyTables(BACKUP_TABLES),
+			tables: emptyTables(LEGACY_V2_V3_BACKUP_TABLES),
 		});
 
 		expect(document.version).toBe(DATABASE_BACKUP_VERSION);
 		expect(document.sourceVersion).toBe(2);
 		expect(document.r2.strategy).toBe("live-references");
+		expect(document.tables.dead_letter_events).toEqual([]);
+	});
+
+	it("keeps version 3 independent R2 backups restorable", () => {
+		const document = normalizeDatabaseBackupDocument({
+			format: DATABASE_BACKUP_FORMAT,
+			version: 3,
+			createdAt: "2026-09-04T00:00:00.000Z",
+			tables: emptyTables(LEGACY_V2_V3_BACKUP_TABLES),
+			r2: { strategy: "independent-copies-v1", objects: [] },
+		});
+
+		expect(document.sourceVersion).toBe(3);
+		expect(document.r2).toEqual({ strategy: "independent-copies-v1", objects: [] });
+		expect(document.tables.dead_letter_events).toEqual([]);
 	});
 
 	it("accepts the current format with an independent R2 manifest", () => {

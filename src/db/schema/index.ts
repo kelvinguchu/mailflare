@@ -260,6 +260,40 @@ export const outboundJobs = sqliteTable(
 	(t) => [uniqueIndex("outbound_jobs_user_idempotency_key_idx").on(t.userId, t.idempotencyKey)],
 );
 
+export const deadLetterEvents = sqliteTable(
+	"dead_letter_events",
+	{
+		id: text("id").primaryKey(),
+		sourceQueue: text("source_queue", { enum: ["inbound", "outbound"] }).notNull(),
+		deadLetterQueue: text("dead_letter_queue").notNull(),
+		queueMessageId: text("queue_message_id").notNull(),
+		referenceId: text("reference_id"),
+		payload: text("payload").notNull(),
+		diagnosticCode: text("diagnostic_code").notNull(),
+		attemptCount: integer("attempt_count").notNull(),
+		status: text("status", { enum: ["unresolved", "replaying", "replayed"] })
+			.notNull()
+			.default("unresolved"),
+		replayCount: integer("replay_count").notNull().default(0),
+		messageCreatedAt: integer("message_created_at", { mode: "timestamp" }).notNull(),
+		createdAt: integer("created_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
+		updatedAt: integer("updated_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
+		replayedAt: integer("replayed_at", { mode: "timestamp" }),
+		replayedByUserId: text("replayed_by_user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+	},
+	(t) => [
+		uniqueIndex("dead_letter_events_queue_message_idx").on(t.deadLetterQueue, t.queueMessageId),
+		index("dead_letter_events_status_created_idx").on(t.status, t.createdAt),
+		index("dead_letter_events_source_created_idx").on(t.sourceQueue, t.createdAt),
+	],
+);
+
 export const emailTemplates = sqliteTable(
 	"email_templates",
 	{
@@ -436,6 +470,7 @@ export const schema = {
 	messages,
 	messageAttachments,
 	outboundJobs,
+	deadLetterEvents,
 	emailTemplates,
 	calendarEvents,
 	routingRules,

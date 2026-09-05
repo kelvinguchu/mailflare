@@ -24,6 +24,7 @@ const MIGRATION_NAMES = [
 	"0025_remove_license_settings.sql",
 	"0027_add_inbound_delivery_key.sql",
 	"0028_add_outbound_idempotency.sql",
+	"0029_add_dead_letter_events.sql",
 ];
 
 const INITIAL_SCHEMA_SQL = `
@@ -55,6 +56,10 @@ CREATE TABLE IF NOT EXISTS message_attachments (id text PRIMARY KEY NOT NULL, me
 CREATE INDEX IF NOT EXISTS message_attachments_message_idx ON message_attachments(message_id);
 CREATE TABLE IF NOT EXISTS outbound_jobs (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, message_id text REFERENCES messages(id) ON DELETE set null, status text DEFAULT 'queued' NOT NULL, payload text NOT NULL, idempotency_key text, request_hash text, delivery_started_at integer, attempt_count integer DEFAULT 0 NOT NULL, error text, scheduled_at integer, created_at integer NOT NULL, updated_at integer NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS outbound_jobs_user_idempotency_key_idx ON outbound_jobs(user_id, idempotency_key);
+CREATE TABLE IF NOT EXISTS dead_letter_events (id text PRIMARY KEY NOT NULL, source_queue text NOT NULL, dead_letter_queue text NOT NULL, queue_message_id text NOT NULL, reference_id text, payload text NOT NULL, diagnostic_code text NOT NULL, attempt_count integer NOT NULL, status text DEFAULT 'unresolved' NOT NULL, replay_count integer DEFAULT 0 NOT NULL, message_created_at integer NOT NULL, created_at integer NOT NULL, updated_at integer NOT NULL, replayed_at integer, replayed_by_user_id text REFERENCES users(id) ON DELETE set null);
+CREATE UNIQUE INDEX IF NOT EXISTS dead_letter_events_queue_message_idx ON dead_letter_events(dead_letter_queue, queue_message_id);
+CREATE INDEX IF NOT EXISTS dead_letter_events_status_created_idx ON dead_letter_events(status, created_at);
+CREATE INDEX IF NOT EXISTS dead_letter_events_source_created_idx ON dead_letter_events(source_queue, created_at);
 CREATE TABLE IF NOT EXISTS email_templates (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, name text NOT NULL, subject text DEFAULT '' NOT NULL, text_body text DEFAULT '' NOT NULL, created_at integer NOT NULL, updated_at integer NOT NULL);
 CREATE INDEX IF NOT EXISTS email_templates_user_idx ON email_templates(user_id);
 CREATE TABLE IF NOT EXISTS calendar_events (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, title text NOT NULL, description text DEFAULT '' NOT NULL, location text DEFAULT '' NOT NULL, attendees text DEFAULT '[]' NOT NULL, starts_at integer NOT NULL, ends_at integer NOT NULL, created_at integer NOT NULL, updated_at integer NOT NULL);

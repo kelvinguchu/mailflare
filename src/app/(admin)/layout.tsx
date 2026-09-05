@@ -9,6 +9,7 @@ import { MailboxProvider } from "@/components/mailbox-provider";
 import { MailboxSelector } from "@/components/mailbox-selector";
 import { AdminNav } from "@/components/admin-nav";
 import { SidebarProvider } from "@/components/sidebar-state";
+import { DeadLetterAlert } from "@/components/dead-letter-alert";
 
 export default function DashboardLayout({
   children,
@@ -29,7 +30,10 @@ export default function DashboardLayout({
                 <MailboxSelector />
               </span>
               <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain rounded-tl-3xl px-6 py-10 scrollbar-gutter-stable lg:px-12">
-                <div className="w-full max-w-3xl">{children}</div>
+                <div className="w-full max-w-3xl">
+                  <DeadLetterAlert />
+                  {children}
+                </div>
               </main>
             </div>
             <FloatingComposer />

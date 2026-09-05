@@ -102,11 +102,16 @@ describe("database backup R2 snapshots", () => {
 		tables.messages = [{ raw_r2_key: "raw/message.eml" }];
 		tables.message_attachments = [{ r2_key: "attachments/report.pdf" }];
 		tables.app_settings = [{ icon_key: "branding/icon.png" }];
+		tables.dead_letter_events = [{
+			source_queue: "inbound",
+			payload: JSON.stringify({ rawR2Key: "inbound/dead-letter.eml" }),
+		}];
 		tables.backups = [{ r2_key: "database-backups/older/manifest.json" }];
 
 		expect(getReferencedR2Keys({ tables })).toEqual([
 			"attachments/report.pdf",
 			"branding/icon.png",
+			"inbound/dead-letter.eml",
 			"mailboxes/avatar.png",
 			"raw/message.eml",
 			"users/avatar.png",

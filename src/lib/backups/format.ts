@@ -1,5 +1,5 @@
 export const DATABASE_BACKUP_FORMAT = "mailflare-database-backup";
-export const DATABASE_BACKUP_VERSION = 3 as const;
+export const DATABASE_BACKUP_VERSION = 4 as const;
 export const MAX_DATABASE_RESTORE_BYTES = 10 * 1024 * 1024;
 export const MAX_BACKUP_OBJECTS = 5_000;
 export const DATABASE_BACKUP_R2_STRATEGY = "independent-copies-v1" as const;
@@ -18,6 +18,7 @@ export const BACKUP_TABLES = [
 	"messages",
 	"message_attachments",
 	"outbound_jobs",
+	"dead_letter_events",
 	"email_templates",
 	"calendar_events",
 	"routing_rules",
@@ -37,7 +38,14 @@ export const LEGACY_V1_BACKUP_TABLES = BACKUP_TABLES.filter(
 	(table) =>
 		table !== "auto_reply_deliveries" &&
 		table !== "email_templates" &&
-		table !== "calendar_events",
+		table !== "calendar_events" &&
+		table !== "dead_letter_events",
+);
+
+// Versions 2 and 3 predate durable dead-letter records. Version 3 still has
+// an independent R2 object manifest and retains that behavior when restored.
+export const LEGACY_V2_V3_BACKUP_TABLES = BACKUP_TABLES.filter(
+	(table) => table !== "dead_letter_events",
 );
 
 // These are D1/SQLite bookkeeping tables, not application data. D1 and the
