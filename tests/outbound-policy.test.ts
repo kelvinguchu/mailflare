@@ -4,6 +4,7 @@ import {
 	decideOutboundFailure,
 	getOutboundRetryDelaySeconds,
 	getOutboundErrorCode,
+	isOutboundDeliveryEnabled,
 	MAX_OUTBOUND_DELIVERY_ATTEMPTS,
 	shouldRetryOutboundFailure,
 } from "../src/lib/email/outbound-policy";
@@ -61,6 +62,12 @@ describe("outbound delivery failure policy", () => {
 
 	it("normalizes provider error codes", () => {
 		expect(getOutboundErrorCode({ code: " e_rate_limit_exceeded " })).toBe("E_RATE_LIMIT_EXCEEDED");
+	});
+
+	it("fails closed unless outbound provider delivery is explicitly enabled", () => {
+		expect(isOutboundDeliveryEnabled("enabled")).toBe(true);
+		expect(isOutboundDeliveryEnabled("disabled")).toBe(false);
+		expect(isOutboundDeliveryEnabled(undefined)).toBe(false);
 	});
 
 	it("accepts only compact job references as outbound queue messages", () => {

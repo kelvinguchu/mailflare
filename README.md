@@ -37,14 +37,16 @@ Deploy this repository from your controlled source checkout. You will need:
 - A domain managed by Cloudflare.
 - A Cloudflare API token that CC Mail can use to configure email routing.
 
-Install dependencies, configure `wrangler.jsonc`, apply the migrations, and deploy:
+Install dependencies, configure `wrangler.jsonc`, apply the staging migrations, and deploy staging:
 
 ```bash
 npm install
 npm run deploy:with-migrations
 ```
 
-After deployment, open your CC Mail URL and follow the first-run setup. The setup checks your Cloudflare configuration, creates the initial account, and helps you connect your first domain.
+After validation, production requires the explicit `npm run deploy:production:with-migrations` command. The default deploy and remote-migration commands target staging, and local development uses local binding emulation with outbound email and Cloudflare management disabled.
+
+After production deployment, open your CC Mail URL and follow the first-run setup. The setup checks your Cloudflare configuration, creates the initial account, and helps you connect your first domain.
 
 See the [deployment guide](docs/deployment.md) for required permissions, deployment, backups, and custom Worker names.
 

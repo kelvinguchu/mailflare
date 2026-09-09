@@ -5,6 +5,7 @@ import {
 	getCloudflareAuthHeaders,
 	getCloudflareAuthHint,
 	getEmailWorkerName,
+	isCloudflareManagementEnabled,
 } from "@/lib/cloudflare-api-utils";
 import { getZoneLookupCandidates } from "@/lib/domains/utils";
 export type { CfDnsRecord } from "@/lib/cloudflare-api.types";
@@ -14,6 +15,9 @@ export async function cfRequest<T>(
 	path: string,
 	init?: RequestInit,
 ): Promise<T> {
+	if (!isCloudflareManagementEnabled(env.CLOUDFLARE_MANAGEMENT_MODE)) {
+		throw new Error("Cloudflare management API is disabled in this deployment environment");
+	}
 	const auth = getCloudflareAuth(env);
 	const res = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
 		...init,

@@ -13,6 +13,7 @@ import {
 	decideOutboundFailure,
 	getOutboundRetryDelaySeconds,
 	getOutboundErrorCode,
+	isOutboundDeliveryEnabled,
 	MAX_OUTBOUND_DELIVERY_ATTEMPTS,
 } from "@/lib/email/outbound-policy";
 import {
@@ -154,6 +155,10 @@ export async function processOutboundQueue(
 	const [message] = await db.select().from(messages).where(eq(messages.id, job.messageId)).limit(1);
 	if (!message || message.direction !== "outbound") {
 		await markOutboundFailed(env, job.id, job.messageId, "Outbound message is missing");
+		return;
+	}
+	if (!isOutboundDeliveryEnabled(env.OUTBOUND_DELIVERY_MODE)) {
+		await recordFinalOutboundFailure(env, job.id, message, "E_OUTBOUND_DELIVERY_DISABLED");
 		return;
 	}
 

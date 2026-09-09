@@ -9,6 +9,10 @@ const RETRYABLE_EMAIL_ERROR_CODES = new Set([
 export type OutboundFailureDisposition = "retryable" | "permanent" | "ambiguous";
 export type OutboundFailureAction = "retry" | "failed" | "unknown";
 
+export function isOutboundDeliveryEnabled(mode: unknown): boolean {
+	return mode === "enabled";
+}
+
 export function getOutboundErrorCode(error: unknown): string | null {
 	if (typeof error !== "object" || error === null || !("code" in error)) return null;
 	const code = (error as { code?: unknown }).code;

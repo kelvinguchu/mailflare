@@ -1,5 +1,9 @@
 import type { CfApiError, CfAuth } from "@/lib/cloudflare-api.types";
 
+export function isCloudflareManagementEnabled(mode: unknown): boolean {
+	return mode === "enabled";
+}
+
 export function getCloudflareAuth(env: CloudflareEnv): CfAuth {
 	const token = env.CF_TOKEN?.trim();
 	const key = env.CF_API_KEY?.trim();

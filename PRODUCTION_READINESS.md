@@ -44,15 +44,17 @@ Acceptance criteria:
 
 ### 0.2 Establish safe deployment environments
 
-- [ ] Define separate staging and production Workers.
-- [ ] Give staging separate D1, R2, Queue, Durable Object, Workflow and email test resources.
-- [ ] Document required variables, secrets and bindings.
-- [ ] Ensure production cannot be targeted accidentally by the normal development command.
+Status: `[x]` Staging is deployed with an independent Worker and stateful bindings. Provider delivery and Cloudflare management fail closed outside production, and all normal remote commands default to staging.
+
+- [x] Define separate staging and production Workers.
+- [x] Give staging separate D1, R2, Queue, Durable Object, Workflow and email test resources.
+- [x] Document required variables, secrets and bindings.
+- [x] Ensure production cannot be targeted accidentally by the normal development command.
 
 Acceptance criteria:
 
-- A staging deployment cannot read, overwrite or send from production data.
-- The same release can be promoted from staging to production without rebuilding different source.
+- [x] A staging deployment cannot read, overwrite or send from production data.
+- [x] The same release can be promoted from staging to production without rebuilding different source.
 
 ## Phase 1 — Make backup and recovery real
 
@@ -592,6 +594,7 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-05 | Manual replay is serialized by a short D1 claim and refuses outbound jobs with an in-flight or unknown provider outcome. | Existing delivery keys and outbound job claims make safe re-enqueue idempotent, while an ambiguous provider response can never be made safely replayable without provider idempotency support. |
 | 2026-09-05 | Database backup format v4 includes dead-letter records and raw R2 messages referenced only by inbound failures; v1-v3 remain restorable. | A failed inbound message must remain recoverable even before it creates a normal `messages` row. |
 | 2026-09-09 | Owner-requested features are split into backend and frontend tracks, with isolated staging and critical integration tests preceding schema, authentication and delivery changes. | CC, rich signatures, Undo send, TOTP and reminders cross persistence and security boundaries; defining and verifying backend behavior first avoids encoding UI assumptions into unsafe production changes. |
+| 2026-09-09 | Local and staging environments fail closed for provider delivery and Cloudflare management; staging has no Email Sending binding, runtime credential, Email Routing rule, or active cron. Production remains an explicit named environment. | Resource-name isolation alone cannot prevent an accidental provider or control-plane call. Independent bindings plus runtime gates and explicit production commands create defense in depth without weakening production behavior. |
 
 ## Progress log
 
@@ -608,3 +611,4 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-04 | 2.2 — Outbound idempotency | Added client-supplied or generated idempotency keys, account-scoped hashes at rest, request fingerprints including attachment contents, a D1 uniqueness constraint, one atomic delivery claim, bounded pre-provider and explicit-transient retries, no-resend handling for unknown post-provider outcomes, and stable derived keys for calendar invitations and auto-replies. | Pre-migration backup `bak_pre_outbound_idempotency_20260904` completed with six independent R2 objects and 1,148,939 total bytes; migration `0028_add_outbound_idempotency.sql` passed on a fresh isolated D1 database and production; production version `bf4c78ce-f6b8-40bd-990e-19f331cdabcc`; 51 tests, typecheck, lint, isolated OpenNext build and Wrangler dry run passed; the production unique index was verified, no migrations remained, no jobs were stuck, and production login returned HTTP 200. No synthetic email was sent. An unauthenticated `/api/send` smoke request created no job but returned `500` instead of a clean `401`; response normalization remains a separate auth/API follow-up. |
 | 2026-09-05 | 2.4 — Dead-letter handling and replay | Added dedicated inbound/outbound DLQs, durable idempotent D1 capture, safe structured diagnostics, provider-final-failure capture, an administrator-only failure history and serialized replay action, an app-wide unresolved-failure alert, and backup format v4 coverage for failure payloads and their raw inbound R2 sources. | Pre-migration backup `bak_pre_dead_letters_20260905` completed through Workflow `5199fc14-80e0-4378-8ab5-d75b320032c6` with eight independent R2 objects and 1,432,182 total bytes; migration `0029_add_dead_letter_events.sql` passed on isolated and production D1; production version `c57e232b-fb4f-40fc-a71c-e3da78df1d47`; 58 tests, typecheck, lint, isolated Next/OpenNext builds and Wrangler dry run passed; all four queue consumers and both new queue resources were verified; no migrations remained; production login and the new page returned HTTP 200; the admin API returned 403 without a session; production had zero unresolved failures and all ten outbound jobs were sent. No synthetic email was sent. |
 | 2026-09-09 | Owner-requested feature planning | Added separate backend and frontend tracks for CC recipients, safe rich signatures, delayed send/Undo, TOTP, original login design, local loading states, and expanded calendar/tasks/reminders. Re-prioritized the next work around isolated staging, the restore drill and integration tests before feature schema or authentication changes. | Roadmap review only; no runtime code, infrastructure or production state changed. |
+| 2026-09-09 | 0.2 — Safe deployment environments | Added explicit local, staging and production Wrangler environments; moved every non-inheritable binding into each named environment; made normal remote commands default to staging; added an automated resource-reuse gate; and made provider delivery and Cloudflare management fail closed outside production. | Staging version `74bd948c-6ee7-42d0-8c50-97b7ec00da58` at `mailflare-staging.agabio.workers.dev`; separate D1, R2, four Queues, Durable Object and Workflow verified; cron disabled; 30 migrations applied; staging secrets, users, messages and outbound jobs all empty; 61 tests, typecheck, lint, isolated OpenNext build and both Wrangler dry runs passed; `/login` reached the empty-instance `/setup` route with HTTP 200; production remained healthy on `c57e232b-fb4f-40fc-a71c-e3da78df1d47`; no synthetic email was sent and no restore drill was run. |

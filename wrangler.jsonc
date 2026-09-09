@@ -1,138 +1,264 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "mailflare",
+	// The top-level environment is intentionally local-only. Production and
+	// staging must always be selected explicitly for remote operations.
+	"name": "mailflare-local",
 	"account_id": "c79518eee7696d23795de5184c4bbc01",
-	// Keep first-admin registration private until onboarding is complete.
-	"workers_dev": false,
-	"preview_urls": false,
-	"routes": [
-		{
-			"pattern": "mail.calibercode.io",
-			"custom_domain": true,
-		},
-	],
-	"vars": {
-		"CF_AID": "c79518eee7696d23795de5184c4bbc01",
-		"CF_EMAIL_WORKER_NAME": "mailflare",
-		"D1_DATABASE_ID": "a9443977-88d2-46c1-bdc4-052784b445e8",
-	},
 	"main": "./worker.ts",
 	"compatibility_date": "2026-05-20",
 	"keep_vars": true,
-	"compatibility_flags": [
-		"nodejs_compat",
-		"global_fetch_strictly_public"
-	],
-	"triggers": {
-		// Check the configured daily, weekly, or monthly backup schedule at 02:00 UTC.
-		"crons": ["0 2 * * *"],
+	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+	"workers_dev": false,
+	"preview_urls": false,
+	"vars": {
+		"DEPLOYMENT_ENV": "local",
+		"CLOUDFLARE_MANAGEMENT_MODE": "disabled",
+		"OUTBOUND_DELIVERY_MODE": "disabled",
+		"CF_EMAIL_WORKER_NAME": "mailflare-local"
 	},
+	"triggers": { "crons": [] },
 	"assets": {
 		"binding": "ASSETS",
-		"directory": ".open-next/assets",
+		"directory": ".open-next/assets"
 	},
-	"images": {
-		"binding": "IMAGES",
-	},
+	"images": { "binding": "IMAGES" },
 	"services": [
-		{
-			"binding": "WORKER_SELF_REFERENCE",
-			"service": "mailflare",
-		},
+		{ "binding": "WORKER_SELF_REFERENCE", "service": "mailflare-local" }
 	],
 	"durable_objects": {
-		"bindings": [
-			{
-				"name": "REALTIME",
-				"class_name": "RealtimeHub",
-			},
-		],
+		"bindings": [{ "name": "REALTIME", "class_name": "RealtimeHub" }]
 	},
 	"migrations": [
-		{
-			"tag": "v1",
-			"new_sqlite_classes": [
-				"RealtimeHub",
-			],
-		},
+		{ "tag": "v1", "new_sqlite_classes": ["RealtimeHub"] }
 	],
 	"workflows": [
 		{
-			"name": "mailflare-database-backup",
+			"name": "mailflare-database-backup-local",
 			"binding": "DATABASE_BACKUP_WORKFLOW",
-			"class_name": "DatabaseBackupWorkflow",
-		},
+			"class_name": "DatabaseBackupWorkflow"
+		}
 	],
 	"ratelimits": [
 		{
 			"name": "LOGIN_RATE_LIMIT",
-			"namespace_id": "1001",
-			"simple": {
-				"limit": 20,
-				"period": 60,
-			},
-		},
+			"namespace_id": "1003",
+			"simple": { "limit": 20, "period": 60 }
+		}
 	],
-	"observability": {
-		"enabled": true,
-	},
+	"observability": { "enabled": true },
 	"upload_source_maps": true,
-	"send_email": [
-		{
-			"name": "EMAIL",
-			"remote": true,
-		},
-	],
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "mailflare",
-			"database_id": "a9443977-88d2-46c1-bdc4-052784b445e8",
-			"migrations_dir": "drizzle/migrations",
-		},
+			"database_name": "mailflare-local",
+			"migrations_dir": "drizzle/migrations"
+		}
 	],
 	"r2_buckets": [
-		{
-			"binding": "BUCKET",
-			"bucket_name": "mailflare-raw",
-		},
+		{ "binding": "BUCKET", "bucket_name": "mailflare-raw-local" }
 	],
 	"queues": {
 		"producers": [
-			{
-				"binding": "INBOUND_QUEUE",
-				"queue": "mailflare-inbound",
-			},
-			{
-				"binding": "OUTBOUND_QUEUE",
-				"queue": "mailflare-outbound",
-			},
+			{ "binding": "INBOUND_QUEUE", "queue": "mailflare-inbound-local" },
+			{ "binding": "OUTBOUND_QUEUE", "queue": "mailflare-outbound-local" }
 		],
 		"consumers": [
 			{
-				"queue": "mailflare-inbound",
+				"queue": "mailflare-inbound-local",
 				"max_batch_size": 5,
 				"max_retries": 3,
-				"dead_letter_queue": "mailflare-inbound-dlq",
+				"dead_letter_queue": "mailflare-inbound-dlq-local"
 			},
 			{
-				"queue": "mailflare-outbound",
+				"queue": "mailflare-outbound-local",
 				"max_batch_size": 5,
 				"max_retries": 3,
-				"dead_letter_queue": "mailflare-outbound-dlq",
+				"dead_letter_queue": "mailflare-outbound-dlq-local"
 			},
 			{
-				"queue": "mailflare-inbound-dlq",
+				"queue": "mailflare-inbound-dlq-local",
 				"max_batch_size": 5,
 				"max_retries": 100,
-				"retry_delay": 3600,
+				"retry_delay": 3600
 			},
 			{
-				"queue": "mailflare-outbound-dlq",
+				"queue": "mailflare-outbound-dlq-local",
 				"max_batch_size": 5,
 				"max_retries": 100,
-				"retry_delay": 3600,
-			},
-		],
+				"retry_delay": 3600
+			}
+		]
 	},
+	"env": {
+		"staging": {
+			"name": "mailflare-staging",
+			"workers_dev": true,
+			"preview_urls": false,
+			"vars": {
+				"DEPLOYMENT_ENV": "staging",
+				"CLOUDFLARE_MANAGEMENT_MODE": "disabled",
+				"OUTBOUND_DELIVERY_MODE": "disabled",
+				"CF_AID": "c79518eee7696d23795de5184c4bbc01",
+				"CF_EMAIL_WORKER_NAME": "mailflare-staging",
+				"D1_DATABASE_ID": "00c73577-0ef1-4d51-ba77-f09c06cfed1d"
+			},
+			// The scheduled handler and staging Workflow are deployed, but automatic
+			// invocations stay disabled until a controlled staging test needs them.
+			"triggers": { "crons": [] },
+			"assets": {
+				"binding": "ASSETS",
+				"directory": ".open-next/assets"
+			},
+			"images": { "binding": "IMAGES" },
+			"services": [
+				{ "binding": "WORKER_SELF_REFERENCE", "service": "mailflare-staging" }
+			],
+			"durable_objects": {
+				"bindings": [{ "name": "REALTIME", "class_name": "RealtimeHub" }]
+			},
+			"workflows": [
+				{
+					"name": "mailflare-database-backup-staging",
+					"binding": "DATABASE_BACKUP_WORKFLOW",
+					"class_name": "DatabaseBackupWorkflow"
+				}
+			],
+			"ratelimits": [
+				{
+					"name": "LOGIN_RATE_LIMIT",
+					"namespace_id": "1002",
+					"simple": { "limit": 20, "period": 60 }
+				}
+			],
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "mailflare-staging",
+					"database_id": "00c73577-0ef1-4d51-ba77-f09c06cfed1d",
+					"migrations_dir": "drizzle/migrations"
+				}
+			],
+			"r2_buckets": [
+				{ "binding": "BUCKET", "bucket_name": "mailflare-raw-staging" }
+			],
+			"queues": {
+				"producers": [
+					{ "binding": "INBOUND_QUEUE", "queue": "mailflare-inbound-staging" },
+					{ "binding": "OUTBOUND_QUEUE", "queue": "mailflare-outbound-staging" }
+				],
+				"consumers": [
+					{
+						"queue": "mailflare-inbound-staging",
+						"max_batch_size": 5,
+						"max_retries": 3,
+						"dead_letter_queue": "mailflare-inbound-dlq-staging"
+					},
+					{
+						"queue": "mailflare-outbound-staging",
+						"max_batch_size": 5,
+						"max_retries": 3,
+						"dead_letter_queue": "mailflare-outbound-dlq-staging"
+					},
+					{
+						"queue": "mailflare-inbound-dlq-staging",
+						"max_batch_size": 5,
+						"max_retries": 100,
+						"retry_delay": 3600
+					},
+					{
+						"queue": "mailflare-outbound-dlq-staging",
+						"max_batch_size": 5,
+						"max_retries": 100,
+						"retry_delay": 3600
+					}
+				]
+			}
+		},
+		"production": {
+			"name": "mailflare",
+			"workers_dev": false,
+			"preview_urls": false,
+			"routes": [
+				{ "pattern": "mail.calibercode.io", "custom_domain": true }
+			],
+			"vars": {
+				"DEPLOYMENT_ENV": "production",
+				"CLOUDFLARE_MANAGEMENT_MODE": "enabled",
+				"OUTBOUND_DELIVERY_MODE": "enabled",
+				"CF_AID": "c79518eee7696d23795de5184c4bbc01",
+				"CF_EMAIL_WORKER_NAME": "mailflare",
+				"D1_DATABASE_ID": "a9443977-88d2-46c1-bdc4-052784b445e8"
+			},
+			"triggers": { "crons": ["0 2 * * *"] },
+			"assets": {
+				"binding": "ASSETS",
+				"directory": ".open-next/assets"
+			},
+			"images": { "binding": "IMAGES" },
+			"services": [
+				{ "binding": "WORKER_SELF_REFERENCE", "service": "mailflare" }
+			],
+			"durable_objects": {
+				"bindings": [{ "name": "REALTIME", "class_name": "RealtimeHub" }]
+			},
+			"workflows": [
+				{
+					"name": "mailflare-database-backup",
+					"binding": "DATABASE_BACKUP_WORKFLOW",
+					"class_name": "DatabaseBackupWorkflow"
+				}
+			],
+			"ratelimits": [
+				{
+					"name": "LOGIN_RATE_LIMIT",
+					"namespace_id": "1001",
+					"simple": { "limit": 20, "period": 60 }
+				}
+			],
+			"send_email": [{ "name": "EMAIL" }],
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "mailflare",
+					"database_id": "a9443977-88d2-46c1-bdc4-052784b445e8",
+					"migrations_dir": "drizzle/migrations"
+				}
+			],
+			"r2_buckets": [
+				{ "binding": "BUCKET", "bucket_name": "mailflare-raw" }
+			],
+			"queues": {
+				"producers": [
+					{ "binding": "INBOUND_QUEUE", "queue": "mailflare-inbound" },
+					{ "binding": "OUTBOUND_QUEUE", "queue": "mailflare-outbound" }
+				],
+				"consumers": [
+					{
+						"queue": "mailflare-inbound",
+						"max_batch_size": 5,
+						"max_retries": 3,
+						"dead_letter_queue": "mailflare-inbound-dlq"
+					},
+					{
+						"queue": "mailflare-outbound",
+						"max_batch_size": 5,
+						"max_retries": 3,
+						"dead_letter_queue": "mailflare-outbound-dlq"
+					},
+					{
+						"queue": "mailflare-inbound-dlq",
+						"max_batch_size": 5,
+						"max_retries": 100,
+						"retry_delay": 3600
+					},
+					{
+						"queue": "mailflare-outbound-dlq",
+						"max_batch_size": 5,
+						"max_retries": 100,
+						"retry_delay": 3600
+					}
+				]
+			}
+		}
+	}
 }
