@@ -3,6 +3,12 @@ export type ManagedAccount = {
 	email: string;
 	name: string;
 	role: "admin" | "user";
+	resetEmail: string | null;
+	activationStatus: "active" | "pending" | "revoked";
+	activatedAt: string | null;
+	invitationSentAt: string | null;
+	invitationExpiresAt: string | null;
+	invitationExpired: boolean;
 	disabled: boolean;
 	canManageMailboxes: boolean;
 	forwardingEmail: string | null;

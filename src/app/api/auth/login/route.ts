@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 
 	const db = getDb(env);
 	const [user] = await db.select().from(users).where(eq(users.email, parsed.data.email)).limit(1);
-	if (!user || !verifyPassword(parsed.data.password, user.passwordHash)) {
+	if (!user || !verifyPassword(parsed.data.password, user.passwordHash) || user.activationStatus !== "active") {
 		return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
 	}
 	if (user.disabled) {

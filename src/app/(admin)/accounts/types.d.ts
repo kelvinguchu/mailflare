@@ -9,6 +9,11 @@ export type Account = {
 	name: string;
 	resetEmail: string | null;
 	role: "admin" | "user";
+	activationStatus: "active" | "pending" | "revoked";
+	activatedAt: string | null;
+	invitationSentAt: string | null;
+	invitationExpiresAt: string | null;
+	invitationExpired: boolean;
 	disabled?: boolean;
 	hasAvatar?: boolean;
 	canManageMailboxes?: boolean;
@@ -21,5 +26,6 @@ export type Account = {
 export type AccountResponse = {
 	accounts?: Account[];
 	account?: Account;
+	invitationDelivery?: "pending" | "delivery_disabled";
 	error?: string;
 };

@@ -11,6 +11,12 @@ export const users = sqliteTable("users", {
 	name: text("name").notNull(),
 	avatarKey: text("avatar_key"),
 	role: text("role", { enum: ["admin", "user"] }).notNull().default("user"),
+	activationStatus: text("activation_status", { enum: ["active", "pending", "revoked"] })
+		.notNull()
+		.default("active"),
+	activatedAt: integer("activated_at", { mode: "timestamp" }),
+	invitationSentAt: integer("invitation_sent_at", { mode: "timestamp" }),
+	invitationExpiresAt: integer("invitation_expires_at", { mode: "timestamp" }),
 	disabled: integer("disabled", { mode: "boolean" }).notNull().default(false),
 	canManageMailboxes: integer("can_manage_mailboxes", { mode: "boolean" }).notNull().default(false),
 	createdByUserId: text("created_by_user_id").references((): AnySQLiteColumn => users.id, { onDelete: "set null" }),
@@ -409,7 +415,7 @@ export const accountRecoveryTokens = sqliteTable(
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
 		purpose: text("purpose", {
-			enum: ["password_reset", "recovery_email_verification"],
+			enum: ["password_reset", "recovery_email_verification", "account_activation"],
 		}).notNull(),
 		tokenHash: text("token_hash").notNull(),
 		email: text("email").notNull(),

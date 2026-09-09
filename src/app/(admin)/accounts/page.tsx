@@ -16,6 +16,13 @@ import { authFetch } from "@/lib/auth/client";
 import { useBranding } from "@/components/branding-provider";
 import type { Account, AccountResponse, Domain } from "./types";
 
+function getActivationLabel(account: Account): string {
+	if (account.activationStatus === "active") return "Active";
+	if (account.activationStatus === "revoked") return "Invitation revoked";
+	if (account.invitationExpired) return "Invitation expired";
+	return account.invitationSentAt ? "Invitation pending" : "Invitation not sent";
+}
+
 export default function AccountsPage() {
 	const branding = useBranding();
 	const [accounts, setAccounts] = useState<Account[]>([]);
@@ -25,7 +32,7 @@ export default function AccountsPage() {
 	const [senderName, setSenderName] = useState("");
 	const [domainId, setDomainId] = useState("");
 	const [role, setRole] = useState<"admin" | "user">("user");
-	const [password, setPassword] = useState("");
+	const [invitationEmail, setInvitationEmail] = useState("");
 	const [avatar, setAvatar] = useState<File | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
@@ -64,7 +71,7 @@ export default function AccountsPage() {
 		setSaving(true);
 		setMessage(null);
 		try {
-			const response = await authFetch("/api/accounts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, name, senderName: senderName.trim() || undefined, domainId, password, role }) });
+			const response = await authFetch("/api/accounts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, name, senderName: senderName.trim() || undefined, domainId, invitationEmail, role }) });
 			const data = (await response.json()) as AccountResponse;
 			if (!response.ok) throw new Error(data.error ?? "Unable to create account");
 			let avatarUploadError: string | null = null;
@@ -83,12 +90,16 @@ export default function AccountsPage() {
 			setUsername("");
 			setName("");
 			setSenderName("");
-			setPassword("");
+			setInvitationEmail("");
 			setAvatar(null);
 			setCreateOpen(false);
 			await loadAccounts();
 			if (avatarUploadError) {
 				setMessage(`Account created, but its profile picture was not saved: ${avatarUploadError}`);
+			} else if (data.invitationDelivery === "delivery_disabled") {
+				setMessage("Account created. Invitation delivery is disabled in this environment; resend it after enabling delivery.");
+			} else {
+				setMessage("Account created and invitation scheduled.");
 			}
 		} catch (error) {
 			setMessage(error instanceof Error ? error.message : "Unable to create account");
@@ -102,14 +113,14 @@ export default function AccountsPage() {
 		{message && !createOpen && <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{message}</p>}
 		<div className="relative"><div className="grid gap-3">
 			{loading && <p className="text-sm text-neutral-500">Loading...</p>}
-			{accounts.map((account) => <Link key={account.id} href={`/accounts/${account.id}`} className="flex items-center gap-4 rounded-3xl bg-white p-5 transition-colors hover:bg-blue-50/40"><span className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 font-semibold text-blue-700">{account.name.charAt(0).toUpperCase()}{account.hasAvatar && <img src={`/api/accounts/${account.id}/avatar`} alt="" className="absolute inset-0 h-full w-full object-cover" />}</span><span className="min-w-0"><span className="flex items-center gap-2"><span className="truncate font-semibold text-neutral-900">{account.name}</span><span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium capitalize text-neutral-600">{account.role}</span></span><span className="block truncate text-sm text-neutral-500">{account.email}</span></span></Link>)}
+			{accounts.map((account) => <Link key={account.id} href={`/accounts/${account.id}`} className="flex items-center gap-4 rounded-3xl bg-white p-5 transition-colors hover:bg-blue-50/40"><span className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 font-semibold text-blue-700">{account.name.charAt(0).toUpperCase()}{account.hasAvatar && <img src={`/api/accounts/${account.id}/avatar`} alt="" className="absolute inset-0 h-full w-full object-cover" />}</span><span className="min-w-0"><span className="flex flex-wrap items-center gap-2"><span className="truncate font-semibold text-neutral-900">{account.name}</span><span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium capitalize text-neutral-600">{account.role}</span><span className={`rounded-full px-2 py-0.5 text-xs font-medium ${account.activationStatus === "active" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{getActivationLabel(account)}</span></span><span className="block truncate text-sm text-neutral-500">{account.email}</span></span></Link>)}
 		</div></div>
-		<Dialog open={createOpen} onOpenChange={setCreateOpen}><DialogContent><DialogHeader><DialogTitle>Add user account</DialogTitle><DialogDescription>The user can sign in with this email and password.</DialogDescription></DialogHeader><form onSubmit={createAccount} className="space-y-4">
+		<Dialog open={createOpen} onOpenChange={setCreateOpen}><DialogContent><DialogHeader><DialogTitle>Add user account</DialogTitle><DialogDescription>We will email a single-use activation link so the user can choose their own password.</DialogDescription></DialogHeader><form onSubmit={createAccount} className="space-y-4">
 			<div className="space-y-2"><Label htmlFor="account-username">Email</Label><div className="flex h-10 overflow-hidden rounded-md border border-neutral-200 bg-white"><Input id="account-username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="username" className="min-w-0 flex-1 rounded-none border-0 shadow-none" required /><span className="flex items-center text-sm text-neutral-400">@</span><Select aria-label="Domain" value={domainId} onChange={(event) => setDomainId(event.target.value)} className="max-w-[55%] bg-transparent px-3 text-sm" required><option value="">Select domain</option>{domains.map((domain) => <option key={domain.id} value={domain.id}>{domain.hostname}</option>)}</Select></div></div>
 			<div className="space-y-2"><Label htmlFor="account-name">Person&apos;s name</Label><Input id="account-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Sharon" maxLength={100} required /></div>
 			<div className="space-y-2"><Label htmlFor="account-sender-name">Sender name</Label><Input id="account-sender-name" value={senderName} onChange={(event) => setSenderName(event.target.value)} placeholder={name.trim() && branding.companyName ? `${name.trim()} from ${branding.companyName}` : name.trim() || "Sharon from CaliberCode"} maxLength={100} /><p className="text-xs text-neutral-500">Optional override. If blank, CC Mail combines the person and company names.</p></div>
 			<div className="space-y-2"><Label htmlFor="account-avatar">Profile picture</Label><Input id="account-avatar" type="file" accept={PROFILE_AVATAR_ACCEPT} onChange={(event) => { const picked = event.target.files?.[0] ?? null; setAvatar(picked); if (picked) setMessage(validateProfileAvatar(picked)); }} /><p className="text-xs text-neutral-500">Optional. The user can change this later in Account settings.</p></div>
-			<div className="space-y-2"><Label htmlFor="account-password">Temporary password</Label><Input id="account-password" type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required /></div>
+			<div className="space-y-2"><Label htmlFor="account-invitation-email">Invitation email</Label><Input id="account-invitation-email" type="email" autoComplete="email" value={invitationEmail} onChange={(event) => setInvitationEmail(event.target.value)} placeholder="person@example.com" required /><p className="text-xs text-neutral-500">Use an external address the user can access. Activation also verifies it for account recovery.</p></div>
 			<div className="space-y-2"><Label htmlFor="account-role">Role</Label><Select id="account-role" value={role} onChange={(event) => setRole(event.target.value as "admin" | "user")} className="h-10 w-full rounded-md border border-neutral-200 bg-white px-3 text-sm"><option value="user">User</option><option value="admin">Admin</option></Select></div>
 			{message && <p className="text-sm text-red-600">{message}</p>}<Button type="submit" disabled={saving || !domainId}>{saving ? "Creating..." : "Create account"}</Button>
 		</form></DialogContent></Dialog>

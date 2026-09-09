@@ -4,6 +4,11 @@ export type AccountListItem = {
 	name: string;
 	resetEmail: string | null;
 	role: "admin" | "user";
+	activationStatus: "active" | "pending" | "revoked";
+	activatedAt: Date | null;
+	invitationSentAt: Date | null;
+	invitationExpiresAt: Date | null;
+	invitationExpired: boolean;
 	createdAt: Date;
 	hasAvatar?: boolean;
 	canManageMailboxes?: boolean;
@@ -22,7 +27,7 @@ export type CreateAccountResult = {
 export type CreateUserAccountInput = {
 	username: string;
 	domainId: string;
-	password: string;
+	invitationEmail: string;
 	name?: string;
 	senderName?: string;
 	role: "admin" | "user";

@@ -11,6 +11,8 @@ import type { ManagedAccount, ManagedMailbox } from "./types";
 import {
 	fetchManagedAccount,
 	fetchManagedMailboxes,
+	resendManagedAccountInvitation,
+	revokeManagedAccountInvitation,
 	saveManagedAccount,
 	uploadManagedAccountAvatar,
 	updateManagedMailboxName,
@@ -22,6 +24,7 @@ export default function AccountDetailsPage() {
 	const [mailboxes, setMailboxes] = useState<ManagedMailbox[]>([]);
 	const [saving, setSaving] = useState(false);
 	const [savingMailboxId, setSavingMailboxId] = useState<string | null>(null);
+	const [invitationBusy, setInvitationBusy] = useState(false);
 	const [message, setMessage] = useState<string | null>(null);
 	const [avatarVersion, setAvatarVersion] = useState(0);
 
@@ -72,7 +75,40 @@ export default function AccountDetailsPage() {
 		}
 	}
 
+	async function resendInvitation() {
+		if (!account?.resetEmail) return;
+		setInvitationBusy(true);
+		setMessage(null);
+		try {
+			const delivery = await resendManagedAccountInvitation(account.id, account.resetEmail);
+			setAccount(await fetchManagedAccount(account.id));
+			setMessage(delivery === "delivery_disabled"
+				? "Invitation delivery is disabled in this environment."
+				: "A new invitation was scheduled; every older link is now invalid.");
+		} catch (error) {
+			setMessage(error instanceof Error ? error.message : "Unable to resend invitation");
+		} finally {
+			setInvitationBusy(false);
+		}
+	}
+
+	async function revokeInvitation() {
+		if (!account) return;
+		setInvitationBusy(true);
+		setMessage(null);
+		try {
+			await revokeManagedAccountInvitation(account.id);
+			setAccount(await fetchManagedAccount(account.id));
+			setMessage("Invitation revoked. Its activation link can no longer be used.");
+		} catch (error) {
+			setMessage(error instanceof Error ? error.message : "Unable to revoke invitation");
+		} finally {
+			setInvitationBusy(false);
+		}
+	}
+
 	if (!account) return <p className="text-sm text-neutral-500">{message ?? "Loading account..."}</p>;
+	const activationLabel = account.activationStatus === "active" ? "Active" : account.activationStatus === "revoked" ? "Invitation revoked" : account.invitationExpired ? "Invitation expired" : account.invitationSentAt ? "Invitation pending" : "Invitation not sent";
 
 	return (
 		<div className="space-y-6">
@@ -124,6 +160,27 @@ export default function AccountDetailsPage() {
 				<Button onClick={() => void saveDetails()} disabled={saving || !account.name.trim()}>
 					{saving ? "Saving..." : "Save details"}
 				</Button>
+			</section>
+			<section className="space-y-4 rounded-3xl bg-white p-6">
+				<div>
+					<h2 className="text-lg font-semibold text-neutral-900">Account activation</h2>
+					<p className="mt-1 text-sm text-neutral-500">Status: <span className="font-medium text-neutral-800">{activationLabel}</span></p>
+				</div>
+				{account.activationStatus === "active" ? (
+					<p className="text-sm text-neutral-500">The user chose their password{account.activatedAt ? ` on ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(account.activatedAt))}` : ""}.</p>
+				) : (
+					<>
+						<div className="space-y-2">
+							<Label htmlFor="invitation-email">Invitation email</Label>
+							<Input id="invitation-email" type="email" value={account.resetEmail ?? ""} onChange={(event) => setAccount({ ...account, resetEmail: event.target.value || null })} />
+							{account.invitationExpiresAt && !account.invitationExpired && <p className="text-xs text-neutral-500">Current link expires {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(account.invitationExpiresAt))}.</p>}
+						</div>
+						<div className="flex flex-wrap gap-3">
+							<Button type="button" onClick={() => void resendInvitation()} disabled={invitationBusy || !account.resetEmail}>Resend invitation</Button>
+							{account.activationStatus === "pending" && <Button type="button" variant="outline" onClick={() => void revokeInvitation()} disabled={invitationBusy}>Revoke invitation</Button>}
+						</div>
+					</>
+				)}
 			</section>
 			<section className="space-y-5 rounded-3xl bg-white p-6">
 				<div>

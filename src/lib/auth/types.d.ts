@@ -9,6 +9,10 @@ export type SessionUser = {
 	passwordHash: string;
 	name: string;
 	role: UserRole;
+	activationStatus: "active" | "pending" | "revoked";
+	activatedAt: Date | null;
+	invitationSentAt: Date | null;
+	invitationExpiresAt: Date | null;
 	disabled: boolean;
 	canManageMailboxes: boolean;
 	createdByUserId: string | null;

@@ -93,6 +93,23 @@ export async function fetchManagedMailboxes(accountId: string): Promise<ManagedM
 	return data.mailboxes ?? [];
 }
 
+export async function resendManagedAccountInvitation(accountId: string, invitationEmail: string): Promise<"pending" | "delivery_disabled"> {
+	const res = await authFetch(`/api/accounts/${accountId}/invitation`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({ invitationEmail }),
+	});
+	const json = (await res.json()) as { error?: string; invitationDelivery?: "pending" | "delivery_disabled" };
+	if (!res.ok) throw new Error(json.error ?? "Failed to resend invitation");
+	return json.invitationDelivery ?? "pending";
+}
+
+export async function revokeManagedAccountInvitation(accountId: string): Promise<void> {
+	const res = await authFetch(`/api/accounts/${accountId}/invitation`, { method: "DELETE" });
+	const json = (await res.json()) as { error?: string };
+	if (!res.ok) throw new Error(json.error ?? "Failed to revoke invitation");
+}
+
 export async function updateManagedMailboxName(mailboxId: string, displayName: string): Promise<void> {
 	const response = await authFetch(`/api/mailboxes/${mailboxId}`, {
 		method: "PATCH",

@@ -1,4 +1,4 @@
-import { and, eq, gt, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, eq, gt, isNotNull, isNull, lt, ne, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
 	accountRecoveryTokens,
@@ -12,8 +12,9 @@ import { hashPassword } from "./password";
 
 const PASSWORD_RESET_TTL_MS = 30 * 60 * 1_000;
 const RECOVERY_EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1_000;
+const ACCOUNT_ACTIVATION_TTL_MS = 72 * 60 * 60 * 1_000;
 
-type RecoveryPurpose = "password_reset" | "recovery_email_verification";
+type RecoveryPurpose = "password_reset" | "recovery_email_verification" | "account_activation";
 
 export type PendingAuthEmail = {
 	tokenId: string;
@@ -29,8 +30,18 @@ export type RecoveryEmailVerificationPreparation =
 	| { status: "delivery_disabled" }
 	| { status: "pending"; email: PendingAuthEmail };
 
+export type AccountActivationPreparation =
+	| { status: "delivery_disabled" }
+	| { status: "pending"; email: PendingAuthEmail };
+
 export function isAuthEmailDeliveryEnabled(env: CloudflareEnv): boolean {
 	return env.AUTH_EMAIL_DELIVERY_MODE === "enabled";
+}
+
+export function createUnusablePasswordHash(): string {
+	const bytes = new Uint8Array(32);
+	crypto.getRandomValues(bytes);
+	return hashPassword(bytesToHex(bytes));
 }
 
 export async function preparePasswordReset(
@@ -84,28 +95,101 @@ export async function prepareRecoveryEmailVerification(
 	return { status: "pending", email: pending };
 }
 
+export async function prepareAccountActivation(
+	env: CloudflareEnv,
+	userId: string,
+): Promise<AccountActivationPreparation> {
+	const db = getDb(env);
+	const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+	if (!user?.resetEmail || user.activationStatus === "active") {
+		throw new Error("Account is not available for invitation");
+	}
+	if (!isAuthEmailDeliveryEnabled(env)) {
+		await db.batch([
+			db.delete(accountRecoveryTokens).where(and(
+				eq(accountRecoveryTokens.userId, userId),
+				eq(accountRecoveryTokens.purpose, "account_activation"),
+			)),
+			db.update(users).set({
+				activationStatus: "pending",
+				invitationSentAt: null,
+				invitationExpiresAt: null,
+				resetEmailVerifiedAt: null,
+			}).where(eq(users.id, userId)),
+		]);
+		return { status: "delivery_disabled" };
+	}
+
+	const pending = await replaceRecoveryToken(env, {
+		userId,
+		purpose: "account_activation",
+		email: user.resetEmail,
+		ttlMs: ACCOUNT_ACTIVATION_TTL_MS,
+	});
+	const updated = await db.update(users).set({
+		activationStatus: "pending",
+		invitationSentAt: new Date(),
+		invitationExpiresAt: new Date(Date.now() + ACCOUNT_ACTIVATION_TTL_MS),
+		resetEmailVerifiedAt: null,
+	}).where(and(eq(users.id, userId), ne(users.activationStatus, "active"))).returning({ id: users.id });
+	if (updated.length === 0) {
+		await db.delete(accountRecoveryTokens).where(eq(accountRecoveryTokens.id, pending.tokenId));
+		throw new Error("Account is already active");
+	}
+	await recordRecoveryAudit(env, {
+		targetUserId: userId,
+		action: "auth.account_invitation_requested",
+		metadata: { delivery: "scheduled" },
+	});
+	return { status: "pending", email: pending };
+}
+
 export async function deliverAuthEmail(env: CloudflareEnv, pending: PendingAuthEmail): Promise<void> {
 	try {
 		const origin = getPublicAppOrigin(env);
 		const route = pending.purpose === "password_reset"
 			? "/reset-password"
-			: "/verify-recovery-email";
+			: pending.purpose === "account_activation"
+				? "/activate-account"
+				: "/verify-recovery-email";
 		const link = new URL(route, origin);
 		link.searchParams.set("token", pending.token);
-		const isReset = pending.purpose === "password_reset";
-		const subject = isReset ? "Continue your CC Mail account recovery" : "Verify your CC Mail recovery email";
-		const action = isReset ? "Continue account recovery" : "Verify recovery email";
-		const expiry = isReset ? "30 minutes" : "24 hours";
+		const content = {
+			password_reset: {
+				subject: "Continue your CC Mail account recovery",
+				action: "Continue account recovery",
+				expiry: "30 minutes",
+			},
+			recovery_email_verification: {
+				subject: "Verify your CC Mail recovery email",
+				action: "Verify recovery email",
+				expiry: "24 hours",
+			},
+			account_activation: {
+				subject: "Activate your CC Mail account",
+				action: "Activate account",
+				expiry: "72 hours",
+			},
+		}[pending.purpose];
 		await env.EMAIL.send({
 			from: env.AUTH_EMAIL_FROM,
 			to: pending.to,
-			subject,
-			text: `${action}: ${link.toString()}\n\nThis link expires in ${expiry}. If you did not request it, you can ignore this email.`,
-			html: `<p>${action}:</p><p><a href="${link.toString()}">${action}</a></p><p>This link expires in ${expiry}. If you did not request it, you can ignore this email.</p>`,
+			subject: content.subject,
+			text: `${content.action}: ${link.toString()}\n\nThis link expires in ${content.expiry}. If you did not expect it, you can ignore this email.`,
+			html: `<p>${content.action}:</p><p><a href="${link.toString()}">${content.action}</a></p><p>This link expires in ${content.expiry}. If you did not expect it, you can ignore this email.</p>`,
 		});
 	} catch (error) {
 		try {
-			await revokeRecoveryToken(env, pending.tokenId);
+			const revoked = await revokeRecoveryToken(env, pending.tokenId);
+			if (revoked && pending.purpose === "account_activation") {
+				await getDb(env).update(users).set({
+					invitationSentAt: null,
+					invitationExpiresAt: null,
+				}).where(and(
+					eq(users.id, pending.userId),
+					eq(users.activationStatus, "pending"),
+				));
+			}
 		} catch {
 			console.error(JSON.stringify({ event: "auth_email_token_revocation_failed" }));
 		}
@@ -125,8 +209,76 @@ export async function deliverAuthEmail(env: CloudflareEnv, pending: PendingAuthE
 		targetUserId: pending.userId,
 		action: pending.purpose === "password_reset"
 			? "auth.password_reset_email_sent"
-			: "auth.recovery_email_verification_sent",
+			: pending.purpose === "account_activation"
+				? "auth.account_invitation_sent"
+				: "auth.recovery_email_verification_sent",
 	});
+}
+
+export async function completeAccountActivation(
+	env: CloudflareEnv,
+	token: string,
+	newPassword: string,
+): Promise<string | null> {
+	const claimed = await claimRecoveryToken(env, token, "account_activation");
+	if (!claimed) return null;
+	const db = getDb(env);
+	const now = new Date();
+	const activated = await db.update(users).set({
+		passwordHash: hashPassword(newPassword),
+		activationStatus: "active",
+		activatedAt: now,
+		invitationSentAt: null,
+		invitationExpiresAt: null,
+		resetEmailVerifiedAt: now,
+	}).where(and(
+		eq(users.id, claimed.userId),
+		eq(users.resetEmail, claimed.email),
+		eq(users.activationStatus, "pending"),
+		eq(users.disabled, false),
+	)).returning({ id: users.id });
+	const user = activated[0];
+	if (!user) return null;
+
+	await db.batch([
+		db.delete(sessions).where(eq(sessions.userId, user.id)),
+		db.delete(accountRecoveryTokens).where(eq(accountRecoveryTokens.userId, user.id)),
+		db.insert(auditLogs).values({
+			id: newId("aud"),
+			actorUserId: user.id,
+			targetUserId: user.id,
+			action: "auth.account_activated",
+			metadata: JSON.stringify({ recoveryEmailVerified: true }),
+		}),
+	]);
+	return user.id;
+}
+
+export async function revokeAccountInvitation(env: CloudflareEnv, userId: string, actorUserId: string): Promise<boolean> {
+	const db = getDb(env);
+	const updated = await db.update(users).set({
+		activationStatus: "revoked",
+		invitationSentAt: null,
+		invitationExpiresAt: null,
+	}).where(and(
+		eq(users.id, userId),
+		eq(users.activationStatus, "pending"),
+	)).returning({ id: users.id });
+	if (updated.length === 0) return false;
+	await db.batch([
+		db.delete(accountRecoveryTokens).where(and(
+			eq(accountRecoveryTokens.userId, userId),
+			eq(accountRecoveryTokens.purpose, "account_activation"),
+		)),
+		db.delete(sessions).where(eq(sessions.userId, userId)),
+		db.insert(auditLogs).values({
+			id: newId("aud"),
+			actorUserId,
+			targetUserId: userId,
+			action: "auth.account_invitation_revoked",
+		}),
+	]);
+	return true;
 }
 
 export async function completeRecoveryEmailVerification(
@@ -271,11 +423,12 @@ async function claimRecoveryToken(
 	return claimed[0] ?? null;
 }
 
-async function revokeRecoveryToken(env: CloudflareEnv, tokenId: string): Promise<void> {
-	await getDb(env)
+async function revokeRecoveryToken(env: CloudflareEnv, tokenId: string): Promise<boolean> {
+	const result = await getDb(env)
 		.update(accountRecoveryTokens)
 		.set({ usedAt: new Date() })
-		.where(eq(accountRecoveryTokens.id, tokenId));
+		.where(and(eq(accountRecoveryTokens.id, tokenId), isNull(accountRecoveryTokens.usedAt)));
+	return result.meta.changes > 0;
 }
 
 function getPublicAppOrigin(env: CloudflareEnv): string {

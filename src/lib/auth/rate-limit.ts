@@ -14,7 +14,7 @@ export async function allowAccountRecoveryAttempt(
 	env: CloudflareEnv,
 	request: Request,
 	accountKey: string,
-	purpose: "request" | "confirm" | "verify",
+	purpose: "request" | "confirm" | "verify" | "activate",
 ): Promise<boolean> {
 	if (!env.PASSWORD_RESET_RATE_LIMIT) return env.DEPLOYMENT_ENV === "local";
 	const ip = request.headers.get("cf-connecting-ip")?.trim() || "unknown";

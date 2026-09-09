@@ -21,6 +21,14 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 			email: account.email,
 			name: account.name,
 			role: account.role,
+			resetEmail: account.resetEmail,
+			activationStatus: account.activationStatus,
+			activatedAt: account.activatedAt,
+			invitationSentAt: account.invitationSentAt,
+			invitationExpiresAt: account.invitationExpiresAt,
+			invitationExpired: account.activationStatus === "pending"
+				&& !!account.invitationExpiresAt
+				&& account.invitationExpiresAt.getTime() <= Date.now(),
 			disabled: account.disabled,
 			canManageMailboxes: account.canManageMailboxes,
 			forwardingEmail: account.forwardingEmail,

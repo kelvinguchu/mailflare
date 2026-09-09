@@ -91,7 +91,7 @@ export const createAccountSchema = z.object({
 export const createUserAccountSchema = z.object({
 	username: z.string().trim().min(1).max(64).regex(/^[a-zA-Z0-9._%+-]+$/),
 	domainId: z.string().min(1),
-	password: z.string().min(8).max(128),
+	invitationEmail: z.string().trim().email().max(320),
 	name: z.string().trim().min(1).max(100).optional(),
 	senderName: z.string().trim().min(1).max(100).optional(),
 	role: z.enum(["admin", "user"]).default("user"),
@@ -169,6 +169,12 @@ export const passwordResetRequestSchema = z.object({
 export const passwordResetConfirmSchema = z.object({
 	token: z.string().regex(/^[a-f0-9]{64}$/),
 	newPassword: z.string().min(8).max(128),
+});
+
+export const accountActivationConfirmSchema = passwordResetConfirmSchema;
+
+export const accountInvitationSchema = z.object({
+	invitationEmail: z.string().trim().email().max(320).optional(),
 });
 
 export const recoveryEmailVerificationSchema = z.object({
