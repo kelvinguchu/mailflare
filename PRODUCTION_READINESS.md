@@ -195,16 +195,18 @@ Acceptance criteria:
 
 ### 3.1 Implement secure password recovery
 
-- [ ] Create short-lived, single-use reset tokens stored only as hashes.
-- [ ] Send reset links only to the verified recovery address.
-- [ ] Rate-limit requests by account and IP without revealing whether an account exists.
-- [ ] Revoke reset tokens after use or password change.
-- [ ] Record reset activity in the audit log.
+Status: `[x]` Recovery addresses require explicit ownership verification; public reset requests use constant responses and hashed account/IP rate-limit keys, while 30-minute single-use token hashes, session revocation, audit records and daily token cleanup are enforced in D1.
+
+- [x] Create short-lived, single-use reset tokens stored only as hashes.
+- [x] Send reset links only to the verified recovery address.
+- [x] Rate-limit requests by account and IP without revealing whether an account exists.
+- [x] Revoke reset tokens after use or password change.
+- [x] Record reset activity in the audit log.
 
 Acceptance criteria:
 
-- A user can recover access without administrator database intervention.
-- Reset tokens expire, cannot be reused and never appear in D1 as plaintext.
+- [x] A user can recover access without administrator database intervention.
+- [x] Reset tokens expire, cannot be reused and never appear in D1 as plaintext.
 
 ### 3.2 Improve administrator-created account activation
 
