@@ -4,6 +4,8 @@ This is the working checklist for taking CC Mail from a functional beta to a dep
 
 Audit date: 2026-09-01
 
+Roadmap updated: 2026-09-09
+
 Production: `https://mail.calibercode.io`
 
 Last reviewed deployment: `c57e232b-fb4f-40fc-a71c-e3da78df1d47`
@@ -436,6 +438,121 @@ Acceptance criteria:
 - [ ] Test narrow desktop, tablet and mobile layouts.
 - [ ] Check contrast, reduced motion and large text.
 
+## Owner-requested feature expansion
+
+These features are split into backend and frontend tracks. Complete and verify the backend contract, migration and authorization rules before wiring the corresponding interface. Do not combine this work with the TanStack Start migration.
+
+### Backend track
+
+#### B1 Add CC recipient semantics
+
+- [ ] Model `To` and `Cc` recipients explicitly in persisted outgoing and incoming messages.
+- [ ] Include CC recipients in outbound MIME generation and inbound parsing without weakening mailbox authorization.
+- [ ] Preserve CC metadata through queued delivery, retries, backups, restores, replies and forwards.
+- [ ] Add validation, recipient limits and tests for duplicate addresses across `To` and `Cc`.
+
+Acceptance criteria:
+
+- A CC recipient receives the message and all recipients see the correct `To` and `Cc` headers.
+- Retrying a queued message cannot change or duplicate its recipient set.
+
+#### B2 Add safe rich-text signatures
+
+- [ ] Store both sanitized HTML and plain-text signature variants per account or sender identity.
+- [ ] Define a conservative formatting allowlist for links, text styles, lists and optional hosted images.
+- [ ] Sanitize signatures on write and again when composing the final outbound MIME message.
+- [ ] Define signature placement for new messages, replies and forwards.
+- [ ] Include signatures in backup, restore and audit coverage.
+
+Acceptance criteria:
+
+- Signatures retain approved formatting in common mail clients and have a readable plain-text fallback.
+- Script, event-handler, unsafe URL, SVG and CSS injection cannot enter the final message through a signature.
+
+#### B3 Add cancelable delayed sending (“Undo send”)
+
+- [ ] Add a configurable short send delay and a durable `scheduled`/`canceled` job state.
+- [ ] Return an undo deadline with the send response.
+- [ ] Add an authenticated cancellation endpoint using an atomic D1 state transition.
+- [ ] Make the queue consumer enforce `send_not_before` and refuse delivery of canceled jobs.
+- [ ] Preserve idempotency when cancellation races with queue delivery.
+
+Acceptance criteria:
+
+- Undo succeeds throughout the advertised window and guarantees the provider was not called.
+- Once provider delivery begins, the UI and API no longer claim the message can be undone.
+
+#### B4 Add TOTP multi-factor authentication
+
+This extends Phase 3.4 and should begin with administrator accounts.
+
+- [ ] Add enrollment, verification, disable and recovery flows with recent-password confirmation.
+- [ ] Encrypt TOTP secrets at rest with an application secret that is not stored in D1.
+- [ ] Generate one-time recovery codes and store only their hashes.
+- [ ] Add rate limits, replay protection, audit events and administrator recovery rules.
+- [ ] Support an enforce-MFA policy beginning with administrators, then optionally all users.
+
+Acceptance criteria:
+
+- A password alone cannot authenticate an enrolled administrator.
+- TOTP codes cannot be replayed, recovery codes are single-use and no MFA secret is returned after enrollment.
+
+#### B5 Expand calendar into events, tasks and reminders
+
+- [ ] Define separate event, task and reminder models with ownership and mailbox/workspace authorization.
+- [ ] Store timezone-aware dates, all-day semantics, task completion and reminder schedules explicitly.
+- [ ] Define recurrence and exception behavior before adding repeating events or tasks.
+- [ ] Dispatch due reminders through an idempotent scheduled backend process with delivery history.
+- [ ] Preserve calendar, task and reminder state through backup and restore.
+- [ ] Add APIs for filtered ranges, overdue tasks, completion and reminder dismissal/snoozing.
+
+Acceptance criteria:
+
+- Due reminders are emitted once despite repeated scheduler execution.
+- Timezone changes and daylight-saving transitions do not silently move event or reminder intent.
+- Users cannot read or mutate another account's calendar or tasks without explicit permission.
+
+### Frontend track
+
+#### F1 Redesign authentication screens
+
+- [ ] Replace Gmail-like layout and visual language with an original CC Mail login, recovery and MFA experience.
+- [ ] Use the existing CC Mail branding consistently without imitating another provider's interface.
+- [ ] Add responsive, accessible error, recovery and TOTP challenge states.
+- [ ] After deployment, verify Safe Browsing/Search Console status and request review if necessary; visual redesign alone is not proof that a warning is resolved.
+
+#### F2 Replace full-screen loading states
+
+- [ ] Keep the current page shell visible during ordinary data mutations and navigation.
+- [ ] Use local spinners, disabled controls or skeletons only where data is pending.
+- [ ] Reserve a full-screen blocking state for initial session bootstrap or operations that genuinely make the whole page unsafe to use.
+
+#### F3 Expose CC composition
+
+- [ ] Add a collapsible CC field with address chips, validation and keyboard support.
+- [ ] Render `To` and `Cc` consistently in message detail, reply and forward views.
+
+#### F4 Add a rich signature editor
+
+- [ ] Provide only the formatting supported by the backend sanitization policy.
+- [ ] Show HTML and plain-text previews and make signature placement understandable.
+
+#### F5 Add the Undo send interaction
+
+- [ ] Show a non-blocking confirmation with an Undo action for the exact server-provided deadline.
+- [ ] Resolve cancellation success, expiry and network races honestly without implying a sent message was recalled.
+
+#### F6 Add MFA setup and challenge interfaces
+
+- [ ] Add QR/manual-key enrollment, code confirmation and recovery-code acknowledgement.
+- [ ] Add sign-in challenge, trusted error handling and recent-authentication prompts for high-risk actions.
+
+#### F7 Expand the calendar interface
+
+- [ ] Add event, task and agenda views with clear overdue and completed states.
+- [ ] Add reminder creation, snooze and dismissal controls.
+- [ ] Make timezone and recurrence behavior visible instead of implicit.
+
 ## Framework migration gate
 
 Do not begin the TanStack Start migration until all of the following are true:
@@ -451,16 +568,16 @@ The migration should then preserve behavior first and improve architecture secon
 
 ## Recommended immediate execution order
 
-1. `0.1` — Create a recoverable source checkpoint.
-2. `1.1` — Repair scheduled backup execution.
-3. `1.2` — Include all D1 data in backups.
-4. `1.4` — Make restore failure-safe.
-5. `1.3` — Add R2 objects to the recovery plan.
-6. `2.3` — Add inbound idempotency.
-7. `2.1` — Make outbound sending genuinely asynchronous.
-8. `2.2` — Add outbound idempotency.
-9. `2.4` — Add dead-letter handling and replay.
-10. `4.1` and `4.2` — Lock the repaired behavior in tests.
+1. `0.2` — Create fully isolated staging resources and safe deployment commands.
+2. `1.4` — Run and document the full staging restore drill.
+3. `4.1` and `4.2` — Lock mail, backup and migration behavior into integration tests.
+4. `B4` / `3.4` — Implement administrator-first TOTP on top of tested session behavior.
+5. `B1` — Add CC recipient semantics end to end.
+6. `B2` — Add safe rich-text signatures.
+7. `B3` — Add cancelable delayed sending and its race-condition tests.
+8. `B5` — Build the calendar/task/reminder backend in bounded schema and scheduling increments.
+9. `F1` through `F7` — Implement each frontend surface only after its backend contract passes.
+10. Re-evaluate the TanStack Start migration gate; do not migrate while infrastructure, recovery or critical integration-test gates remain open.
 
 ## Decision log
 
@@ -474,6 +591,7 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-05 | Queue dead letters and provider-declared final outbound failures share one durable D1 recovery ledger; logs and the admin API expose only queue/reference IDs, safe error codes, attempts and timestamps. | Preserve replay material without leaking sender, recipient, subject, headers or body into logs or the operational UI. |
 | 2026-09-05 | Manual replay is serialized by a short D1 claim and refuses outbound jobs with an in-flight or unknown provider outcome. | Existing delivery keys and outbound job claims make safe re-enqueue idempotent, while an ambiguous provider response can never be made safely replayable without provider idempotency support. |
 | 2026-09-05 | Database backup format v4 includes dead-letter records and raw R2 messages referenced only by inbound failures; v1-v3 remain restorable. | A failed inbound message must remain recoverable even before it creates a normal `messages` row. |
+| 2026-09-09 | Owner-requested features are split into backend and frontend tracks, with isolated staging and critical integration tests preceding schema, authentication and delivery changes. | CC, rich signatures, Undo send, TOTP and reminders cross persistence and security boundaries; defining and verifying backend behavior first avoids encoding UI assumptions into unsafe production changes. |
 
 ## Progress log
 
@@ -489,3 +607,4 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-04 | 2.1 — Asynchronous outbound delivery | Split durable message/job creation from Email Service delivery; browser and API sends return `202` with stable message and job IDs; the consumer loads the existing D1 message and R2 attachments, updates that same job, retries transient provider failures up to four attempts and records permanent/exhausted failures without reclassifying webhook or audit errors as send failures. | Production version `3edf3ebd-53e7-4e03-af55-8a5f4554bf60`; Cloudflare Email Sending confirmed enabled for `calibercode.io`; 40 tests and typecheck passed; lint completed with zero errors and 57 pre-existing warnings; isolated OpenNext build and Wrangler dry run passed; production login returned HTTP 200; production had no legacy queued outbound jobs before deployment. No synthetic email was sent. |
 | 2026-09-04 | 2.2 — Outbound idempotency | Added client-supplied or generated idempotency keys, account-scoped hashes at rest, request fingerprints including attachment contents, a D1 uniqueness constraint, one atomic delivery claim, bounded pre-provider and explicit-transient retries, no-resend handling for unknown post-provider outcomes, and stable derived keys for calendar invitations and auto-replies. | Pre-migration backup `bak_pre_outbound_idempotency_20260904` completed with six independent R2 objects and 1,148,939 total bytes; migration `0028_add_outbound_idempotency.sql` passed on a fresh isolated D1 database and production; production version `bf4c78ce-f6b8-40bd-990e-19f331cdabcc`; 51 tests, typecheck, lint, isolated OpenNext build and Wrangler dry run passed; the production unique index was verified, no migrations remained, no jobs were stuck, and production login returned HTTP 200. No synthetic email was sent. An unauthenticated `/api/send` smoke request created no job but returned `500` instead of a clean `401`; response normalization remains a separate auth/API follow-up. |
 | 2026-09-05 | 2.4 — Dead-letter handling and replay | Added dedicated inbound/outbound DLQs, durable idempotent D1 capture, safe structured diagnostics, provider-final-failure capture, an administrator-only failure history and serialized replay action, an app-wide unresolved-failure alert, and backup format v4 coverage for failure payloads and their raw inbound R2 sources. | Pre-migration backup `bak_pre_dead_letters_20260905` completed through Workflow `5199fc14-80e0-4378-8ab5-d75b320032c6` with eight independent R2 objects and 1,432,182 total bytes; migration `0029_add_dead_letter_events.sql` passed on isolated and production D1; production version `c57e232b-fb4f-40fc-a71c-e3da78df1d47`; 58 tests, typecheck, lint, isolated Next/OpenNext builds and Wrangler dry run passed; all four queue consumers and both new queue resources were verified; no migrations remained; production login and the new page returned HTTP 200; the admin API returned 403 without a session; production had zero unresolved failures and all ten outbound jobs were sent. No synthetic email was sent. |
+| 2026-09-09 | Owner-requested feature planning | Added separate backend and frontend tracks for CC recipients, safe rich signatures, delayed send/Undo, TOTP, original login design, local loading states, and expanded calendar/tasks/reminders. Re-prioritized the next work around isolated staging, the restore drill and integration tests before feature schema or authentication changes. | Roadmap review only; no runtime code, infrastructure or production state changed. |
