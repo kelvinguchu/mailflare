@@ -44,7 +44,7 @@ describe("database backup format", () => {
 
 	it("puts the format version in new backup filenames", () => {
 		expect(createBackupFilename(new Date("2026-09-04T02:00:00.000Z"))).toBe(
-			"cc-mail-v4-2026-09-04T02-00-00-000Z.json",
+			"cc-mail-v5-2026-09-04T02-00-00-000Z.json",
 		);
 	});
 

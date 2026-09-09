@@ -26,6 +26,7 @@ export async function GET(request: Request) {
 			email: user.email,
 			name: user.name,
 			resetEmail: user.resetEmail,
+			resetEmailVerified: !!user.resetEmailVerifiedAt,
 			forwardingEmail: user.forwardingEmail,
 			role: user.role,
 			canManageMailboxes: user.canManageMailboxes,

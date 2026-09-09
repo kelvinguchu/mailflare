@@ -10,6 +10,7 @@ import {
 	DATABASE_BACKUP_FORMAT,
 	LEGACY_V1_BACKUP_TABLES,
 	LEGACY_V2_V3_BACKUP_TABLES,
+	LEGACY_V4_BACKUP_TABLES,
 } from "@/lib/backups/format";
 import { restoreDatabaseRecords } from "@/lib/backups/restore";
 import type { DatabaseBackupDocument, DatabaseRecord } from "@/lib/backups/types";
@@ -50,7 +51,7 @@ describe("database backups with isolated D1 and R2", () => {
 		const restored = await exportDatabaseDocument(integrationEnv.DB);
 
 		for (const table of BACKUP_TABLES) {
-			if (table === "sessions" || table === "backups") continue;
+			if (table === "sessions" || table === "account_recovery_tokens" || table === "backups") continue;
 			expect(restored.tables[table], table).toEqual(original.tables[table]);
 		}
 		expect(restored.tables.sessions).toEqual([]);
@@ -67,9 +68,13 @@ describe("database backups with isolated D1 and R2", () => {
 		expect(stagingTables.results).toEqual([]);
 	});
 
-	it("restores legacy versions 1, 2, and 3 through the live D1 path", async () => {
-		for (const version of [1, 2, 3] as const) {
-			const names = version === 1 ? LEGACY_V1_BACKUP_TABLES : LEGACY_V2_V3_BACKUP_TABLES;
+	it("restores legacy versions 1 through 4 through the live D1 path", async () => {
+		for (const version of [1, 2, 3, 4] as const) {
+			const names = version === 1
+				? LEGACY_V1_BACKUP_TABLES
+				: version === 4
+					? LEGACY_V4_BACKUP_TABLES
+					: LEGACY_V2_V3_BACKUP_TABLES;
 			const tables = emptyTables(names);
 			tables.users = [{
 				id: `legacy_user_${version}`,
@@ -86,7 +91,7 @@ describe("database backups with isolated D1 and R2", () => {
 				version,
 				createdAt: "2026-09-09T00:00:00.000Z",
 				tables,
-				...(version === 3
+				...(version >= 3
 					? { r2: { strategy: "independent-copies-v1" as const, objects: [] } }
 					: {}),
 			};

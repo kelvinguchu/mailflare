@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { ZodError } from "zod";
 import { getEnv } from "@/lib/cloudflare";
 import { getDb } from "@/db";
-import { users } from "@/db/schema";
+import { accountRecoveryTokens, users } from "@/db/schema";
 import { requireUser } from "@/lib/auth/cookies";
 import type { UpdateProfileInput } from "./types";
 import { parseUpdateProfileRequest } from "./utils";
@@ -23,22 +23,35 @@ export async function PATCH(request: Request) {
 
 	const db = getDb(env);
 	const forwardingEmail = parsed.forwardingEmail === undefined ? user.forwardingEmail : parsed.forwardingEmail;
-	await db
-		.update(users)
-		.set({
-			name: parsed.name,
-			resetEmail: parsed.resetEmail,
-			forwardingEmail,
-		})
-		.where(eq(users.id, user.id));
+	const resetEmail = normalizeEmail(parsed.resetEmail) || null;
+	const recoveryEmailChanged = resetEmail !== normalizeEmail(user.resetEmail);
+	await db.batch([
+		db
+			.update(users)
+			.set({
+				name: parsed.name,
+				resetEmail,
+				resetEmailVerifiedAt: recoveryEmailChanged ? null : user.resetEmailVerifiedAt,
+				forwardingEmail,
+			})
+			.where(eq(users.id, user.id)),
+		...(recoveryEmailChanged
+			? [db.delete(accountRecoveryTokens).where(eq(accountRecoveryTokens.userId, user.id))]
+			: []),
+	]);
 
 	return NextResponse.json({
 		user: {
 			id: user.id,
 			email: user.email,
 			name: parsed.name,
-			resetEmail: parsed.resetEmail,
+			resetEmail,
+			resetEmailVerified: recoveryEmailChanged ? false : !!user.resetEmailVerifiedAt,
 			forwardingEmail,
 		},
 	});
+}
+
+function normalizeEmail(email: string | null): string {
+	return email?.trim().toLowerCase() ?? "";
 }

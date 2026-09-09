@@ -85,6 +85,7 @@ export function sessionUser(id: string): SessionUser {
 		role: value.role,
 		passwordHash: "hash",
 		resetEmail: null,
+		resetEmailVerifiedAt: null,
 		forwardingEmail: null,
 		disabled: false,
 		canManageMailboxes: false,

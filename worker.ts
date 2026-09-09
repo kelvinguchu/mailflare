@@ -30,6 +30,7 @@ import {
 	processWebhookQueue,
 	WebhookRetryError,
 } from "./src/lib/email/webhooks";
+import { deleteExpiredAccountRecoveryTokens } from "./src/lib/auth/recovery";
 export { RealtimeHub } from "./src/lib/realtime/hub";
 export { DatabaseBackupWorkflow } from "./src/lib/backups/workflow";
 
@@ -96,6 +97,14 @@ export default {
 		} catch (error) {
 			console.error(JSON.stringify({
 				event: "webhook_retention_cleanup_failed",
+				error: error instanceof Error ? error.message : "Unknown cleanup error",
+			}));
+		}
+		try {
+			await deleteExpiredAccountRecoveryTokens(env, new Date(controller.scheduledTime));
+		} catch (error) {
+			console.error(JSON.stringify({
+				event: "account_recovery_token_cleanup_failed",
 				error: error instanceof Error ? error.message : "Unknown cleanup error",
 			}));
 		}

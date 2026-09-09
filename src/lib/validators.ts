@@ -162,6 +162,19 @@ export const changePasswordSchema = z.object({
 	newPassword: z.string().min(8).max(128),
 });
 
+export const passwordResetRequestSchema = z.object({
+	email: z.string().trim().email().max(320),
+});
+
+export const passwordResetConfirmSchema = z.object({
+	token: z.string().regex(/^[a-f0-9]{64}$/),
+	newPassword: z.string().min(8).max(128),
+});
+
+export const recoveryEmailVerificationSchema = z.object({
+	token: z.string().regex(/^[a-f0-9]{64}$/),
+});
+
 export const routingRuleSchema = z.object({
 	domainId: z.string().optional(),
 	pattern: z.string().trim().min(1).max(200).optional(),

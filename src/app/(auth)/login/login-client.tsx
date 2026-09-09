@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Mail } from "lucide-react";
+import Link from "next/link";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,8 +60,13 @@ export function LoginClient() {
             required
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+		<div className="space-y-2">
+			<div className="flex items-center justify-between gap-3">
+				<Label htmlFor="password">Password</Label>
+				<Link href="/forgot-password" className="text-sm font-medium text-neutral-600 hover:text-neutral-900">
+					Forgot password?
+				</Link>
+			</div>
           <Input
             id="password"
             name="password"

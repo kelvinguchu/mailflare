@@ -9,6 +9,7 @@ export type ProfileResponse = {
 		email: string;
 		name: string;
 		resetEmail: string | null;
+		resetEmailVerified: boolean;
 		forwardingEmail: string | null;
 	};
 };

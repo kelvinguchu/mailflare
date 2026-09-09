@@ -7,16 +7,24 @@ import { Label } from "@/components/ui/label";
 import { authFetch } from "@/lib/auth/client";
 import type { ProfileFormProps, ProfileFormResponse } from "./types";
 
-export function ProfileForm({ initialName, initialResetEmail, email }: ProfileFormProps) {
+export function ProfileForm({
+	initialName,
+	initialResetEmail,
+	initialResetEmailVerified,
+	email,
+}: ProfileFormProps) {
 	const [name, setName] = useState(initialName);
 	const [resetEmail, setResetEmail] = useState(initialResetEmail);
 	const [savedName, setSavedName] = useState(initialName);
 	const [savedResetEmail, setSavedResetEmail] = useState(initialResetEmail);
+	const [resetEmailVerified, setResetEmailVerified] = useState(initialResetEmailVerified);
 	const [status, setStatus] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
+	const [verificationLoading, setVerificationLoading] = useState(false);
 	const hasChanges =
 		name.trim() !== savedName ||
 		resetEmail.trim() !== savedResetEmail;
+	const canVerify = !!savedResetEmail && !resetEmailVerified && !hasChanges;
 
 	async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
@@ -42,11 +50,36 @@ export function ProfileForm({ initialName, initialResetEmail, email }: ProfileFo
 			setResetEmail(nextResetEmail);
 			setSavedName(nextName);
 			setSavedResetEmail(nextResetEmail);
-			setStatus("Saved");
+			setResetEmailVerified(data.user?.resetEmailVerified ?? false);
+			setStatus(
+				nextResetEmail && !data.user?.resetEmailVerified
+					? "Saved. Verify this address before it can be used for password recovery."
+					: "Saved",
+			);
 		} catch (err) {
 			setStatus(err instanceof Error ? err.message : "Failed to update account");
 		} finally {
 			setLoading(false);
+		}
+	}
+
+	async function sendVerification() {
+		setVerificationLoading(true);
+		setStatus(null);
+		try {
+			const res = await authFetch("/api/settings/recovery-email/verification", { method: "POST" });
+			const data = (await res.json()) as { error?: string; verified?: boolean };
+			if (!res.ok) throw new Error(data.error ?? "Failed to send verification email");
+			if (data.verified) {
+				setResetEmailVerified(true);
+				setStatus("Recovery email is verified.");
+			} else {
+				setStatus("Verification email sent. The link expires in 24 hours.");
+			}
+		} catch (error) {
+			setStatus(error instanceof Error ? error.message : "Failed to send verification email");
+		} finally {
+			setVerificationLoading(false);
 		}
 	}
 
@@ -61,7 +94,14 @@ export function ProfileForm({ initialName, initialResetEmail, email }: ProfileFo
 				<Input id="name" value={name} onChange={(event) => setName(event.target.value)} required />
 			</div>
 			<div className="space-y-2">
-				<Label htmlFor="resetEmail">Recovery email</Label>
+				<div className="flex items-center justify-between gap-3">
+					<Label htmlFor="resetEmail">Recovery email</Label>
+					{savedResetEmail && !hasChanges && (
+						<span className={`text-xs font-medium ${resetEmailVerified ? "text-emerald-700" : "text-amber-700"}`}>
+							{resetEmailVerified ? "Verified" : "Not verified"}
+						</span>
+					)}
+				</div>
 				<Input
 					id="resetEmail"
 					value={resetEmail}
@@ -74,6 +114,16 @@ export function ProfileForm({ initialName, initialResetEmail, email }: ProfileFo
 				<Button type="submit" disabled={loading || !hasChanges}>
 					{loading ? "Saving..." : "Save"}
 				</Button>
+				{canVerify && (
+					<Button
+						type="button"
+						variant="outline"
+						disabled={verificationLoading}
+						onClick={sendVerification}
+					>
+						{verificationLoading ? "Sending..." : "Send verification"}
+					</Button>
+				)}
 				{status && <p className="text-sm text-neutral-500">{status}</p>}
 			</div>
 		</form>

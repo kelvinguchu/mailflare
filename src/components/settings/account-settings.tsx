@@ -67,6 +67,7 @@ export function AccountSettings() {
 					<ProfileForm
 						initialName={user.name}
 						initialResetEmail={user.resetEmail ?? ""}
+						initialResetEmailVerified={user.resetEmailVerified}
 						email={user.email}
 					/>
 				</CardContent>

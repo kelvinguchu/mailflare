@@ -14,9 +14,14 @@ export async function seedEveryBackupTable(): Promise<void> {
 	const db = integrationEnv.DB;
 	await db.batch([
 		db.prepare(`INSERT INTO users
-			(id, email, password_hash, name, avatar_key, role, disabled, can_manage_mailboxes, created_at)
-			VALUES ('user_backup', 'backup@example.test', 'hash', 'Backup User', 'avatars/users/user.png', 'admin', 0, 1, ?)`)
-			.bind(timestamp),
+			(id, email, reset_email, reset_email_verified_at, password_hash, name, avatar_key, role, disabled, can_manage_mailboxes, created_at)
+			VALUES ('user_backup', 'backup@example.test', 'recovery@example.test', ?, 'hash', 'Backup User', 'avatars/users/user.png', 'admin', 0, 1, ?)`)
+			.bind(timestamp, timestamp),
+		db.prepare(`INSERT INTO account_recovery_tokens
+			(id, user_id, purpose, token_hash, email, expires_at, created_at)
+			VALUES ('recovery_backup', 'user_backup', 'password_reset', 'recovery-token-hash',
+				'recovery@example.test', ?, ?)`)
+			.bind(timestamp + 1800, timestamp),
 		db.prepare(`INSERT INTO domains
 			(id, user_id, hostname, zone_id, status, sending_enabled, routing_enabled, created_at)
 			VALUES ('domain_backup', 'user_backup', 'example.test', 'zone', 'active', 1, 1, ?)`)

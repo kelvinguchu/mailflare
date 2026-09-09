@@ -5,6 +5,7 @@ export const users = sqliteTable("users", {
 	id: text("id").primaryKey(),
 	email: text("email").notNull().unique(),
 	resetEmail: text("reset_email"),
+	resetEmailVerifiedAt: integer("reset_email_verified_at", { mode: "timestamp" }),
 	forwardingEmail: text("forwarding_email"),
 	passwordHash: text("password_hash").notNull(),
 	name: text("name").notNull(),
@@ -400,6 +401,31 @@ export const sessions = sqliteTable("sessions", {
 		.$defaultFn(() => new Date()),
 });
 
+export const accountRecoveryTokens = sqliteTable(
+	"account_recovery_tokens",
+	{
+		id: text("id").primaryKey(),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		purpose: text("purpose", {
+			enum: ["password_reset", "recovery_email_verification"],
+		}).notNull(),
+		tokenHash: text("token_hash").notNull(),
+		email: text("email").notNull(),
+		expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+		usedAt: integer("used_at", { mode: "timestamp" }),
+		createdAt: integer("created_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
+	},
+	(t) => [
+		uniqueIndex("account_recovery_tokens_hash_idx").on(t.tokenHash),
+		index("account_recovery_tokens_user_purpose_idx").on(t.userId, t.purpose, t.createdAt),
+		index("account_recovery_tokens_expires_idx").on(t.expiresAt),
+	],
+);
+
 export const auditLogs = sqliteTable(
 	"audit_logs",
 	{
@@ -489,6 +515,7 @@ export const schema = {
 	webhooks,
 	webhookDeliveries,
 	sessions,
+	accountRecoveryTokens,
 	auditLogs,
 	backupSettings,
 	backups,

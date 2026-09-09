@@ -284,7 +284,7 @@ function createFinalRestoreStatements(
 	for (const table of BACKUP_TABLES) {
 		// Restoring authentication sessions would revive old credentials. The
 		// sessions table is emptied above and deliberately not copied back.
-		if (table === "sessions" || document.tables[table].length === 0) continue;
+		if (table === "sessions" || table === "account_recovery_tokens" || document.tables[table].length === 0) continue;
 		const columns = selectedColumns[table];
 		const identifiers = columns.map(quoteIdentifier).join(", ");
 		statements.push({

@@ -7,3 +7,7 @@ export function getEnv(): CloudflareEnv {
 export async function getEnvAsync(): Promise<CloudflareEnv> {
 	return (await getCloudflareContext({ async: true })).env as CloudflareEnv;
 }
+
+export function getExecutionContext(): ExecutionContext {
+	return getCloudflareContext().ctx;
+}

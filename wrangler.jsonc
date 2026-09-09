@@ -14,6 +14,9 @@
 		"DEPLOYMENT_ENV": "local",
 		"CLOUDFLARE_MANAGEMENT_MODE": "disabled",
 		"OUTBOUND_DELIVERY_MODE": "disabled",
+		"AUTH_EMAIL_DELIVERY_MODE": "disabled",
+		"AUTH_EMAIL_FROM": "no-reply@calibercode.io",
+		"PUBLIC_APP_ORIGIN": "http://localhost:3000",
 		"CF_EMAIL_WORKER_NAME": "mailflare-local"
 	},
 	"triggers": { "crons": [] },
@@ -43,6 +46,11 @@
 			"name": "LOGIN_RATE_LIMIT",
 			"namespace_id": "1003",
 			"simple": { "limit": 20, "period": 60 }
+		},
+		{
+			"name": "PASSWORD_RESET_RATE_LIMIT",
+			"namespace_id": "1013",
+			"simple": { "limit": 5, "period": 60 }
 		}
 	],
 	"observability": { "enabled": true },
@@ -104,6 +112,9 @@
 				"DEPLOYMENT_ENV": "staging",
 				"CLOUDFLARE_MANAGEMENT_MODE": "disabled",
 				"OUTBOUND_DELIVERY_MODE": "disabled",
+				"AUTH_EMAIL_DELIVERY_MODE": "disabled",
+				"AUTH_EMAIL_FROM": "no-reply@calibercode.io",
+				"PUBLIC_APP_ORIGIN": "https://mailflare-staging.agabio.workers.dev",
 				"CF_AID": "c79518eee7696d23795de5184c4bbc01",
 				"CF_EMAIL_WORKER_NAME": "mailflare-staging",
 				"D1_DATABASE_ID": "00c73577-0ef1-4d51-ba77-f09c06cfed1d"
@@ -134,6 +145,11 @@
 					"name": "LOGIN_RATE_LIMIT",
 					"namespace_id": "1002",
 					"simple": { "limit": 20, "period": 60 }
+				},
+				{
+					"name": "PASSWORD_RESET_RATE_LIMIT",
+					"namespace_id": "1012",
+					"simple": { "limit": 5, "period": 60 }
 				}
 			],
 			"d1_databases": [
@@ -197,6 +213,9 @@
 				"DEPLOYMENT_ENV": "production",
 				"CLOUDFLARE_MANAGEMENT_MODE": "enabled",
 				"OUTBOUND_DELIVERY_MODE": "enabled",
+				"AUTH_EMAIL_DELIVERY_MODE": "enabled",
+				"AUTH_EMAIL_FROM": "no-reply@calibercode.io",
+				"PUBLIC_APP_ORIGIN": "https://mail.calibercode.io",
 				"CF_AID": "c79518eee7696d23795de5184c4bbc01",
 				"CF_EMAIL_WORKER_NAME": "mailflare",
 				"D1_DATABASE_ID": "a9443977-88d2-46c1-bdc4-052784b445e8"
@@ -225,6 +244,11 @@
 					"name": "LOGIN_RATE_LIMIT",
 					"namespace_id": "1001",
 					"simple": { "limit": 20, "period": 60 }
+				},
+				{
+					"name": "PASSWORD_RESET_RATE_LIMIT",
+					"namespace_id": "1011",
+					"simple": { "limit": 5, "period": 60 }
 				}
 			],
 			"send_email": [{ "name": "EMAIL" }],

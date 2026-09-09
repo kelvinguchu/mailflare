@@ -1,5 +1,5 @@
 export const DATABASE_BACKUP_FORMAT = "mailflare-database-backup";
-export const DATABASE_BACKUP_VERSION = 4 as const;
+export const DATABASE_BACKUP_VERSION = 5 as const;
 export const MAX_DATABASE_RESTORE_BYTES = 10 * 1024 * 1024;
 export const MAX_BACKUP_OBJECTS = 5_000;
 export const DATABASE_BACKUP_R2_STRATEGY = "independent-copies-v1" as const;
@@ -25,6 +25,7 @@ export const BACKUP_TABLES = [
 	"webhooks",
 	"webhook_deliveries",
 	"sessions",
+	"account_recovery_tokens",
 	"audit_logs",
 	"backup_settings",
 	"backups",
@@ -39,13 +40,19 @@ export const LEGACY_V1_BACKUP_TABLES = BACKUP_TABLES.filter(
 		table !== "auto_reply_deliveries" &&
 		table !== "email_templates" &&
 		table !== "calendar_events" &&
-		table !== "dead_letter_events",
+		table !== "dead_letter_events" &&
+		table !== "account_recovery_tokens",
 );
 
 // Versions 2 and 3 predate durable dead-letter records. Version 3 still has
 // an independent R2 object manifest and retains that behavior when restored.
 export const LEGACY_V2_V3_BACKUP_TABLES = BACKUP_TABLES.filter(
-	(table) => table !== "dead_letter_events",
+	(table) => table !== "dead_letter_events" && table !== "account_recovery_tokens",
+);
+
+// Version 4 added dead-letter records but predates secure account-recovery tokens.
+export const LEGACY_V4_BACKUP_TABLES = BACKUP_TABLES.filter(
+	(table) => table !== "account_recovery_tokens",
 );
 
 // These are D1/SQLite bookkeeping tables, not application data. D1 and the

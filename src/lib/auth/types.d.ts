@@ -4,6 +4,7 @@ export type SessionUser = {
 	id: string;
 	email: string;
 	resetEmail: string | null;
+	resetEmailVerifiedAt: Date | null;
 	forwardingEmail: string | null;
 	passwordHash: string;
 	name: string;
