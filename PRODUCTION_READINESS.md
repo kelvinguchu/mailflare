@@ -571,13 +571,13 @@ The migration should then preserve behavior first and improve architecture secon
 1. `0.2` — Create fully isolated staging resources and safe deployment commands.
 2. `1.4` — Run and document the full staging restore drill.
 3. `4.1` and `4.2` — Lock mail, backup and migration behavior into integration tests.
-4. `B4` / `3.4` — Implement administrator-first TOTP on top of tested session behavior.
-5. `B1` — Add CC recipient semantics end to end.
-6. `B2` — Add safe rich-text signatures.
-7. `B3` — Add cancelable delayed sending and its race-condition tests.
-8. `B5` — Build the calendar/task/reminder backend in bounded schema and scheduling increments.
-9. `F1` through `F7` — Implement each frontend surface only after its backend contract passes.
-10. Re-evaluate the TanStack Start migration gate; do not migrate while infrastructure, recovery or critical integration-test gates remain open.
+4. `3.1` through `3.3` — Complete password recovery, account activation and session management foundations.
+5. `B4` / `3.4` — Implement administrator-first TOTP on top of tested recovery and session behavior.
+6. `B1` — Add CC recipient semantics end to end.
+7. `B2` — Add safe rich-text signatures.
+8. `B3` — Add cancelable delayed sending and its race-condition tests.
+9. `B5` — Build the calendar/task/reminder backend in bounded schema and scheduling increments.
+10. `F1` through `F7` — Implement each frontend surface only after its backend contract passes, then re-evaluate the TanStack Start migration gate.
 
 ## Decision log
 
