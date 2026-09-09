@@ -395,17 +395,24 @@ export const webhookDeliveries = sqliteTable(
 	],
 );
 
-export const sessions = sqliteTable("sessions", {
-	id: text("id").primaryKey(),
-	userId: text("user_id")
-		.notNull()
-		.references(() => users.id, { onDelete: "cascade" }),
-	tokenHash: text("token_hash").notNull().unique(),
-	expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
-	createdAt: integer("created_at", { mode: "timestamp" })
-		.notNull()
-		.$defaultFn(() => new Date()),
-});
+export const sessions = sqliteTable(
+	"sessions",
+	{
+		id: text("id").primaryKey(),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		tokenHash: text("token_hash").notNull().unique(),
+		expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+		createdAt: integer("created_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
+	},
+	(t) => [
+		index("sessions_user_expires_idx").on(t.userId, t.expiresAt),
+		index("sessions_expires_idx").on(t.expiresAt),
+	],
+);
 
 export const accountRecoveryTokens = sqliteTable(
 	"account_recovery_tokens",
@@ -450,6 +457,7 @@ export const auditLogs = sqliteTable(
 		index("audit_logs_actor_idx").on(t.actorUserId),
 		index("audit_logs_mailbox_idx").on(t.mailboxId),
 		index("audit_logs_created_idx").on(t.createdAt),
+		index("audit_logs_target_action_created_idx").on(t.targetUserId, t.action, t.createdAt),
 	],
 );
 

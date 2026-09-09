@@ -13,6 +13,7 @@ import {
 	fetchManagedMailboxes,
 	resendManagedAccountInvitation,
 	revokeManagedAccountInvitation,
+	revokeManagedAccountSessions,
 	saveManagedAccount,
 	uploadManagedAccountAvatar,
 	updateManagedMailboxName,
@@ -25,6 +26,7 @@ export default function AccountDetailsPage() {
 	const [saving, setSaving] = useState(false);
 	const [savingMailboxId, setSavingMailboxId] = useState<string | null>(null);
 	const [invitationBusy, setInvitationBusy] = useState(false);
+	const [sessionsBusy, setSessionsBusy] = useState(false);
 	const [message, setMessage] = useState<string | null>(null);
 	const [avatarVersion, setAvatarVersion] = useState(0);
 
@@ -107,6 +109,23 @@ export default function AccountDetailsPage() {
 		}
 	}
 
+	async function revokeSessions() {
+		if (!account) return;
+		setSessionsBusy(true);
+		setMessage(null);
+		try {
+			const revoked = await revokeManagedAccountSessions(account.id);
+			setAccount({ ...account, activeSessionCount: 0 });
+			setMessage(revoked === 0
+				? "No active sessions were found."
+				: `${revoked} ${revoked === 1 ? "session" : "sessions"} revoked.`);
+		} catch (error) {
+			setMessage(error instanceof Error ? error.message : "Unable to revoke sessions");
+		} finally {
+			setSessionsBusy(false);
+		}
+	}
+
 	if (!account) return <p className="text-sm text-neutral-500">{message ?? "Loading account..."}</p>;
 	const activationLabel = account.activationStatus === "active" ? "Active" : account.activationStatus === "revoked" ? "Invitation revoked" : account.invitationExpired ? "Invitation expired" : account.invitationSentAt ? "Invitation pending" : "Invitation not sent";
 
@@ -181,6 +200,15 @@ export default function AccountDetailsPage() {
 						</div>
 					</>
 				)}
+			</section>
+			<section className="space-y-4 rounded-3xl bg-white p-6">
+				<div>
+					<h2 className="text-lg font-semibold text-neutral-900">Sessions</h2>
+					<p className="mt-1 text-sm text-neutral-500">{account.activeSessionCount} active {account.activeSessionCount === 1 ? "session" : "sessions"}</p>
+				</div>
+				<Button type="button" variant="outline" onClick={() => void revokeSessions()} disabled={sessionsBusy || account.activeSessionCount === 0}>
+					{sessionsBusy ? "Revoking..." : "Revoke all sessions"}
+				</Button>
 			</section>
 			<section className="space-y-5 rounded-3xl bg-white p-6">
 				<div>

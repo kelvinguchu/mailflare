@@ -8,6 +8,7 @@ import { ForwardingEmailForm } from "./forwarding-email-form";
 import { MailboxSignatureForm } from "./mailbox-signature-form";
 import { ProfileForm } from "./profile-form";
 import { ProfileAvatarForm } from "./profile-avatar-form";
+import { SessionManagement } from "./session-management";
 import type { AccountSettingsResponse } from "./types";
 import { loadAccountSettings } from "./utils";
 
@@ -90,6 +91,16 @@ export function AccountSettings() {
 				</CardHeader>
 				<CardContent className="pb-6">
 					<MailboxSignatureForm />
+				</CardContent>
+			</Card>
+
+			<Card className="rounded-3xl border-0 bg-white px-6">
+				<CardHeader>
+					<CardTitle>Sessions</CardTitle>
+					<CardDescription>Review recent sign-ins and sign out browsers you no longer use.</CardDescription>
+				</CardHeader>
+				<CardContent className="pb-6">
+					<SessionManagement />
 				</CardContent>
 			</Card>
 

@@ -4,6 +4,7 @@ import { getDb } from "@/db";
 import { users } from "@/db/schema";
 import { updateManagedAccountSchema } from "@/lib/validators";
 import { requireAdmin } from "../utils";
+import { countActiveSessions } from "@/lib/auth/session";
 import type { AccountRouteParams } from "./types";
 import { selectAccountById, updateAccountCredentials } from "./utils";
 
@@ -15,6 +16,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 	if (!account || (account.id !== access.user!.id && account.createdByUserId !== access.user!.id)) {
 		return NextResponse.json({ error: "Account not found" }, { status: 404 });
 	}
+	const activeSessionCount = await countActiveSessions(access.env, account.id);
 	return NextResponse.json({
 		account: {
 			id: account.id,
@@ -31,6 +33,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 				&& account.invitationExpiresAt.getTime() <= Date.now(),
 			disabled: account.disabled,
 			canManageMailboxes: account.canManageMailboxes,
+			activeSessionCount,
 			forwardingEmail: account.forwardingEmail,
 			hasAvatar: !!account.avatarKey,
 		},

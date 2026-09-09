@@ -9,6 +9,7 @@ import type {
 	MailboxSignatureResponse,
 } from "./types";
 import type { AccountSettingsResponse, ChangePasswordResponse } from "./types";
+import type { SessionManagementResponse } from "./types";
 
 export function getMailboxAddress(mailbox: Pick<MailboxOption, "localPart" | "hostname">): string {
 	return `${mailbox.localPart}@${mailbox.hostname}`;
@@ -100,7 +101,7 @@ export async function updateMailboxAutoReply(
 	};
 }
 
-export async function updatePassword(currentPassword: string, newPassword: string): Promise<void> {
+export async function updatePassword(currentPassword: string, newPassword: string): Promise<number> {
 	const res = await authFetch("/api/settings/password", {
 		method: "PATCH",
 		headers: { "Content-Type": "application/json" },
@@ -111,4 +112,27 @@ export async function updatePassword(currentPassword: string, newPassword: strin
 	if (!res.ok) {
 		throw new Error(typeof data.error === "string" ? data.error : "Failed to change password");
 	}
+	return data.revokedSessions ?? 0;
+}
+
+export async function loadSessionManagement(): Promise<Required<Pick<SessionManagementResponse, "activeSessionCount" | "recentSignIns">> & Pick<SessionManagementResponse, "currentSession">> {
+	const res = await authFetch("/api/settings/sessions");
+	const data = (await res.json()) as SessionManagementResponse;
+	if (!res.ok || data.activeSessionCount === undefined || !data.recentSignIns) {
+		throw new Error(typeof data.error === "string" ? data.error : "Failed to load sessions");
+	}
+	return {
+		activeSessionCount: data.activeSessionCount,
+		currentSession: data.currentSession,
+		recentSignIns: data.recentSignIns,
+	};
+}
+
+export async function revokeOtherUserSessions(): Promise<number> {
+	const res = await authFetch("/api/settings/sessions", { method: "DELETE" });
+	const data = (await res.json()) as SessionManagementResponse;
+	if (!res.ok) {
+		throw new Error(typeof data.error === "string" ? data.error : "Failed to revoke sessions");
+	}
+	return data.revokedSessions ?? 0;
 }

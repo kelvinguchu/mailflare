@@ -33,6 +33,13 @@ export class RealtimeHub extends DurableObject<CloudflareEnv> {
 			return new Response(null, { status: 204 });
 		}
 
+		if (url.pathname === "/disconnect" && request.method === "POST") {
+			for (const socket of this.ctx.getWebSockets()) {
+				socket.close(1008, "Session revoked");
+			}
+			return new Response(null, { status: 204 });
+		}
+
 		return new Response("Not found", { status: 404 });
 	}
 

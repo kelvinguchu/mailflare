@@ -9,6 +9,7 @@ import {
 import { newId } from "@/lib/ids";
 import { createAuditLog } from "@/lib/mailboxes/audit";
 import { hashPassword } from "./password";
+import { disconnectUserRealtime, hashSessionToken } from "./session";
 
 const PASSWORD_RESET_TTL_MS = 30 * 60 * 1_000;
 const RECOVERY_EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1_000;
@@ -278,6 +279,7 @@ export async function revokeAccountInvitation(env: CloudflareEnv, userId: string
 			action: "auth.account_invitation_revoked",
 		}),
 	]);
+	await disconnectUserRealtime(env, userId);
 	return true;
 }
 
@@ -333,6 +335,7 @@ export async function completePasswordReset(
 			metadata: JSON.stringify({ sessionsRevoked: true }),
 		}),
 	]);
+	await disconnectUserRealtime(env, user.id);
 	return true;
 }
 
@@ -340,19 +343,31 @@ export async function changePasswordAndRevokeRecoveryTokens(
 	env: CloudflareEnv,
 	userId: string,
 	newPassword: string,
-): Promise<void> {
+	currentSessionToken?: string,
+): Promise<number> {
 	const db = getDb(env);
-	await db.batch([
+	const currentSessionHash = currentSessionToken
+		? await hashSessionToken(currentSessionToken)
+		: null;
+	const results = await db.batch([
 		db.update(users).set({ passwordHash: hashPassword(newPassword) }).where(eq(users.id, userId)),
+		currentSessionHash
+			? db.delete(sessions).where(and(
+				eq(sessions.userId, userId),
+				ne(sessions.tokenHash, currentSessionHash),
+			))
+			: db.delete(sessions).where(eq(sessions.userId, userId)),
 		db.delete(accountRecoveryTokens).where(eq(accountRecoveryTokens.userId, userId)),
 		db.insert(auditLogs).values({
 			id: newId("aud"),
 			actorUserId: userId,
 			targetUserId: userId,
 			action: "auth.password_changed",
-			metadata: JSON.stringify({ recoveryTokensRevoked: true }),
+			metadata: JSON.stringify({ recoveryTokensRevoked: true, otherSessionsRevoked: true }),
 		}),
 	]);
+	await disconnectUserRealtime(env, userId);
+	return results[1].meta.changes;
 }
 
 export async function deleteExpiredAccountRecoveryTokens(

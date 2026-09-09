@@ -110,6 +110,13 @@ export async function revokeManagedAccountInvitation(accountId: string): Promise
 	if (!res.ok) throw new Error(json.error ?? "Failed to revoke invitation");
 }
 
+export async function revokeManagedAccountSessions(accountId: string): Promise<number> {
+	const res = await authFetch(`/api/accounts/${accountId}/sessions`, { method: "DELETE" });
+	const json = (await res.json()) as { error?: string; revokedSessions?: number };
+	if (!res.ok) throw new Error(json.error ?? "Failed to revoke sessions");
+	return json.revokedSessions ?? 0;
+}
+
 export async function updateManagedMailboxName(mailboxId: string, displayName: string): Promise<void> {
 	const response = await authFetch(`/api/mailboxes/${mailboxId}`, {
 		method: "PATCH",

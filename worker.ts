@@ -31,6 +31,7 @@ import {
 	WebhookRetryError,
 } from "./src/lib/email/webhooks";
 import { deleteExpiredAccountRecoveryTokens } from "./src/lib/auth/recovery";
+import { deleteExpiredSessions } from "./src/lib/auth/session";
 export { RealtimeHub } from "./src/lib/realtime/hub";
 export { DatabaseBackupWorkflow } from "./src/lib/backups/workflow";
 
@@ -43,7 +44,7 @@ export default {
 			}
 
 			const user = await getUserFromSession(env, getSessionTokenFromRequest(request));
-			if (!user || user.disabled) {
+			if (!user || user.disabled || user.activationStatus !== "active") {
 				return new Response("Unauthorized", { status: 401 });
 			}
 
@@ -105,6 +106,14 @@ export default {
 		} catch (error) {
 			console.error(JSON.stringify({
 				event: "account_recovery_token_cleanup_failed",
+				error: error instanceof Error ? error.message : "Unknown cleanup error",
+			}));
+		}
+		try {
+			await deleteExpiredSessions(env, new Date(controller.scheduledTime));
+		} catch (error) {
+			console.error(JSON.stringify({
+				event: "expired_session_cleanup_failed",
 				error: error instanceof Error ? error.message : "Unknown cleanup error",
 			}));
 		}

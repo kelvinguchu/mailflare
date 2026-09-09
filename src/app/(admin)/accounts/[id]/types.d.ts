@@ -11,6 +11,7 @@ export type ManagedAccount = {
 	invitationExpired: boolean;
 	disabled: boolean;
 	canManageMailboxes: boolean;
+	activeSessionCount: number;
 	forwardingEmail: string | null;
 	hasAvatar: boolean;
 };

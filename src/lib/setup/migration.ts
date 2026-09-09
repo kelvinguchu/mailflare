@@ -26,6 +26,9 @@ const MIGRATION_NAMES = [
 	"0028_add_outbound_idempotency.sql",
 	"0029_add_dead_letter_events.sql",
 	"0030_add_webhook_delivery_retries.sql",
+	"0031_add_account_recovery.sql",
+	"0032_add_account_activation.sql",
+	"0033_add_session_management_indexes.sql",
 ];
 
 const INITIAL_SCHEMA_SQL = `

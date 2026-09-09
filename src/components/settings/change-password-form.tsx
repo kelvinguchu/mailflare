@@ -24,11 +24,13 @@ export function ChangePasswordForm() {
 
 		setLoading(true);
 		try {
-			await updatePassword(currentPassword, newPassword);
+			const revokedSessions = await updatePassword(currentPassword, newPassword);
 			setCurrentPassword("");
 			setNewPassword("");
 			setConfirmPassword("");
-			setStatus("Password changed");
+			setStatus(revokedSessions > 0
+				? `Password changed and ${revokedSessions} other ${revokedSessions === 1 ? "session" : "sessions"} signed out`
+				: "Password changed");
 		} catch (err) {
 			setStatus(err instanceof Error ? err.message : "Failed to change password");
 		} finally {

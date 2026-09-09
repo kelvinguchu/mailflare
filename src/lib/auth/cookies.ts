@@ -5,7 +5,7 @@ export async function getCurrentUser(env: CloudflareEnv, _request?: Request) {
 	const jar = await cookies();
 	const token = jar.get(SESSION_COOKIE)?.value;
 	const user = await getUserFromSession(env, token);
-	return user?.disabled ? null : user;
+	return user?.disabled || user?.activationStatus !== "active" ? null : user;
 }
 
 export async function requireUser(env: CloudflareEnv, request?: Request) {

@@ -64,6 +64,25 @@ export type MailboxAutoReplyResponse = {
 };
 
 export type ChangePasswordResponse = {
+	revokedSessions?: number;
+	error?: unknown;
+};
+
+export type RecentSignIn = {
+	id: string;
+	createdAt: string;
+	ipAddress: string;
+	city: string | null;
+	country: string | null;
+	device: string;
+	platform: string;
+};
+
+export type SessionManagementResponse = {
+	activeSessionCount?: number;
+	currentSession?: { createdAt: string; expiresAt: string } | null;
+	recentSignIns?: RecentSignIn[];
+	revokedSessions?: number;
 	error?: unknown;
 };
 

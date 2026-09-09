@@ -224,16 +224,18 @@ Acceptance criteria:
 
 ### 3.3 Add session management
 
-- [ ] Revoke other sessions when a password changes or is reset.
-- [ ] Add “sign out other sessions.”
-- [ ] Let administrators revoke sessions for a compromised account.
-- [ ] Periodically delete expired session rows.
-- [ ] Display recent sign-in activity to the account owner.
+Status: `[x]` Account owners can review recent successful sign-ins and revoke every other session while preserving the current browser; password changes, password resets, invitation revocation and administrator actions invalidate the appropriate D1 sessions and close established realtime connections immediately, while the daily scheduler removes expired rows.
+
+- [x] Revoke other sessions when a password changes or is reset.
+- [x] Add “sign out other sessions.”
+- [x] Let administrators revoke sessions for a compromised account.
+- [x] Periodically delete expired session rows.
+- [x] Display recent sign-in activity to the account owner.
 
 Acceptance criteria:
 
-- A stolen old session cannot remain valid after account recovery.
-- Session revocation is immediate and tested.
+- [x] A stolen old session cannot remain valid after account recovery.
+- [x] Session revocation is immediate and tested.
 
 ### 3.4 Add stronger administrator authentication
 
@@ -430,7 +432,7 @@ Acceptance criteria:
 ### 7.1 Complete account lifecycle controls
 
 - [ ] Reset or re-invite an account.
-- [ ] Revoke sessions.
+- [x] Revoke sessions.
 - [ ] Transfer mailbox ownership.
 - [ ] Archive or delete an account safely.
 - [ ] Export an account's data.
@@ -609,6 +611,7 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-09 | Auto-replies are suppressed for every sender address routed by the local CC Mail instance, not only the destination mailbox itself. | Two local mailboxes with auto-replies enabled could otherwise reply to each other indefinitely. |
 | 2026-09-09 | Webhook delivery uses a dedicated Queue and a stable delivery ID across automatic and manual attempts; temporary failures retry at most five total attempts, and delivery records expire after 30 days. | Delivery must not block email processing, receivers need a durable deduplication key, and retry history must remain useful without growing forever. |
 | 2026-09-09 | Administrator-created accounts begin pending with a random unusable password hash; activation requires a 72-hour, hashed, single-use invitation sent to an external address, and successful activation also verifies that address for recovery. | Administrators never handle user passwords, existing accounts remain active through the migration, and resend, revoke or provider failure makes every displaced link unusable. |
+| 2026-09-09 | Session revocation deletes D1 credentials before closing every realtime socket for the account; the current browser reconnects only when its preserved session remains valid. Recent sign-in history is derived from owner-scoped successful-login audit records. | Database-first invalidation prevents an established socket from extending a revoked credential, while preserving the initiating session avoids an unnecessary password-change logout and owner scoping prevents cross-account activity disclosure. |
 
 ## Progress log
 
@@ -630,3 +633,4 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-09 | 4.1 mail-path integration foundation and 4.2 backup/migration integration | Added a secret-isolated Workers-runtime Vitest project with real local D1 and R2 bindings, Queue-compatible mail seams, full table/object restore fixtures, legacy v1-v3 restore coverage and sequential migration verification. The suite exposed and fixed cross-mailbox auto-reply loops and Miniflare's `_cf_METADATA` backup classification. Item 4.2 is complete; 4.1 remains open only for durable webhook retry behavior tracked by 2.5. | 61 unit tests and 12 Workers integration tests passed; every one of 30 migrations applied against its preceding schema and matched the fresh schema; source and integration typechecks passed; lint completed with zero errors and the same 57 warnings. No remote resources, staging or production were accessed. |
 | 2026-09-09 | 2.5 — Reliable webhooks and completion of 4.1 | Moved endpoint delivery to a dedicated Queue; added stable signed delivery IDs/timestamps, five-attempt exponential retry for network/429/5xx failures, durable status details, owner-scoped history and manual redelivery, a delivery-history interface, and 30-day scheduled retention. | Pre-migration production backup `bak_scheduled_2026-09-09` was complete at 2,118,220 bytes; migration `0030_add_webhook_delivery_retries.sql` applied to staging and production; staging version `9b179d1d-7eff-4151-b497-4ead93b54ad4`; production version `e3568848-c8ca-4510-b769-5d1385f4b0e3`; both webhook queues show one producer and one consumer; production had zero webhook deliveries in flight, all ten outbound jobs remained sent, no migrations remained, and production returned HTTP 200. The isolated OpenNext build and Wrangler dry run passed; 61 unit tests, 12 Workers integration tests, source/integration typechecks and environment-isolation checks passed; lint had zero errors and 57 pre-existing warnings. No synthetic email or webhook was sent. |
 | 2026-09-09 | 3.2 — Administrator-created account activation | Replaced administrator-selected temporary passwords with external-address invitations; added pending, active, expired and revoked states; required the user to choose the permanent password; verified the recovery address during activation; blocked pre-activation login; and added administrator resend, address-correction and revoke controls. | Pre-migration production backup `bak_prerelease_account_activation_20260909` completed at 2,119,434 bytes; migration `0032_add_account_activation.sql` applied to staging and production; final staging version `9e819700-2521-4486-829e-6dddb6f05fc7`; final production version `b3976368-67d6-48af-b925-fdc2272c4bf7`; 63 unit tests and 21 Workers integration tests passed; source/integration typechecks, lint with zero errors and 57 pre-existing warnings, Next/OpenNext builds and Wrangler dry run passed. Production routes returned expected 200/401/400 statuses, all three existing users remained active, zero activation tokens existed, and all ten outbound jobs remained sent. No synthetic invitation was sent. |
+| 2026-09-09 | 3.3 — Session management | Added owner-visible recent successful sign-ins, current-session-aware “sign out other sessions,” password-change/reset revocation, administrator all-session revocation, realtime Durable Object disconnects, indexed session queries and daily expired-row cleanup. | Pre-migration production backup `bak_prerelease_session_management_20260909` completed at 2,120,132 bytes; migration `0033_add_session_management_indexes.sql` applied to staging and production; final staging version `543f1bea-55e9-44f1-9217-2fa3df6efc63`; production version `816d926b-a796-4514-8968-fc395f3a26fe`; 63 unit tests and 26 Workers integration tests passed; source/integration typechecks, lint with zero errors and 57 pre-existing warnings, Next/OpenNext builds, environment-isolation checks and both Wrangler dry runs passed. Production returned HTTP 200 for login and the new APIs returned 401/403 without authentication; all three accounts remained active, two existing active session rows remained present, zero expired sessions or recovery tokens existed, and all ten outbound jobs remained sent. No synthetic email or invitation was sent. |

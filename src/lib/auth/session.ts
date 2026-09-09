@@ -1,4 +1,4 @@
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, lte, ne, sql } from "drizzle-orm";
 import { newId } from "@/lib/ids";
 import { getDb } from "@/db";
 import { sessions, users } from "@/db/schema";
@@ -56,4 +56,69 @@ export async function deleteSession(env: CloudflareEnv, token: string): Promise<
 	const db = getDb(env);
 	const tokenHash = await hashSessionToken(token);
 	await db.delete(sessions).where(eq(sessions.tokenHash, tokenHash));
+}
+
+export async function revokeOtherSessions(
+	env: CloudflareEnv,
+	userId: string,
+	currentToken: string,
+): Promise<number> {
+	const currentTokenHash = await hashSessionToken(currentToken);
+	const result = await getDb(env).delete(sessions).where(and(
+		eq(sessions.userId, userId),
+		ne(sessions.tokenHash, currentTokenHash),
+	));
+	await disconnectUserRealtime(env, userId);
+	return result.meta.changes;
+}
+
+export async function revokeAllSessions(env: CloudflareEnv, userId: string): Promise<number> {
+	const result = await getDb(env).delete(sessions).where(eq(sessions.userId, userId));
+	await disconnectUserRealtime(env, userId);
+	return result.meta.changes;
+}
+
+export async function countActiveSessions(env: CloudflareEnv, userId: string): Promise<number> {
+	const [row] = await getDb(env)
+		.select({ count: sql<number>`count(*)` })
+		.from(sessions)
+		.where(and(eq(sessions.userId, userId), gt(sessions.expiresAt, new Date())));
+	return row?.count ?? 0;
+}
+
+export async function getCurrentSessionDetails(
+	env: CloudflareEnv,
+	userId: string,
+	token: string,
+): Promise<{ createdAt: Date; expiresAt: Date } | null> {
+	const tokenHash = await hashSessionToken(token);
+	const [session] = await getDb(env)
+		.select({ createdAt: sessions.createdAt, expiresAt: sessions.expiresAt })
+		.from(sessions)
+		.where(and(
+			eq(sessions.userId, userId),
+			eq(sessions.tokenHash, tokenHash),
+			gt(sessions.expiresAt, new Date()),
+		))
+		.limit(1);
+	return session ?? null;
+}
+
+export async function deleteExpiredSessions(env: CloudflareEnv, now = new Date()): Promise<number> {
+	const result = await getDb(env).delete(sessions).where(lte(sessions.expiresAt, now));
+	return result.meta.changes;
+}
+
+export async function disconnectUserRealtime(env: CloudflareEnv, userId: string): Promise<void> {
+	if (!env.REALTIME) return;
+	try {
+		const hub = env.REALTIME.getByName(userId);
+		await hub.fetch("https://cc-mail-realtime/disconnect", { method: "POST" });
+	} catch (error) {
+		console.error(JSON.stringify({
+			event: "realtime_session_disconnect_failed",
+			userId,
+			error: error instanceof Error ? error.message : "Unknown error",
+		}));
+	}
 }

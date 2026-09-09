@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { ZodError } from "zod";
-import { requireUser } from "@/lib/auth/cookies";
+import { getCurrentUser } from "@/lib/auth/cookies";
 import { verifyPassword } from "@/lib/auth/password";
 import { changePasswordAndRevokeRecoveryTokens } from "@/lib/auth/recovery";
+import { SESSION_COOKIE } from "@/lib/auth/session";
 import { getEnv } from "@/lib/cloudflare";
 import type { ChangePasswordInput } from "./types";
 import { parseChangePasswordRequest } from "./utils";
 
 export async function PATCH(request: Request) {
 	const env = getEnv();
-	const user = await requireUser(env, request);
+	const user = await getCurrentUser(env, request);
+	if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	let parsed: ChangePasswordInput;
 
 	try {
@@ -29,7 +32,17 @@ export async function PATCH(request: Request) {
 		return NextResponse.json({ error: "New password must be different from the current password" }, { status: 400 });
 	}
 
-	await changePasswordAndRevokeRecoveryTokens(env, user.id, parsed.newPassword);
+	const jar = await cookies();
+	const currentSessionToken = jar.get(SESSION_COOKIE)?.value;
+	if (!currentSessionToken) {
+		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+	}
+	const revokedSessions = await changePasswordAndRevokeRecoveryTokens(
+		env,
+		user.id,
+		parsed.newPassword,
+		currentSessionToken,
+	);
 
-	return NextResponse.json({ ok: true });
+	return NextResponse.json({ ok: true, revokedSessions });
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { completeAccountActivation } from "@/lib/auth/recovery";
+import { recordAuthActivity } from "@/lib/auth/activity";
 import { createSession } from "@/lib/auth/session";
 import { createAuthenticatedResponse } from "@/lib/auth/http-response";
 import { allowAccountRecoveryAttempt } from "@/lib/auth/rate-limit";
@@ -35,5 +36,6 @@ export async function POST(request: Request) {
 		return NextResponse.json({ error: "This activation link is invalid or expired" }, { status: 400 });
 	}
 	const sessionToken = await createSession(env, userId);
+	await recordAuthActivity(env, { action: "auth.login", userId, request });
 	return createAuthenticatedResponse(sessionToken, "/inbox");
 }

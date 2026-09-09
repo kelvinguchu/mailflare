@@ -1,3 +1,6 @@
+import { and, desc, eq } from "drizzle-orm";
+import { getDb } from "@/db";
+import { auditLogs } from "@/db/schema";
 import { createAuditLog } from "@/lib/mailboxes/audit";
 import type { AuthActivityAction, AuthActivityMetadata } from "./activity-types";
 
@@ -31,6 +34,19 @@ export function getAuthActivityMetadata(request: Request): AuthActivityMetadata 
 		platform: getPlatform(userAgent),
 		userAgent,
 	};
+}
+
+export async function listRecentSignIns(env: CloudflareEnv, userId: string, limit = 10) {
+	return getDb(env)
+		.select({
+			id: auditLogs.id,
+			metadata: auditLogs.metadata,
+			createdAt: auditLogs.createdAt,
+		})
+		.from(auditLogs)
+		.where(and(eq(auditLogs.targetUserId, userId), eq(auditLogs.action, "auth.login")))
+		.orderBy(desc(auditLogs.createdAt))
+		.limit(Math.min(Math.max(limit, 1), 20));
 }
 
 function getRequestIpAddress(request: Request): string {
