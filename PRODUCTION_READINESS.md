@@ -177,17 +177,19 @@ Acceptance criteria:
 
 ### 2.5 Make webhooks reliable
 
-- [ ] Move webhook delivery off the request and mail-processing critical paths.
-- [ ] Retry temporary failures with bounded exponential backoff.
-- [ ] include a stable delivery ID and timestamp in the signed payload.
-- [ ] Add manual redelivery and delivery history.
-- [ ] Define retention for webhook delivery records.
+Status: `[x]` Webhook events are persisted and delivered by a dedicated Queue consumer with stable signed envelopes, bounded retries, owner-scoped history/redelivery and scheduled retention.
+
+- [x] Move webhook delivery off the request and mail-processing critical paths.
+- [x] Retry temporary failures with bounded exponential backoff.
+- [x] Include a stable delivery ID and timestamp in the signed payload.
+- [x] Add manual redelivery and delivery history.
+- [x] Define retention for webhook delivery records.
 
 Acceptance criteria:
 
-- Temporary endpoint failure is retried automatically.
-- Receiving systems can deduplicate deliveries.
-- Webhook failure cannot make an otherwise successful email operation fail.
+- [x] Temporary endpoint failure is retried automatically.
+- [x] Receiving systems can deduplicate deliveries.
+- [x] Webhook failure cannot make an otherwise successful email operation fail.
 
 ## Phase 3 — Complete account security and recovery
 
@@ -258,7 +260,7 @@ Acceptance criteria:
 
 ### 4.1 Add mail-path integration tests
 
-Status: `[-]` The existing critical mail paths now run against isolated Workers-runtime D1 and R2 bindings with Queue-compatible provider seams. Webhook signing and failed-attempt persistence are covered; durable webhook retries remain part of 2.5.
+Status: `[x]` Critical mail paths run against isolated Workers-runtime D1 and R2 bindings with Queue-compatible provider seams, including signed webhook retry and redelivery behavior.
 
 - [x] Inbound routing and aliases.
 - [x] Inbound retry and deduplication.
@@ -267,7 +269,7 @@ Status: `[-]` The existing critical mail paths now run against isolated Workers-
 - [x] Shared mailbox permissions.
 - [x] Attachment authorization and storage cleanup.
 - [x] Auto-reply loop prevention.
-- [ ] Webhook signing and retries. Signing and failure persistence are tested; automatic retry is not implemented yet.
+- [x] Webhook signing and retries.
 
 Acceptance criteria:
 
@@ -601,6 +603,7 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-09 | Local and staging environments fail closed for provider delivery and Cloudflare management; staging has no Email Sending binding, runtime credential, Email Routing rule, or active cron. Production remains an explicit named environment. | Resource-name isolation alone cannot prevent an accidental provider or control-plane call. Independent bindings plus runtime gates and explicit production commands create defense in depth without weakening production behavior. |
 | 2026-09-09 | The staging restore drill requires an empty, uninitialized staging instance and an explicit `mailflare-staging` confirmation; it creates only run-scoped fixtures and removes its D1 and R2 artifacts after verification. | A recovery test is intentionally destructive. Fail-closed preflight and bounded cleanup prevent the reusable drill from becoming an accidental data-reset command. |
 | 2026-09-09 | Auto-replies are suppressed for every sender address routed by the local CC Mail instance, not only the destination mailbox itself. | Two local mailboxes with auto-replies enabled could otherwise reply to each other indefinitely. |
+| 2026-09-09 | Webhook delivery uses a dedicated Queue and a stable delivery ID across automatic and manual attempts; temporary failures retry at most five total attempts, and delivery records expire after 30 days. | Delivery must not block email processing, receivers need a durable deduplication key, and retry history must remain useful without growing forever. |
 
 ## Progress log
 
@@ -620,3 +623,4 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-09 | 0.2 — Safe deployment environments | Added explicit local, staging and production Wrangler environments; moved every non-inheritable binding into each named environment; made normal remote commands default to staging; added an automated resource-reuse gate; and made provider delivery and Cloudflare management fail closed outside production. | Staging version `74bd948c-6ee7-42d0-8c50-97b7ec00da58` at `mailflare-staging.agabio.workers.dev`; separate D1, R2, four Queues, Durable Object and Workflow verified; cron disabled; 30 migrations applied; staging secrets, users, messages and outbound jobs all empty; 61 tests, typecheck, lint, isolated OpenNext build and both Wrangler dry runs passed; `/login` reached the empty-instance `/setup` route with HTTP 200; production remained healthy on `c57e232b-fb4f-40fc-a71c-e3da78df1d47`; no synthetic email was sent and no restore drill was run. |
 | 2026-09-09 | 1.4 — Full staging restore drill | Added a fail-closed reusable drill runner and exercised the deployed backup Workflow and restore API with representative D1 data plus user avatar, mailbox avatar, branding icon, raw email, inline image and downloadable attachment objects. | Run `drill_20260909065804_7808a312`; backup `bak_0xm-BlgBecFj9gbQOsEWa`; injected final-batch uniqueness failure left recovery bundle `bak_restore_ac5b4f2a70744678876257bb7662b2d4`, preserved the mutated D1/R2 state and kept the session valid; the valid restore created recovery bundle `bak_restore_4b1b21b9e45741c389034c723af87d43`, restored all six objects and D1 values, invalidated every session and left zero temporary tables. The runner verified cleanup returned staging to zero application rows, restored default settings and removed every known R2 fixture and bundle key. Production was not accessed or changed by the drill. |
 | 2026-09-09 | 4.1 mail-path integration foundation and 4.2 backup/migration integration | Added a secret-isolated Workers-runtime Vitest project with real local D1 and R2 bindings, Queue-compatible mail seams, full table/object restore fixtures, legacy v1-v3 restore coverage and sequential migration verification. The suite exposed and fixed cross-mailbox auto-reply loops and Miniflare's `_cf_METADATA` backup classification. Item 4.2 is complete; 4.1 remains open only for durable webhook retry behavior tracked by 2.5. | 61 unit tests and 12 Workers integration tests passed; every one of 30 migrations applied against its preceding schema and matched the fresh schema; source and integration typechecks passed; lint completed with zero errors and the same 57 warnings. No remote resources, staging or production were accessed. |
+| 2026-09-09 | 2.5 — Reliable webhooks and completion of 4.1 | Moved endpoint delivery to a dedicated Queue; added stable signed delivery IDs/timestamps, five-attempt exponential retry for network/429/5xx failures, durable status details, owner-scoped history and manual redelivery, a delivery-history interface, and 30-day scheduled retention. | Pre-migration production backup `bak_scheduled_2026-09-09` was complete at 2,118,220 bytes; migration `0030_add_webhook_delivery_retries.sql` applied to staging and production; staging version `9b179d1d-7eff-4151-b497-4ead93b54ad4`; production version `e3568848-c8ca-4510-b769-5d1385f4b0e3`; both webhook queues show one producer and one consumer; production had zero webhook deliveries in flight, all ten outbound jobs remained sent, no migrations remained, and production returned HTTP 200. The isolated OpenNext build and Wrangler dry run passed; 61 unit tests, 12 Workers integration tests, source/integration typechecks and environment-isolation checks passed; lint had zero errors and 57 pre-existing warnings. No synthetic email or webhook was sent. |
