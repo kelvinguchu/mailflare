@@ -60,7 +60,8 @@
 	"queues": {
 		"producers": [
 			{ "binding": "INBOUND_QUEUE", "queue": "mailflare-inbound-local" },
-			{ "binding": "OUTBOUND_QUEUE", "queue": "mailflare-outbound-local" }
+			{ "binding": "OUTBOUND_QUEUE", "queue": "mailflare-outbound-local" },
+			{ "binding": "WEBHOOK_QUEUE", "queue": "mailflare-webhook-local" }
 		],
 		"consumers": [
 			{
@@ -74,6 +75,11 @@
 				"max_batch_size": 5,
 				"max_retries": 3,
 				"dead_letter_queue": "mailflare-outbound-dlq-local"
+			},
+			{
+				"queue": "mailflare-webhook-local",
+				"max_batch_size": 5,
+				"max_retries": 4
 			},
 			{
 				"queue": "mailflare-inbound-dlq-local",
@@ -144,7 +150,8 @@
 			"queues": {
 				"producers": [
 					{ "binding": "INBOUND_QUEUE", "queue": "mailflare-inbound-staging" },
-					{ "binding": "OUTBOUND_QUEUE", "queue": "mailflare-outbound-staging" }
+					{ "binding": "OUTBOUND_QUEUE", "queue": "mailflare-outbound-staging" },
+					{ "binding": "WEBHOOK_QUEUE", "queue": "mailflare-webhook-staging" }
 				],
 				"consumers": [
 					{
@@ -158,6 +165,11 @@
 						"max_batch_size": 5,
 						"max_retries": 3,
 						"dead_letter_queue": "mailflare-outbound-dlq-staging"
+					},
+					{
+						"queue": "mailflare-webhook-staging",
+						"max_batch_size": 5,
+						"max_retries": 4
 					},
 					{
 						"queue": "mailflare-inbound-dlq-staging",
@@ -230,7 +242,8 @@
 			"queues": {
 				"producers": [
 					{ "binding": "INBOUND_QUEUE", "queue": "mailflare-inbound" },
-					{ "binding": "OUTBOUND_QUEUE", "queue": "mailflare-outbound" }
+					{ "binding": "OUTBOUND_QUEUE", "queue": "mailflare-outbound" },
+					{ "binding": "WEBHOOK_QUEUE", "queue": "mailflare-webhook" }
 				],
 				"consumers": [
 					{
@@ -244,6 +257,11 @@
 						"max_batch_size": 5,
 						"max_retries": 3,
 						"dead_letter_queue": "mailflare-outbound-dlq"
+					},
+					{
+						"queue": "mailflare-webhook",
+						"max_batch_size": 5,
+						"max_retries": 4
 					},
 					{
 						"queue": "mailflare-inbound-dlq",

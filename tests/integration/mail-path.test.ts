@@ -11,7 +11,14 @@ import { stageInboundMessageAttachments } from "@/lib/email/inbound-attachments"
 import { resolveInboundAddress } from "@/lib/email/routing";
 import { getAuthorizedSenderAddress } from "@/lib/email/sender";
 import { OutboundRetryError, processOutboundQueue, queueEmail } from "@/lib/email/send";
-import { dispatchWebhooks } from "@/lib/email/webhooks";
+import {
+	deleteExpiredWebhookDeliveries,
+	dispatchWebhooks,
+	listWebhookDeliveriesForUser,
+	processWebhookQueue,
+	redeliverWebhookForUser,
+	WebhookRetryError,
+} from "@/lib/email/webhooks";
 import { getMailboxAccessLevel } from "@/lib/mailboxes/access";
 import {
 	createMailEnv,
@@ -249,7 +256,7 @@ describe("mail path with isolated Workers bindings", () => {
 		expect(counts).toEqual({ deliveries: 1, jobs: 1 });
 	});
 
-	it("signs webhook bodies and persists a failed attempt without failing the caller", async () => {
+	it("queues signed webhooks, retries transient failures, deduplicates replay, and supports redelivery", async () => {
 		await seedMailboxWorld();
 		await integrationEnv.DB.prepare(`INSERT INTO webhooks
 			(id, user_id, url, secret, events, enabled, created_at)
@@ -262,16 +269,71 @@ describe("mail path with isolated Workers bindings", () => {
 				JSON.stringify(["message.inbound"]),
 				1_700_000_000,
 			).run();
-		const fetchSpy = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
-			new Response("retry", { status: 503 }));
+		const queued: Array<{ deliveryId: string }> = [];
+		const queueSend = vi.fn(async (message: { deliveryId: string }) => {
+			queued.push(message);
+		});
+		const env = createMailEnv({ WEBHOOK_QUEUE: { send: queueSend } as unknown as Queue });
+		let fetchAttempt = 0;
+		const fetchSpy = vi.fn(async (...args: [RequestInfo | URL, RequestInit?]) => {
+			void args;
+			fetchAttempt += 1;
+			return fetchAttempt === 1
+				? new Response("retry", { status: 503 })
+				: new Response(null, { status: 204 });
+		});
 		vi.stubGlobal("fetch", fetchSpy);
 
-		await expect(dispatchWebhooks(createMailEnv(), fixtureIds.owner, "message.inbound", {
+		await expect(dispatchWebhooks(env, fixtureIds.owner, "message.inbound", {
 			messageId: "msg_webhook",
 		})).resolves.toBeUndefined();
-		expect(fetchSpy).toHaveBeenCalledTimes(1);
+		expect(fetchSpy).not.toHaveBeenCalled();
+		expect(queued).toHaveLength(1);
+		const deliveryId = queued[0]!.deliveryId;
+
+		await expect(processWebhookQueue(env, { deliveryId })).rejects.toMatchObject({
+			name: "WebhookRetryError",
+			delaySeconds: 30,
+		} satisfies Partial<WebhookRetryError>);
+		let delivery = await integrationEnv.DB.prepare(
+			"SELECT status, attempts, next_attempt_at, last_status_code, last_error FROM webhook_deliveries WHERE id = ?",
+		).bind(deliveryId).first<{
+			status: string;
+			attempts: number;
+			next_attempt_at: number | null;
+			last_status_code: number | null;
+			last_error: string | null;
+		}>();
+		expect(delivery).toMatchObject({
+			status: "failed",
+			attempts: 1,
+			last_status_code: 503,
+			last_error: "E_WEBHOOK_HTTP_503",
+		});
+		expect(delivery?.next_attempt_at).toBeTypeOf("number");
+
+		await processWebhookQueue(env, { deliveryId });
+		await processWebhookQueue(env, { deliveryId });
+		expect(fetchSpy).toHaveBeenCalledTimes(2);
+		delivery = await integrationEnv.DB.prepare(
+			"SELECT status, attempts, next_attempt_at, last_status_code, last_error FROM webhook_deliveries WHERE id = ?",
+		).bind(deliveryId).first();
+		expect(delivery).toEqual({
+			status: "delivered",
+			attempts: 2,
+			next_attempt_at: null,
+			last_status_code: 204,
+			last_error: null,
+		});
+
 		const [, init] = fetchSpy.mock.calls[0]!;
 		const body = String(init?.body);
+		expect(JSON.parse(body)).toMatchObject({
+			id: deliveryId,
+			type: "message.inbound",
+			createdAt: expect.any(String),
+			data: { messageId: "msg_webhook" },
+		});
 		const key = await crypto.subtle.importKey(
 			"raw",
 			new TextEncoder().encode("integration-secret"),
@@ -284,10 +346,33 @@ describe("mail path with isolated Workers bindings", () => {
 			.map((byte) => byte.toString(16).padStart(2, "0"))
 			.join("");
 		expect(new Headers(init?.headers).get("X-Email-Platform-Signature")).toBe(expectedSignature);
+		expect(new Headers(init?.headers).get("X-Email-Platform-Delivery")).toBe(deliveryId);
+		expect(fetchSpy.mock.calls[1]?.[1]?.body).toBe(body);
 
-		const delivery = await integrationEnv.DB.prepare(
-			"SELECT status, attempts FROM webhook_deliveries WHERE webhook_id = ?",
-		).bind("hook_1").first<{ status: string; attempts: number }>();
-		expect(delivery).toEqual({ status: "failed", attempts: 1 });
+		const history = await listWebhookDeliveriesForUser(env, fixtureIds.owner, "hook_1");
+		expect(history).toHaveLength(1);
+		expect(history[0]).toMatchObject({ id: deliveryId, status: "delivered", attempts: 2 });
+		await expect(redeliverWebhookForUser(
+			env,
+			fixtureIds.stranger,
+			"hook_1",
+			deliveryId,
+		)).resolves.toBe(false);
+		await expect(redeliverWebhookForUser(
+			env,
+			fixtureIds.owner,
+			"hook_1",
+			deliveryId,
+		)).resolves.toBe(true);
+		expect(queueSend).toHaveBeenCalledTimes(2);
+
+		await integrationEnv.DB.prepare(
+			"UPDATE webhook_deliveries SET created_at = ? WHERE id = ?",
+		).bind(1_600_000_000, deliveryId).run();
+		await deleteExpiredWebhookDeliveries(env, new Date("2026-09-09T00:00:00Z"));
+		const retained = await integrationEnv.DB.prepare(
+			"SELECT COUNT(*) AS count FROM webhook_deliveries",
+		).first<{ count: number }>();
+		expect(retained?.count).toBe(0);
 	});
 });

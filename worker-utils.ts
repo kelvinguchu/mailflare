@@ -1,5 +1,6 @@
 import type { InboundQueueMessage } from "./src/lib/email/inbound";
 import type { OutboundQueueMessage } from "./src/lib/email/send";
+import type { WebhookQueueMessage } from "./src/lib/email/webhooks";
 
 export function isInboundQueueMessage(payload: unknown): payload is InboundQueueMessage {
 	return (
@@ -18,5 +19,15 @@ export function isOutboundQueueMessage(payload: unknown): payload is OutboundQue
 		"jobId" in payload &&
 		typeof payload.jobId === "string" &&
 		payload.jobId.length > 0
+	);
+}
+
+export function isWebhookQueueMessage(payload: unknown): payload is WebhookQueueMessage {
+	return (
+		typeof payload === "object" &&
+		payload !== null &&
+		"deliveryId" in payload &&
+		typeof payload.deliveryId === "string" &&
+		payload.deliveryId.length > 0
 	);
 }

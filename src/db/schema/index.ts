@@ -362,19 +362,31 @@ export const webhooks = sqliteTable("webhooks", {
 		.$defaultFn(() => new Date()),
 });
 
-export const webhookDeliveries = sqliteTable("webhook_deliveries", {
-	id: text("id").primaryKey(),
-	webhookId: text("webhook_id")
-		.notNull()
-		.references(() => webhooks.id, { onDelete: "cascade" }),
-	eventType: text("event_type").notNull(),
-	payload: text("payload").notNull(),
-	status: text("status").notNull().default("pending"),
-	attempts: integer("attempts").notNull().default(0),
-	createdAt: integer("created_at", { mode: "timestamp" })
-		.notNull()
-		.$defaultFn(() => new Date()),
-});
+export const webhookDeliveries = sqliteTable(
+	"webhook_deliveries",
+	{
+		id: text("id").primaryKey(),
+		webhookId: text("webhook_id")
+			.notNull()
+			.references(() => webhooks.id, { onDelete: "cascade" }),
+		eventType: text("event_type").notNull(),
+		payload: text("payload").notNull(),
+		status: text("status").notNull().default("pending"),
+		attempts: integer("attempts").notNull().default(0),
+		lastAttemptAt: integer("last_attempt_at", { mode: "timestamp" }),
+		nextAttemptAt: integer("next_attempt_at", { mode: "timestamp" }),
+		deliveredAt: integer("delivered_at", { mode: "timestamp" }),
+		lastStatusCode: integer("last_status_code"),
+		lastError: text("last_error"),
+		createdAt: integer("created_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
+	},
+	(t) => [
+		index("webhook_deliveries_webhook_created_idx").on(t.webhookId, t.createdAt),
+		index("webhook_deliveries_status_next_idx").on(t.status, t.nextAttemptAt),
+	],
+);
 
 export const sessions = sqliteTable("sessions", {
 	id: text("id").primaryKey(),

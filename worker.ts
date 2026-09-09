@@ -8,7 +8,11 @@ import {
 import { OutboundRetryError, processOutboundQueue } from "./src/lib/email/send";
 import { getDb } from "./src/db";
 import { resolveInboundAddress } from "./src/lib/email/routing";
-import { isInboundQueueMessage, isOutboundQueueMessage } from "./worker-utils";
+import {
+	isInboundQueueMessage,
+	isOutboundQueueMessage,
+	isWebhookQueueMessage,
+} from "./worker-utils";
 import { getUserFromSession } from "./src/lib/auth/session";
 import { getSessionTokenFromRequest } from "./src/lib/realtime/utils";
 import {
@@ -21,6 +25,11 @@ import {
 	captureFinalOutboundFailure,
 } from "./src/lib/queues/dead-letters";
 import { getDeadLetterSource } from "./src/lib/queues/dead-letter-policy";
+import {
+	deleteExpiredWebhookDeliveries,
+	processWebhookQueue,
+	WebhookRetryError,
+} from "./src/lib/email/webhooks";
 export { RealtimeHub } from "./src/lib/realtime/hub";
 export { DatabaseBackupWorkflow } from "./src/lib/backups/workflow";
 
@@ -82,6 +91,14 @@ export default {
 
 	async scheduled(controller: ScheduledController, env: CloudflareEnv) {
 		await runScheduledBackup(env, new Date(controller.scheduledTime));
+		try {
+			await deleteExpiredWebhookDeliveries(env, new Date(controller.scheduledTime));
+		} catch (error) {
+			console.error(JSON.stringify({
+				event: "webhook_retention_cleanup_failed",
+				error: error instanceof Error ? error.message : "Unknown cleanup error",
+			}));
+		}
 	},
 
 	async queue(batch: MessageBatch, env: CloudflareEnv): Promise<void> {
@@ -100,6 +117,8 @@ export default {
 						attempts: msg.attempts,
 						body: msg.body,
 					});
+				} else if (isWebhookQueueMessage(msg.body)) {
+					await processWebhookQueue(env, msg.body);
 				} else {
 					console.error(JSON.stringify({
 						event: "queue_message_malformed",
@@ -121,6 +140,8 @@ export default {
 						? 3600
 						: err instanceof OutboundRetryError
 							? err.delaySeconds
+							: err instanceof WebhookRetryError
+								? err.delaySeconds
 							: 10,
 				});
 			}
@@ -135,5 +156,7 @@ function getQueueErrorCode(error: unknown): string {
 			return code.toUpperCase();
 		}
 	}
-	return error instanceof OutboundRetryError ? "OUTBOUND_RETRY" : "QUEUE_HANDLER_ERROR";
+	if (error instanceof OutboundRetryError) return "OUTBOUND_RETRY";
+	if (error instanceof WebhookRetryError) return "WEBHOOK_RETRY";
+	return "QUEUE_HANDLER_ERROR";
 }
