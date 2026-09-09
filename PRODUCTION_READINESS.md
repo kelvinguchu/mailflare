@@ -101,7 +101,7 @@ Acceptance criteria:
 
 ### 1.4 Make restoration failure-safe
 
-Status: `[-]` Implementation is deployed; the staging restore drill remains blocked on Phase 0.2.
+Status: `[x]` The failure-safe restore path and a repeatable staging drill are complete. The live drill verified D1 atomicity, R2 rollback, successful recovery, session invalidation and cleanup against the isolated staging resources.
 
 - [x] Validate backup structure, version, tables, columns and object availability before deleting live data.
 - [x] Add a maximum restore upload size.
@@ -113,7 +113,7 @@ Acceptance criteria:
 
 - [x] An invalid or incomplete backup cannot erase the current database.
 - [x] An injected failure during restoration leaves a documented recovery path.
-- [!] A full restore drill succeeds in staging. Pending the isolated staging resources from Phase 0.2.
+- [x] A full restore drill succeeds in staging.
 
 ## Phase 2 — Guarantee mail processing integrity
 
@@ -595,6 +595,7 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-05 | Database backup format v4 includes dead-letter records and raw R2 messages referenced only by inbound failures; v1-v3 remain restorable. | A failed inbound message must remain recoverable even before it creates a normal `messages` row. |
 | 2026-09-09 | Owner-requested features are split into backend and frontend tracks, with isolated staging and critical integration tests preceding schema, authentication and delivery changes. | CC, rich signatures, Undo send, TOTP and reminders cross persistence and security boundaries; defining and verifying backend behavior first avoids encoding UI assumptions into unsafe production changes. |
 | 2026-09-09 | Local and staging environments fail closed for provider delivery and Cloudflare management; staging has no Email Sending binding, runtime credential, Email Routing rule, or active cron. Production remains an explicit named environment. | Resource-name isolation alone cannot prevent an accidental provider or control-plane call. Independent bindings plus runtime gates and explicit production commands create defense in depth without weakening production behavior. |
+| 2026-09-09 | The staging restore drill requires an empty, uninitialized staging instance and an explicit `mailflare-staging` confirmation; it creates only run-scoped fixtures and removes its D1 and R2 artifacts after verification. | A recovery test is intentionally destructive. Fail-closed preflight and bounded cleanup prevent the reusable drill from becoming an accidental data-reset command. |
 
 ## Progress log
 
@@ -612,3 +613,4 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-05 | 2.4 — Dead-letter handling and replay | Added dedicated inbound/outbound DLQs, durable idempotent D1 capture, safe structured diagnostics, provider-final-failure capture, an administrator-only failure history and serialized replay action, an app-wide unresolved-failure alert, and backup format v4 coverage for failure payloads and their raw inbound R2 sources. | Pre-migration backup `bak_pre_dead_letters_20260905` completed through Workflow `5199fc14-80e0-4378-8ab5-d75b320032c6` with eight independent R2 objects and 1,432,182 total bytes; migration `0029_add_dead_letter_events.sql` passed on isolated and production D1; production version `c57e232b-fb4f-40fc-a71c-e3da78df1d47`; 58 tests, typecheck, lint, isolated Next/OpenNext builds and Wrangler dry run passed; all four queue consumers and both new queue resources were verified; no migrations remained; production login and the new page returned HTTP 200; the admin API returned 403 without a session; production had zero unresolved failures and all ten outbound jobs were sent. No synthetic email was sent. |
 | 2026-09-09 | Owner-requested feature planning | Added separate backend and frontend tracks for CC recipients, safe rich signatures, delayed send/Undo, TOTP, original login design, local loading states, and expanded calendar/tasks/reminders. Re-prioritized the next work around isolated staging, the restore drill and integration tests before feature schema or authentication changes. | Roadmap review only; no runtime code, infrastructure or production state changed. |
 | 2026-09-09 | 0.2 — Safe deployment environments | Added explicit local, staging and production Wrangler environments; moved every non-inheritable binding into each named environment; made normal remote commands default to staging; added an automated resource-reuse gate; and made provider delivery and Cloudflare management fail closed outside production. | Staging version `74bd948c-6ee7-42d0-8c50-97b7ec00da58` at `mailflare-staging.agabio.workers.dev`; separate D1, R2, four Queues, Durable Object and Workflow verified; cron disabled; 30 migrations applied; staging secrets, users, messages and outbound jobs all empty; 61 tests, typecheck, lint, isolated OpenNext build and both Wrangler dry runs passed; `/login` reached the empty-instance `/setup` route with HTTP 200; production remained healthy on `c57e232b-fb4f-40fc-a71c-e3da78df1d47`; no synthetic email was sent and no restore drill was run. |
+| 2026-09-09 | 1.4 — Full staging restore drill | Added a fail-closed reusable drill runner and exercised the deployed backup Workflow and restore API with representative D1 data plus user avatar, mailbox avatar, branding icon, raw email, inline image and downloadable attachment objects. | Run `drill_20260909065804_7808a312`; backup `bak_0xm-BlgBecFj9gbQOsEWa`; injected final-batch uniqueness failure left recovery bundle `bak_restore_ac5b4f2a70744678876257bb7662b2d4`, preserved the mutated D1/R2 state and kept the session valid; the valid restore created recovery bundle `bak_restore_4b1b21b9e45741c389034c723af87d43`, restored all six objects and D1 values, invalidated every session and left zero temporary tables. The runner verified cleanup returned staging to zero application rows, restored default settings and removed every known R2 fixture and bundle key. Production was not accessed or changed by the drill. |

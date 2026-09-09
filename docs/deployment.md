@@ -142,7 +142,35 @@ The Worker checks the automatic-backup settings at 02:00 UTC each day. Enable au
 
 Backup data is read through the `DB` binding and written through the `BUCKET` binding. No Cloudflare API token is required for the backup itself.
 
-Backup format version 2 includes every table registered in the application schema. `_cf_KV`, `d1_migrations`, and `sqlite_sequence` are excluded because Cloudflare D1, the migration runner, and SQLite own them. Before each export, CC Mail rejects any D1 table that has not been classified as application data or database bookkeeping.
+Backup format version 4 includes every table registered in the application schema, independent copies of referenced R2 objects, and durable dead-letter records. `_cf_KV`, `d1_migrations`, and `sqlite_sequence` are excluded because Cloudflare D1, the migration runner, and SQLite own them. Before each export, CC Mail rejects any D1 table that has not been classified as application data or database bookkeeping.
+
+### Staging restore drill
+
+The reusable drill exercises the deployed staging Workflow and restore API. It verifies a controlled final-D1-batch failure, R2 rollback, a successful D1/R2 restore, global session invalidation and removal of temporary restore tables. Its fixture includes raw email, an inline image, a downloadable attachment, user and mailbox avatars, and a branding icon.
+
+The drill is destructive by design and refuses to run unless all of these safeguards pass:
+
+- the committed staging/production isolation check passes;
+- the target Worker is exactly `mailflare-staging`;
+- `DEPLOYMENT_ENV` is `staging`;
+- staging has no administrator or application data; and
+- the operator supplies the exact staging confirmation value.
+
+Run it from PowerShell:
+
+```powershell
+$env:CC_MAIL_STAGING_RESTORE_DRILL = "mailflare-staging"
+npm run drill:restore:staging
+Remove-Item Env:CC_MAIL_STAGING_RESTORE_DRILL
+```
+
+Or from a POSIX shell:
+
+```bash
+CC_MAIL_STAGING_RESTORE_DRILL=mailflare-staging npm run drill:restore:staging
+```
+
+The session token exists only in runner memory and is never printed. A successful run prints the backup and recovery IDs, verifies cleanup, and returns staging to its pre-drill empty state. See [the recorded staging drill](staging-restore-drill.md) for the latest evidence.
 
 ## Updating CC Mail
 
