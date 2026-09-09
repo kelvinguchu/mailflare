@@ -24,7 +24,12 @@ describe("database backup format", () => {
 	});
 
 	it("documents the database-owned tables that are intentionally excluded", () => {
-		expect(DATABASE_SYSTEM_TABLES).toEqual(["_cf_KV", "d1_migrations", "sqlite_sequence"]);
+		expect(DATABASE_SYSTEM_TABLES).toEqual([
+			"_cf_KV",
+			"_cf_METADATA",
+			"d1_migrations",
+			"sqlite_sequence",
+		]);
 	});
 
 	it("reports an unclassified database table", () => {

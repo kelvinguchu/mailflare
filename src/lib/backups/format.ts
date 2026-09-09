@@ -51,7 +51,12 @@ export const LEGACY_V2_V3_BACKUP_TABLES = BACKUP_TABLES.filter(
 // These are D1/SQLite bookkeeping tables, not application data. D1 and the
 // migration runner own them, so application-level restore must not overwrite
 // them.
-export const DATABASE_SYSTEM_TABLES = ["_cf_KV", "d1_migrations", "sqlite_sequence"] as const;
+export const DATABASE_SYSTEM_TABLES = [
+	"_cf_KV",
+	"_cf_METADATA",
+	"d1_migrations",
+	"sqlite_sequence",
+] as const;
 
 const CLASSIFIED_DATABASE_TABLES = new Set<string>([
 	...BACKUP_TABLES,

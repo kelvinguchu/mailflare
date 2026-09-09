@@ -20,7 +20,9 @@ export async function sendMailboxAutoReply(
 
 	const db = getDb(env);
 	const senderDecision = await resolveInboundAddress(db, recipient);
-	if (senderDecision?.mailbox?.mailboxId === input.mailboxId) return;
+	// Never auto-reply to another address routed by this CC Mail instance. Two
+	// auto-reply-enabled local mailboxes could otherwise generate a reply loop.
+	if (senderDecision?.mailbox) return;
 	const [mailbox] = await db
 		.select({
 			autoReplyEnabled: mailboxes.autoReplyEnabled,

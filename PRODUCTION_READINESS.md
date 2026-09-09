@@ -258,31 +258,35 @@ Acceptance criteria:
 
 ### 4.1 Add mail-path integration tests
 
-- [ ] Inbound routing and aliases.
-- [ ] Inbound retry and deduplication.
-- [ ] Outbound authorization and sender identity.
-- [ ] Outbound queue retry and idempotency.
-- [ ] Shared mailbox permissions.
-- [ ] Attachment authorization and storage cleanup.
-- [ ] Auto-reply loop prevention.
-- [ ] Webhook signing and retries.
+Status: `[-]` The existing critical mail paths now run against isolated Workers-runtime D1 and R2 bindings with Queue-compatible provider seams. Webhook signing and failed-attempt persistence are covered; durable webhook retries remain part of 2.5.
+
+- [x] Inbound routing and aliases.
+- [x] Inbound retry and deduplication.
+- [x] Outbound authorization and sender identity.
+- [x] Outbound queue retry and idempotency.
+- [x] Shared mailbox permissions.
+- [x] Attachment authorization and storage cleanup.
+- [x] Auto-reply loop prevention.
+- [ ] Webhook signing and retries. Signing and failure persistence are tested; automatic retry is not implemented yet.
 
 Acceptance criteria:
 
-- Critical mail flows run against isolated D1, R2 and Queue-compatible test bindings.
-- Tests prove both allowed and forbidden mailbox actions.
+- [x] Critical mail flows run against isolated D1, R2 and Queue-compatible test bindings.
+- [x] Tests prove both allowed and forbidden mailbox actions.
 
 ### 4.2 Add backup and migration tests
 
-- [ ] Round-trip every supported table through export and restore.
-- [ ] Test old backup-format compatibility.
-- [ ] Test every migration against a copy of the preceding schema.
-- [ ] Test restoration failure without corrupting the source database.
+Status: `[x]` The Workers-runtime integration suite continuously exercises every backup table, referenced R2 objects, all legacy formats, the complete migration chain and failure rollback against isolated local bindings.
+
+- [x] Round-trip every supported table through export and restore.
+- [x] Test old backup-format compatibility.
+- [x] Test every migration against a copy of the preceding schema.
+- [x] Test restoration failure without corrupting the source database.
 
 Acceptance criteria:
 
-- A fresh database and an upgraded database produce the same expected schema.
-- Backup restoration is continuously verified rather than assumed.
+- [x] A fresh database and an upgraded database produce the same expected schema.
+- [x] Backup restoration is continuously verified rather than assumed.
 
 ### 4.3 Add browser smoke tests
 
@@ -587,7 +591,7 @@ The migration should then preserve behavior first and improve architecture secon
 | --- | --- | --- |
 | 2026-09-01 | Personal mailboxes use the owner account avatar; shared mailboxes retain their own avatar. | Avoid duplicate avatar state and inconsistent rendering. |
 | 2026-09-01 | Reliability work precedes the TanStack Start migration. | Preserve a testable behavioral baseline and avoid migrating known delivery/recovery risks. |
-| 2026-09-04 | `_cf_KV`, `d1_migrations`, and `sqlite_sequence` are classified as database-owned rather than application backup data. | Cloudflare D1, the migration runner, and SQLite recreate or manage these tables; restoring application rows must not overwrite their state. |
+| 2026-09-04 | `_cf_KV`, `_cf_METADATA`, `d1_migrations`, and `sqlite_sequence` are classified as database-owned rather than application backup data. | Cloudflare D1, Miniflare, the migration runner, and SQLite recreate or manage these tables; restoring application rows must not overwrite their state. |
 | 2026-09-04 | Outbound queue messages contain only a D1 job ID; provider delivery reads the durable message and R2 attachments in the consumer. | Keep queue payloads small, preserve a stable browser/API message ID and ensure one request creates one message and one job. |
 | 2026-09-04 | An unclassified error after Email Service delivery begins is recorded as `E_DELIVERY_OUTCOME_UNKNOWN` and is not retried. | The current Email Service binding has no caller-supplied provider idempotency key and controls `Message-ID`; suppressing a possible email is safer than knowingly risking a duplicate. Explicit transient provider rejections remain retryable. |
 | 2026-09-05 | Queue dead letters and provider-declared final outbound failures share one durable D1 recovery ledger; logs and the admin API expose only queue/reference IDs, safe error codes, attempts and timestamps. | Preserve replay material without leaking sender, recipient, subject, headers or body into logs or the operational UI. |
@@ -596,6 +600,7 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-09 | Owner-requested features are split into backend and frontend tracks, with isolated staging and critical integration tests preceding schema, authentication and delivery changes. | CC, rich signatures, Undo send, TOTP and reminders cross persistence and security boundaries; defining and verifying backend behavior first avoids encoding UI assumptions into unsafe production changes. |
 | 2026-09-09 | Local and staging environments fail closed for provider delivery and Cloudflare management; staging has no Email Sending binding, runtime credential, Email Routing rule, or active cron. Production remains an explicit named environment. | Resource-name isolation alone cannot prevent an accidental provider or control-plane call. Independent bindings plus runtime gates and explicit production commands create defense in depth without weakening production behavior. |
 | 2026-09-09 | The staging restore drill requires an empty, uninitialized staging instance and an explicit `mailflare-staging` confirmation; it creates only run-scoped fixtures and removes its D1 and R2 artifacts after verification. | A recovery test is intentionally destructive. Fail-closed preflight and bounded cleanup prevent the reusable drill from becoming an accidental data-reset command. |
+| 2026-09-09 | Auto-replies are suppressed for every sender address routed by the local CC Mail instance, not only the destination mailbox itself. | Two local mailboxes with auto-replies enabled could otherwise reply to each other indefinitely. |
 
 ## Progress log
 
@@ -614,3 +619,4 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-09 | Owner-requested feature planning | Added separate backend and frontend tracks for CC recipients, safe rich signatures, delayed send/Undo, TOTP, original login design, local loading states, and expanded calendar/tasks/reminders. Re-prioritized the next work around isolated staging, the restore drill and integration tests before feature schema or authentication changes. | Roadmap review only; no runtime code, infrastructure or production state changed. |
 | 2026-09-09 | 0.2 — Safe deployment environments | Added explicit local, staging and production Wrangler environments; moved every non-inheritable binding into each named environment; made normal remote commands default to staging; added an automated resource-reuse gate; and made provider delivery and Cloudflare management fail closed outside production. | Staging version `74bd948c-6ee7-42d0-8c50-97b7ec00da58` at `mailflare-staging.agabio.workers.dev`; separate D1, R2, four Queues, Durable Object and Workflow verified; cron disabled; 30 migrations applied; staging secrets, users, messages and outbound jobs all empty; 61 tests, typecheck, lint, isolated OpenNext build and both Wrangler dry runs passed; `/login` reached the empty-instance `/setup` route with HTTP 200; production remained healthy on `c57e232b-fb4f-40fc-a71c-e3da78df1d47`; no synthetic email was sent and no restore drill was run. |
 | 2026-09-09 | 1.4 — Full staging restore drill | Added a fail-closed reusable drill runner and exercised the deployed backup Workflow and restore API with representative D1 data plus user avatar, mailbox avatar, branding icon, raw email, inline image and downloadable attachment objects. | Run `drill_20260909065804_7808a312`; backup `bak_0xm-BlgBecFj9gbQOsEWa`; injected final-batch uniqueness failure left recovery bundle `bak_restore_ac5b4f2a70744678876257bb7662b2d4`, preserved the mutated D1/R2 state and kept the session valid; the valid restore created recovery bundle `bak_restore_4b1b21b9e45741c389034c723af87d43`, restored all six objects and D1 values, invalidated every session and left zero temporary tables. The runner verified cleanup returned staging to zero application rows, restored default settings and removed every known R2 fixture and bundle key. Production was not accessed or changed by the drill. |
+| 2026-09-09 | 4.1 mail-path integration foundation and 4.2 backup/migration integration | Added a secret-isolated Workers-runtime Vitest project with real local D1 and R2 bindings, Queue-compatible mail seams, full table/object restore fixtures, legacy v1-v3 restore coverage and sequential migration verification. The suite exposed and fixed cross-mailbox auto-reply loops and Miniflare's `_cf_METADATA` backup classification. Item 4.2 is complete; 4.1 remains open only for durable webhook retry behavior tracked by 2.5. | 61 unit tests and 12 Workers integration tests passed; every one of 30 migrations applied against its preceding schema and matched the fresh schema; source and integration typechecks passed; lint completed with zero errors and the same 57 warnings. No remote resources, staging or production were accessed. |

@@ -1,0 +1,20 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"incremental": false,
+		"plugins": [],
+		"types": [
+			"./cloudflare-env.d.ts",
+			"node",
+			"@cloudflare/workers-types",
+			"@cloudflare/vitest-plugin/types"
+		]
+	},
+	"include": [
+		"cloudflare-env.d.ts",
+		"env.d.ts",
+		"vitest.integration.config.mts",
+		"tests/integration/**/*.ts"
+	],
+	"exclude": ["node_modules", ".next", ".open-next", ".wrangler"]
+}
