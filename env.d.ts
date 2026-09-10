@@ -4,6 +4,7 @@ interface CloudflareEnv {
 	BUCKET: R2Bucket;
 	INBOUND_QUEUE: Queue<import("./src/lib/email/inbound").InboundQueueMessage>;
 	OUTBOUND_QUEUE: Queue<import("./src/lib/email/send").OutboundQueueMessage>;
+	WEBHOOK_QUEUE: Queue<import("./src/lib/email/webhooks").WebhookQueueMessage>;
 	ASSETS: Fetcher;
 	IMAGES: ImagesBinding;
 	WORKER_SELF_REFERENCE: Fetcher;
@@ -12,9 +13,13 @@ interface CloudflareEnv {
 	>;
 	DATABASE_BACKUP_WORKFLOW?: Workflow<import("./src/lib/backups/types").BackupWorkflowParams>;
 	LOGIN_RATE_LIMIT?: RateLimit;
+	PASSWORD_RESET_RATE_LIMIT?: RateLimit;
 	DEPLOYMENT_ENV?: "local" | "staging" | "production";
 	CLOUDFLARE_MANAGEMENT_MODE?: "disabled" | "enabled";
 	OUTBOUND_DELIVERY_MODE?: "disabled" | "enabled";
+	AUTH_EMAIL_DELIVERY_MODE?: "disabled" | "enabled";
+	AUTH_EMAIL_FROM: string;
+	PUBLIC_APP_ORIGIN: string;
 	CF_TOKEN?: string;
 	CF_API_KEY?: string;
 	CF_EMAIL?: string;

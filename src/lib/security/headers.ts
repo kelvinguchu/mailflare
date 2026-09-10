@@ -1,19 +1,27 @@
-const csp = [
-	"default-src 'self'",
-	"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
-	"style-src 'self' 'unsafe-inline'",
-	"img-src 'self' data: blob: https:",
-	"font-src 'self' data:",
-	"connect-src 'self' ws: wss: https://challenges.cloudflare.com",
-	"frame-src https://challenges.cloudflare.com",
-	"object-src 'none'",
-	"base-uri 'self'",
-	"form-action 'self'",
-	"frame-ancestors 'self'",
-	"upgrade-insecure-requests",
-].join("; ");
+export function getSecurityHeaders(
+	environment: "development" | "production" = process.env.NODE_ENV === "development"
+		? "development"
+		: "production",
+) {
+	const developmentScriptSource = environment === "development"
+		? " 'unsafe-eval'"
+		: "";
+	const csp = [
+		"default-src 'self'",
+		`script-src 'self' 'unsafe-inline'${developmentScriptSource} https://challenges.cloudflare.com`,
+		"script-src-attr 'none'",
+		"style-src 'self' 'unsafe-inline'",
+		"img-src 'self' data: blob: https:",
+		"font-src 'self' data:",
+		"connect-src 'self' ws: wss: https://challenges.cloudflare.com",
+		"frame-src https://challenges.cloudflare.com",
+		"object-src 'none'",
+		"base-uri 'self'",
+		"form-action 'self'",
+		"frame-ancestors 'self'",
+		"upgrade-insecure-requests",
+	].join("; ");
 
-export function getSecurityHeaders() {
 	return [
 		{ key: "Content-Security-Policy", value: csp },
 		{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },

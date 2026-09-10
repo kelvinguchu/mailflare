@@ -127,7 +127,19 @@ const ALLOWED_STYLE_PROPERTIES = new Set([
 ]);
 const APP_FONT_FALLBACK = "var(--font-geist-sans), system-ui, sans-serif";
 
+export interface SanitizedEmailHtml {
+	html: string | null;
+	blockedRemoteImageCount: number;
+}
+
+export interface SanitizeEmailHtmlOptions {
+	allowRemoteImages?: boolean;
+}
+
+type ImageSourceKind = "inline" | "remote" | "unsafe";
+
 function isSafeLinkUrl(value: string): boolean {
+	if (!/^(?:(?:https?:)?\/\/|mailto:|tel:)/i.test(value)) return false;
 	try {
 		const url = new URL(value, window.location.origin);
 		return ["http:", "https:", "mailto:", "tel:"].includes(url.protocol);
@@ -136,14 +148,21 @@ function isSafeLinkUrl(value: string): boolean {
 	}
 }
 
-function isSafeImageUrl(value: string): boolean {
-	if (value.startsWith("/api/messages/")) return true;
-	if (/^data:image\/(?:gif|jpeg|png|webp);base64,/i.test(value)) return true;
+function classifyImageUrl(value: string): ImageSourceKind {
+	if (/^\/api\/messages\/[^/]+\/attachments\/[^/?#]+(?:\?[^#]*)?$/i.test(value)) {
+		return "inline";
+	}
+	if (/^data:image\/(?:gif|jpeg|png|webp);base64,/i.test(value)) {
+		return "inline";
+	}
+	if (!/^(?:https?:)?\/\//i.test(value)) return "unsafe";
 	try {
 		const url = new URL(value, window.location.origin);
-		return url.protocol === "http:" || url.protocol === "https:";
+		return url.protocol === "http:" || url.protocol === "https:"
+			? "remote"
+			: "unsafe";
 	} catch {
-		return false;
+		return "unsafe";
 	}
 }
 
@@ -152,7 +171,10 @@ function sanitizeStyle(element: HTMLElement): void {
 	for (const property of Array.from(element.style)) {
 		if (!ALLOWED_STYLE_PROPERTIES.has(property)) continue;
 		const value = element.style.getPropertyValue(property);
-		if (/url\s*\(|expression\s*\(|javascript:|@import|behavior\s*:|-moz-binding/i.test(value)) continue;
+		if (
+			/[\\\u0000-\u001f\u007f]/.test(value) ||
+			/url\s*\(|expression\s*\(|javascript:|@import|behavior\s*:|-moz-binding/i.test(value)
+		) continue;
 		const safeValue = property === "font-family"
 			? `${value}, ${APP_FONT_FALLBACK}`
 			: value;
@@ -165,7 +187,11 @@ function sanitizeStyle(element: HTMLElement): void {
 	}
 }
 
-function sanitizeElement(element: Element): void {
+function sanitizeElement(
+	element: Element,
+	options: SanitizeEmailHtmlOptions,
+	onRemoteImageBlocked: () => void,
+): void {
 	const tag = element.tagName.toLowerCase();
 	if (!ALLOWED_TAGS.has(tag)) {
 		if (DROP_CONTENT_TAGS.has(tag)) {
@@ -196,7 +222,13 @@ function sanitizeElement(element: Element): void {
 
 	if (tag === "img") {
 		const src = element.getAttribute("src");
-		if (!src || !isSafeImageUrl(src)) {
+		const sourceKind = src ? classifyImageUrl(src) : "unsafe";
+		if (sourceKind === "remote" && !options.allowRemoteImages) {
+			onRemoteImageBlocked();
+			element.remove();
+			return;
+		}
+		if (sourceKind === "unsafe") {
 			element.remove();
 			return;
 		}
@@ -205,11 +237,22 @@ function sanitizeElement(element: Element): void {
 	}
 }
 
-export function sanitizeEmailHtml(html: string | null): string | null {
-	if (!html) return null;
-	const document = new DOMParser().parseFromString(html, "text/html");
-	for (const element of Array.from(document.body.querySelectorAll("*"))) {
-		sanitizeElement(element);
+export function sanitizeEmailHtml(
+	html: string | null,
+	options: SanitizeEmailHtmlOptions = {},
+): SanitizedEmailHtml {
+	if (!html) return { html: null, blockedRemoteImageCount: 0 };
+
+	// Template contents are inert: parsing untrusted email HTML here does not fetch
+	// image/CSS resources before the sanitizer has removed them.
+	const template = document.createElement("template");
+	template.innerHTML = html;
+	let blockedRemoteImageCount = 0;
+	for (const element of Array.from(template.content.querySelectorAll("*"))) {
+		if (!template.content.contains(element)) continue;
+		sanitizeElement(element, options, () => {
+			blockedRemoteImageCount += 1;
+		});
 	}
-	return document.body.innerHTML;
+	return { html: template.innerHTML, blockedRemoteImageCount };
 }

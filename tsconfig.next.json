@@ -1,0 +1,26 @@
+{
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"incremental": true,
+		"types": [
+			"./env.d.ts",
+			"node",
+			"@cloudflare/workers-types"
+		]
+	},
+	"include": [
+		"next-env.d.ts",
+		"src/**/*.ts",
+		"src/**/*.tsx",
+		".next/types/**/*.ts",
+		".next/dev/types/**/*.ts"
+	],
+	"exclude": [
+		"node_modules",
+		"tests",
+		"worker.ts",
+		"worker-utils.ts",
+		".open-next",
+		".wrangler"
+	]
+}

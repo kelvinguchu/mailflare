@@ -253,11 +253,13 @@ Acceptance criteria:
 
 ### 3.5 Harden email-content privacy
 
-- [ ] Block remote images by default or load them through a privacy-preserving proxy.
-- [ ] Add a per-message “Display remote images” action.
-- [ ] Add security tests for the custom HTML sanitizer.
-- [ ] Review whether the application CSP can remove `unsafe-eval` and reduce `unsafe-inline`.
-- [ ] Test malicious HTML, CSS, links, SVG, data URLs and inline attachments.
+Status: `[x]` Remote content is inert and blocked until per-message opt-in, with sanitizer and CSP regression coverage.
+
+- [x] Block remote images by default or load them through a privacy-preserving proxy.
+- [x] Add a per-message “Display remote images” action.
+- [x] Add security tests for the custom HTML sanitizer.
+- [x] Review whether the application CSP can remove `unsafe-eval` and reduce `unsafe-inline`. Production no longer allows `unsafe-eval`, and inline script attributes are denied; `unsafe-inline` remains for the Next.js bootstrap and sanitized email presentation styles until a nonce-based CSP is introduced.
+- [x] Test malicious HTML, CSS, links, SVG, data URLs and inline attachments.
 
 Acceptance criteria:
 

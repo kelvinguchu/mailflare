@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Cloud, ExternalLink } from "lucide-react";
+import { Cloud, ExternalLink, ImageOff } from "lucide-react";
 import dayjs from "dayjs";
 import { MarkAsRead } from "@/components/mark-read";
 import { useSelectedMailbox } from "@/components/mailbox-provider";
@@ -14,7 +13,6 @@ import { MessageAttachmentCard } from "@/components/message-attachment-card";
 import { MessageDetailSkeleton } from "@/components/page-skeletons";
 import { usePageLoading } from "@/components/page-loading";
 import { PreviousMessage } from "@/components/previous-message";
-import { getMessageBackHref } from "@/components/message-actions/utils";
 import type { MessageAttachment, MessageDetailResponse } from "./types";
 import {
   fetchMessageDetail,
@@ -35,6 +33,9 @@ export default function MessageDetailPage() {
   const [loading, setLoading] = useState(true);
   const [previewAttachment, setPreviewAttachment] =
     useState<MessageAttachment | null>(null);
+  const [remoteImagesAllowedFor, setRemoteImagesAllowedFor] = useState<
+    string | null
+  >(null);
   usePageLoading(loading);
 
   useEffect(() => {
@@ -95,8 +96,9 @@ export default function MessageDetailPage() {
     message.snippet,
     ownAddress,
   );
-  const htmlBody = sanitizeEmailHtml(
+  const sanitizedHtml = sanitizeEmailHtml(
     resolveInlineAttachmentUrls(bodyDisplay.htmlBody, message.id, attachments),
+    { allowRemoteImages: remoteImagesAllowedFor === message.id },
   );
   const cloudAttachmentResult = extractCloudAttachments(
     bodyDisplay.latestContent,
@@ -168,9 +170,30 @@ export default function MessageDetailPage() {
             {dayjs(message.createdAt).format("MMM DD, YYYY, hh:mmA")}
           </p>
         </div>
+        {sanitizedHtml.blockedRemoteImageCount > 0 && (
+          <div
+            className="mb-4 flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
+            role="status"
+          >
+            <span className="flex items-center gap-2">
+              <ImageOff className="h-4 w-4 shrink-0" aria-hidden="true" />
+              Remote images are hidden to protect your privacy.
+            </span>
+            <button
+              type="button"
+              className="shrink-0 font-medium text-amber-950 underline underline-offset-2 hover:no-underline"
+              onClick={() => setRemoteImagesAllowedFor(message.id)}
+            >
+              Display remote images
+            </button>
+          </div>
+        )}
         <div className="prose max-w-none text-neutral-900">
-          {htmlBody ? (
-            <div className="mx-auto" dangerouslySetInnerHTML={{ __html: htmlBody }} />
+          {sanitizedHtml.html ? (
+            <div
+              className="mx-auto"
+              dangerouslySetInnerHTML={{ __html: sanitizedHtml.html }}
+            />
           ) : (
             <pre className="whitespace-pre-wrap text-sm text mx-auto">
               {cloudAttachmentResult.content}

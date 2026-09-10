@@ -6,13 +6,10 @@ const nextConfig: NextConfig = {
 	turbopack: {
 		root: import.meta.dirname,
 	},
-  allowedDevOrigins: ['mail.dev'],
+	allowedDevOrigins: ["mail.dev"],
 	typescript: {
-    // !! WARN !!
-    // Dangerously allow production builds to successfully complete
-    // even if your project has type errors.
-    ignoreBuildErrors: true,
-	  },
+		tsconfigPath: "tsconfig.next.json",
+	},
 	async headers() {
 		return [
 			{
