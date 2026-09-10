@@ -12,6 +12,7 @@ import {
 	LEGACY_V1_BACKUP_TABLES,
 	LEGACY_V2_V3_BACKUP_TABLES,
 	LEGACY_V4_BACKUP_TABLES,
+	LEGACY_V5_BACKUP_TABLES,
 } from "./format";
 import {
 	normalizeDatabaseBackupR2,
@@ -52,7 +53,7 @@ export function parseDatabaseBackup(content: ArrayBuffer): NormalizedDatabaseBac
 export function normalizeDatabaseBackupDocument(value: unknown): NormalizedDatabaseBackupDocument {
 	if (!isRecord(value)) throw invalidBackupError();
 	if (value.format !== DATABASE_BACKUP_FORMAT) throw invalidBackupError();
-	if (value.version !== 1 && value.version !== 2 && value.version !== 3 && value.version !== 4 && value.version !== DATABASE_BACKUP_VERSION) throw invalidBackupError();
+	if (value.version !== 1 && value.version !== 2 && value.version !== 3 && value.version !== 4 && value.version !== 5 && value.version !== DATABASE_BACKUP_VERSION) throw invalidBackupError();
 	if (typeof value.createdAt !== "string" || !isRecord(value.tables)) throw invalidBackupError();
 	const sourceVersion = value.version;
 
@@ -63,7 +64,9 @@ export function normalizeDatabaseBackupDocument(value: unknown): NormalizedDatab
 			? LEGACY_V2_V3_BACKUP_TABLES
 			: value.version === 4
 				? LEGACY_V4_BACKUP_TABLES
-				: BACKUP_TABLES;
+				: value.version === 5
+					? LEGACY_V5_BACKUP_TABLES
+					: BACKUP_TABLES;
 	const requiredTableSet = new Set<string>(requiredTables);
 	for (const table of requiredTables) validateTableRows(table, sourceTables[table]);
 

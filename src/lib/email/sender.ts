@@ -12,7 +12,7 @@ export async function getAuthorizedSenderAddress(
 		from: string;
 		mailboxId?: string | null;
 	},
-): Promise<{ fromAddr: string; mailboxId: string }> {
+): Promise<{ fromAddr: string; mailboxId: string; domainId: string }> {
 	if (!input.mailboxId) throw new Error("Mailbox is required");
 
 	const db = getDb(env);
@@ -23,6 +23,9 @@ export async function getAuthorizedSenderAddress(
 		hostname: domains.hostname,
 		domainId: mailboxes.domainId,
 		useAllDomains: mailboxes.useAllDomains,
+		disabled: mailboxes.disabled,
+		domainStatus: domains.status,
+		sendingEnabled: domains.sendingEnabled,
 			id: mailboxes.id,
 		})
 		.from(mailboxes)
@@ -31,6 +34,7 @@ export async function getAuthorizedSenderAddress(
 		.limit(1);
 
 	if (!mailbox) throw new Error("Mailbox not found");
+	if (mailbox.disabled) throw new Error("Sender mailbox is disabled");
 	const [actor] = await db.select().from(users).where(eq(users.id, input.userId)).limit(1);
 	if (!actor || actor.disabled) throw new Error("Sender account not found");
 
@@ -45,11 +49,17 @@ export async function getAuthorizedSenderAddress(
 		throw new Error("Sender address does not match the selected mailbox");
 	}
 	const senderAddress = requestedAddress.toLowerCase();
+	const senderHostname = senderAddress.split("@")[1] ?? "";
+	const [senderDomain] = await db.select().from(domains).where(eq(domains.hostname, senderHostname)).limit(1);
+	if (!senderDomain || senderDomain.status !== "active" || !senderDomain.sendingEnabled) {
+		throw new Error("Sender domain is not ready for sending");
+	}
 
 	if (access.canSendAs) {
 		return {
 			fromAddr: formatEmailAddress(senderAddress, mailbox.displayName),
 			mailboxId: mailbox.id,
+			domainId: senderDomain.id,
 		};
 	}
 
@@ -57,5 +67,6 @@ export async function getAuthorizedSenderAddress(
 	return {
 		fromAddr: formatEmailAddress(senderAddress, `${actor.name} on behalf of ${mailboxName}`),
 		mailboxId: mailbox.id,
+		domainId: senderDomain.id,
 	};
 }

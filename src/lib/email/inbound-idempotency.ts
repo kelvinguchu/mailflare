@@ -15,6 +15,9 @@ export type InboundMessageWrite = {
 	htmlBody: string | null;
 	rawR2Key: string;
 	status: "received" | "spam" | "trash";
+	securityStatus?: "clean" | "suspicious" | "quarantined";
+	securityReason?: string | null;
+	spamScore?: number;
 	threadId: string | null;
 	createdAt: Date;
 };
@@ -72,8 +75,8 @@ export async function commitInboundMessage(
 		db.prepare(`INSERT INTO messages (
 			id, user_id, mailbox_id, direction, provider_message_id, folder_id,
 			from_addr, to_addr, subject, snippet, text_body, html_body, raw_r2_key,
-			status, thread_id, inbound_delivery_key, created_at
-		) VALUES (?, ?, ?, 'inbound', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+			status, thread_id, inbound_delivery_key, security_status, security_reason, spam_score, created_at
+		) VALUES (?, ?, ?, 'inbound', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 			.bind(
 				message.id,
 				message.userId,
@@ -90,12 +93,15 @@ export async function commitInboundMessage(
 				message.status,
 				message.threadId,
 				message.deliveryKey,
+				message.securityStatus ?? "clean",
+				message.securityReason ?? null,
+				message.spamScore ?? 0,
 				createdAt,
 			),
 		...attachments.map((attachment) =>
 			db.prepare(`INSERT INTO message_attachments (
-				id, message_id, filename, content_type, size, disposition, content_id, r2_key, created_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+				id, message_id, filename, content_type, size, disposition, content_id, security_status, security_reason, r2_key, created_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 				.bind(
 					attachment.id,
 					attachment.messageId,
@@ -104,6 +110,8 @@ export async function commitInboundMessage(
 					attachment.size,
 					attachment.disposition,
 					attachment.contentId,
+					attachment.securityStatus,
+					attachment.securityReason,
 					attachment.r2Key,
 					createdAt,
 				),

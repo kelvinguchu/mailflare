@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { messages } from "@/db/schema";
+import { messages, outboundJobs } from "@/db/schema";
 import { buildSnippet, parseRawMime } from "@/lib/email/parse";
 import { resolveInboundAddress, resolveInboxRuleDestination } from "@/lib/email/routing";
 import { dispatchWebhooks } from "@/lib/email/webhooks";
@@ -23,6 +23,7 @@ import {
 	findInboundMessageId,
 	isInboundDeliveryKey,
 } from "@/lib/email/inbound-idempotency";
+import { assessInboundAbuse } from "@/lib/email/abuse-policy";
 
 export { createInboundDeliveryKey } from "@/lib/email/inbound-idempotency";
 
@@ -90,6 +91,12 @@ export async function processInboundMessage(
 		address: fromAddr,
 		source: "inbound",
 	});
+	const abuse = await assessInboundAbuse(db, {
+		userId: decision.mailbox.userId,
+		from: fromAddr,
+		headers: payload.headers,
+		attachments: parsed.attachments,
+	});
 
 	const attachments = await stageInboundMessageAttachments(
 		env,
@@ -111,8 +118,11 @@ export async function processInboundMessage(
 		textBody: parsed.text,
 		htmlBody: parsed.html,
 		rawR2Key: payload.rawR2Key,
-		status: destination.status,
+		status: abuse.securityStatus === "quarantined" ? "spam" : destination.status,
 		threadId: parsed.messageId,
+		securityStatus: abuse.securityStatus,
+		securityReason: abuse.securityReason,
+		spamScore: abuse.spamScore,
 		createdAt: new Date(),
 	}, attachments);
 	if (!committed.created) {
@@ -120,7 +130,7 @@ export async function processInboundMessage(
 		return;
 	}
 
-	if (destination.status === "received") {
+	if (destination.status === "received" && abuse.securityStatus !== "quarantined") {
 		try {
 			await sendMailboxAutoReply(env, {
 				mailboxId: decision.mailbox.mailboxId,
@@ -212,7 +222,15 @@ export async function getMessageWithBody(env: CloudflareEnv, userId: string, mes
 	const contactNames = await getMessageContactNames(env, userId, message.fromAddr, message.toAddr);
 	const attachments = await listMessageAttachments(env, messageId);
 	const unsubscribeUrl = await getUnsubscribeUrlFromRawR2Key(env, message.rawR2Key);
-	return { message: { ...message, ...contactNames }, body: message, attachments, unsubscribeUrl };
+	const delivery = await getDeliveryState(db, message.id);
+	const quarantined = message.securityStatus === "quarantined";
+	return {
+		message: { ...message, ...contactNames, ...(quarantined ? { snippet: "Message quarantined for security review" } : {}) },
+		body: quarantined ? null : message,
+		attachments,
+		delivery,
+		unsubscribeUrl: quarantined ? null : unsubscribeUrl,
+	};
 }
 
 export async function getMessageWithBodyForUser(env: CloudflareEnv, user: SessionUser, messageId: string) {
@@ -224,7 +242,25 @@ export async function getMessageWithBodyForUser(env: CloudflareEnv, user: Sessio
 	const contactNames = await getMessageContactNames(env, message.userId, message.fromAddr, message.toAddr);
 	const attachments = await listMessageAttachments(env, messageId);
 	const unsubscribeUrl = await getUnsubscribeUrlFromRawR2Key(env, message.rawR2Key);
-	return { message: { ...message, ...contactNames }, body: message, attachments, unsubscribeUrl };
+	const delivery = await getDeliveryState(db, message.id);
+	const quarantined = message.securityStatus === "quarantined";
+	return {
+		message: { ...message, ...contactNames, ...(quarantined ? { snippet: "Message quarantined for security review" } : {}) },
+		body: quarantined ? null : message,
+		attachments,
+		delivery,
+		unsubscribeUrl: quarantined ? null : unsubscribeUrl,
+	};
+}
+
+async function getDeliveryState(db: ReturnType<typeof getDb>, messageId: string) {
+	const [job] = await db.select({
+		status: outboundJobs.status,
+		attemptCount: outboundJobs.attemptCount,
+		error: outboundJobs.error,
+		updatedAt: outboundJobs.updatedAt,
+	}).from(outboundJobs).where(eq(outboundJobs.messageId, messageId)).limit(1);
+	return job ?? null;
 }
 
 export async function getMessageMetadataForUser(env: CloudflareEnv, user: SessionUser, messageId: string) {

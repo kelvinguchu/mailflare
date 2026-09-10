@@ -10,7 +10,8 @@ import {
   Settings,
   Palette,
   Users,
-	Webhook,
+  Webhook,
+	ShieldBan,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NavItem } from "./components-nav";
@@ -34,6 +35,7 @@ const sections = [
     label: "Administration",
     links: [
       { href: "/accounts", label: "Accounts", icon: Users },
+	  { href: "/sender-policies", label: "Sender policies", icon: ShieldBan },
       { href: "/activity", label: "Activity", icon: Activity },
 			{ href: "/delivery-failures", label: "Delivery failures", icon: AlertTriangle },
       { href: "/backups", label: "Backups", icon: DatabaseBackup },

@@ -68,7 +68,7 @@ Keep `wrangler.jsonc` committed. Do not commit `.dev.vars`; enter secrets during
 
 CC Mail needs these runtime values:
 
-- `CF_TOKEN` — a scoped Cloudflare API token with Zone Read, Email Routing Edit, Email Sending Edit, and Email Routing Rules Write access for the domains you will connect. This is separate from the token Cloudflare uses to deploy the app.
+- `CF_TOKEN` — a scoped Cloudflare API token with Zone Read, DNS Read, Email Routing Edit, Email Sending Edit, and Email Routing Rules Write access for the domains you will connect. DNS Read powers SPF, DKIM, and DMARC health checks. This is separate from the token Cloudflare uses to deploy the app.
 - `CF_EMAIL_WORKER_NAME` — the deployed Worker name. It must match the Worker name exactly so CC Mail can create Email Routing rules.
 - `CF_AID` — the Cloudflare account ID retained for compatibility with existing deployments.
 - `D1_DATABASE_ID` — the environment's D1 ID retained for compatibility; backups use the `DB` binding directly.

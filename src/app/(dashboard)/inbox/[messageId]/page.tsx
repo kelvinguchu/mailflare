@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Cloud, ExternalLink, ImageOff } from "lucide-react";
+import { AlertTriangle, Cloud, ExternalLink, ImageOff } from "lucide-react";
 import dayjs from "dayjs";
 import { MarkAsRead } from "@/components/mark-read";
 import { useSelectedMailbox } from "@/components/mailbox-provider";
@@ -136,6 +136,19 @@ export default function MessageDetailPage() {
         <h1 className="text-2xl text-neutral-900 mb-4">
           {message.subject ?? "(no subject)"}
         </h1>
+		{message.securityStatus === "quarantined" && (
+			<div className="mb-4 flex gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-950" role="alert">
+				<AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+				<span>This message is quarantined. Its body and attachments are unavailable. {message.securityReason}</span>
+			</div>
+		)}
+		{message.direction === "outbound" && message.deliveryStatus && (
+			<div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-950" role="status">
+				Delivery: {message.deliveryStatus}. {message.deliveryDetail}
+				{data.delivery && data.delivery.attemptCount > 0 ? ` Attempts: ${data.delivery.attemptCount}.` : ""}
+				{data.delivery?.error ? ` Last error: ${data.delivery.error}.` : ""}
+			</div>
+		)}
 
         <div className="mb-6 flex items-start justify-between border-b border-neutral-100 pb-5">
           <div>

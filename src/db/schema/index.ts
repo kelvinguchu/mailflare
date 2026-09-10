@@ -22,6 +22,8 @@ export const users = sqliteTable("users", {
 	mfaRecoveryCodeHashes: text("mfa_recovery_code_hashes").notNull().default("[]"),
 	mfaLastUsedCounter: integer("mfa_last_used_counter"),
 	disabled: integer("disabled", { mode: "boolean" }).notNull().default(false),
+	sendRateLimitPerMinute: integer("send_rate_limit_per_minute").notNull().default(20),
+	dailySendLimit: integer("daily_send_limit").notNull().default(500),
 	canManageMailboxes: integer("can_manage_mailboxes", { mode: "boolean" }).notNull().default(false),
 	createdByUserId: text("created_by_user_id").references((): AnySQLiteColumn => users.id, { onDelete: "set null" }),
 	createdAt: integer("created_at", { mode: "timestamp" })
@@ -45,6 +47,8 @@ export const domains = sqliteTable(
 		sendingSubdomainTag: text("sending_subdomain_tag"),
 		sendingEnabled: integer("sending_enabled", { mode: "boolean" }).notNull().default(false),
 		routingEnabled: integer("routing_enabled", { mode: "boolean" }).notNull().default(false),
+		sendRateLimitPerMinute: integer("send_rate_limit_per_minute").notNull().default(60),
+		dailySendLimit: integer("daily_send_limit").notNull().default(2000),
 		createdAt: integer("created_at", { mode: "timestamp" })
 			.notNull()
 			.$defaultFn(() => new Date()),
@@ -205,6 +209,16 @@ export const messages = sqliteTable(
 		rawR2Key: text("raw_r2_key"),
 		inboundDeliveryKey: text("inbound_delivery_key"),
 		status: text("status").notNull().default("received"),
+		deliveryStatus: text("delivery_status", {
+			enum: ["queued", "accepted", "delivered", "failed", "suppressed", "unknown"],
+		}),
+		deliveryDetail: text("delivery_detail"),
+		deliveryUpdatedAt: integer("delivery_updated_at", { mode: "timestamp" }),
+		securityStatus: text("security_status", { enum: ["clean", "suspicious", "quarantined"] })
+			.notNull()
+			.default("clean"),
+		securityReason: text("security_reason"),
+		spamScore: integer("spam_score").notNull().default(0),
 		read: integer("read", { mode: "boolean" }).notNull().default(false),
 		starred: integer("starred", { mode: "boolean" }).notNull().default(false),
 		snoozedUntil: integer("snoozed_until", { mode: "timestamp" }),
@@ -235,6 +249,10 @@ export const messageAttachments = sqliteTable(
 			.notNull()
 			.default("attachment"),
 		contentId: text("content_id"),
+		securityStatus: text("security_status", { enum: ["safe", "quarantined"] })
+			.notNull()
+			.default("safe"),
+		securityReason: text("security_reason"),
 		r2Key: text("r2_key").notNull().unique(),
 		createdAt: integer("created_at", { mode: "timestamp" })
 			.notNull()
@@ -251,6 +269,7 @@ export const outboundJobs = sqliteTable(
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
 		messageId: text("message_id").references(() => messages.id, { onDelete: "set null" }),
+		domainId: text("domain_id").references(() => domains.id, { onDelete: "set null" }),
 		status: text("status", { enum: ["queued", "sending", "sent", "failed"] })
 			.notNull()
 			.default("queued"),
@@ -268,7 +287,28 @@ export const outboundJobs = sqliteTable(
 			.notNull()
 			.$defaultFn(() => new Date()),
 	},
-	(t) => [uniqueIndex("outbound_jobs_user_idempotency_key_idx").on(t.userId, t.idempotencyKey)],
+	(t) => [
+		uniqueIndex("outbound_jobs_user_idempotency_key_idx").on(t.userId, t.idempotencyKey),
+		index("outbound_jobs_user_created_idx").on(t.userId, t.createdAt),
+		index("outbound_jobs_domain_created_idx").on(t.domainId, t.createdAt),
+	],
+);
+
+export const senderPolicies = sqliteTable(
+	"sender_policies",
+	{
+		id: text("id").primaryKey(),
+		userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+		patternType: text("pattern_type", { enum: ["address", "domain"] }).notNull(),
+		pattern: text("pattern").notNull(),
+		action: text("action", { enum: ["allow", "block"] }).notNull(),
+		createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+		createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+	},
+	(t) => [
+		uniqueIndex("sender_policies_scope_pattern_idx").on(t.userId, t.patternType, t.pattern),
+		index("sender_policies_lookup_idx").on(t.userId, t.patternType, t.pattern),
+	],
 );
 
 export const deadLetterEvents = sqliteTable(
@@ -530,6 +570,7 @@ export const schema = {
 	messages,
 	messageAttachments,
 	outboundJobs,
+	senderPolicies,
 	deadLetterEvents,
 	emailTemplates,
 	calendarEvents,

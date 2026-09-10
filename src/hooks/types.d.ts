@@ -11,6 +11,12 @@ export type Message = {
 	folderId: string | null;
 	direction: MessageDirection;
 	providerMessageId: string | null;
+	deliveryStatus?: "queued" | "accepted" | "delivered" | "failed" | "suppressed" | "unknown" | null;
+	deliveryDetail?: string | null;
+	deliveryUpdatedAt?: string | null;
+	securityStatus?: "clean" | "suspicious" | "quarantined";
+	securityReason?: string | null;
+	spamScore?: number;
 	fromAddr: string;
 	toAddr: string;
 	fromContactName?: string | null;

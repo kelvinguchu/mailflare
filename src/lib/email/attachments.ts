@@ -88,6 +88,8 @@ export async function storeMessageAttachments(
 				size: attachment.content.byteLength,
 				disposition,
 				contentId: attachment.contentId ?? null,
+				securityStatus: "safe",
+				securityReason: null,
 				r2Key,
 			});
 			await db.insert(messageAttachments).values({
@@ -98,6 +100,8 @@ export async function storeMessageAttachments(
 				size: attachment.content.byteLength,
 				disposition,
 				contentId: attachment.contentId ?? null,
+				securityStatus: "safe",
+				securityReason: null,
 				r2Key,
 			});
 		}
@@ -127,6 +131,8 @@ export async function listMessageAttachments(
 		size: attachment.size,
 		disposition: attachment.disposition as "attachment" | "inline",
 		contentId: attachment.contentId,
+		securityStatus: attachment.securityStatus,
+		securityReason: attachment.securityReason,
 	}));
 }
 
@@ -158,6 +164,7 @@ export async function getAttachmentForUser(
 		)
 		.limit(1);
 	if (!attachment) return null;
+	if (attachment.securityStatus === "quarantined") return null;
 
 	const object = await env.BUCKET.get(attachment.r2Key);
 	if (!object) return null;

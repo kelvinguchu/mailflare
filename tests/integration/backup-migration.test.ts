@@ -11,6 +11,7 @@ import {
 	LEGACY_V1_BACKUP_TABLES,
 	LEGACY_V2_V3_BACKUP_TABLES,
 	LEGACY_V4_BACKUP_TABLES,
+	LEGACY_V5_BACKUP_TABLES,
 } from "@/lib/backups/format";
 import { restoreDatabaseRecords } from "@/lib/backups/restore";
 import type { DatabaseBackupDocument, DatabaseRecord } from "@/lib/backups/types";
@@ -69,13 +70,15 @@ describe("database backups with isolated D1 and R2", () => {
 		expect(stagingTables.results).toEqual([]);
 	});
 
-	it("restores legacy versions 1 through 4 through the live D1 path", async () => {
-		for (const version of [1, 2, 3, 4] as const) {
+	it("restores legacy versions 1 through 5 through the live D1 path", async () => {
+		for (const version of [1, 2, 3, 4, 5] as const) {
 			const names = version === 1
 				? LEGACY_V1_BACKUP_TABLES
 				: version === 4
 					? LEGACY_V4_BACKUP_TABLES
-					: LEGACY_V2_V3_BACKUP_TABLES;
+					: version === 5
+						? LEGACY_V5_BACKUP_TABLES
+						: LEGACY_V2_V3_BACKUP_TABLES;
 			const tables = emptyTables(names);
 			tables.users = [{
 				id: `legacy_user_${version}`,

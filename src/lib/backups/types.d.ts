@@ -58,6 +58,6 @@ export type DatabaseBackupDocument = {
 	r2: DatabaseBackupR2Snapshot;
 };
 export type NormalizedDatabaseBackupDocument = Omit<DatabaseBackupDocument, "r2"> & {
-	sourceVersion: 1 | 2 | 3 | 4 | typeof DATABASE_BACKUP_VERSION;
+	sourceVersion: 1 | 2 | 3 | 4 | 5 | typeof DATABASE_BACKUP_VERSION;
 	r2: DatabaseBackupR2Snapshot | { strategy: "live-references"; objects: [] };
 };

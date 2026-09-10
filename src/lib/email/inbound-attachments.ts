@@ -1,4 +1,5 @@
 import type { AttachmentContent, StoredAttachment } from "./attachment-types";
+import { classifyAttachment } from "./attachment-security";
 
 export async function stageInboundMessageAttachments(
 	env: Pick<CloudflareEnv, "BUCKET">,
@@ -15,6 +16,7 @@ export async function stageInboundMessageAttachments(
 		const id = `att_in_${deliveryKey}_${index}`;
 		const r2Key = `attachments/inbound/${deliveryKey}/${index}-${checksum}-${filename}`;
 		const disposition = attachment.disposition ?? "attachment";
+		const security = classifyAttachment(attachment);
 		const existing = await env.BUCKET.head(r2Key);
 		if (
 			!existing ||
@@ -37,6 +39,8 @@ export async function stageInboundMessageAttachments(
 			size: attachment.content.byteLength,
 			disposition,
 			contentId: attachment.contentId ?? null,
+			securityStatus: security.status,
+			securityReason: security.reason,
 			r2Key,
 		});
 	}

@@ -9,6 +9,7 @@ import {
 	getUnclassifiedDatabaseTables,
 	LEGACY_V1_BACKUP_TABLES,
 	LEGACY_V2_V3_BACKUP_TABLES,
+	LEGACY_V5_BACKUP_TABLES,
 } from "../src/lib/backups/format";
 import { normalizeDatabaseBackupDocument } from "../src/lib/backups/export";
 import { createBackupFilename } from "../src/lib/backups/utils";
@@ -44,7 +45,7 @@ describe("database backup format", () => {
 
 	it("puts the format version in new backup filenames", () => {
 		expect(createBackupFilename(new Date("2026-09-04T02:00:00.000Z"))).toBe(
-			"cc-mail-v5-2026-09-04T02-00-00-000Z.json",
+			`cc-mail-v${DATABASE_BACKUP_VERSION}-2026-09-04T02-00-00-000Z.json`,
 		);
 	});
 
@@ -103,6 +104,18 @@ describe("database backup format", () => {
 
 		expect(document.sourceVersion).toBe(DATABASE_BACKUP_VERSION);
 		expect(document.r2).toEqual({ strategy: "independent-copies-v1", objects: [] });
+	});
+
+	it("normalizes version 5 backups without sender policies", () => {
+		const document = normalizeDatabaseBackupDocument({
+			format: DATABASE_BACKUP_FORMAT,
+			version: 5,
+			createdAt: "2026-09-04T00:00:00.000Z",
+			tables: emptyTables(LEGACY_V5_BACKUP_TABLES),
+			r2: { strategy: "independent-copies-v1", objects: [] },
+		});
+		expect(document.sourceVersion).toBe(5);
+		expect(document.tables.sender_policies).toEqual([]);
 	});
 
 	it("merges legacy message body rows while upgrading version 1", () => {

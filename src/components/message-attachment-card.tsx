@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownToLine, Play } from "lucide-react";
+import { ArrowDownToLine, LockKeyhole, Play } from "lucide-react";
 import { formatAttachmentSize } from "@/app/(dashboard)/inbox/[messageId]/utils";
 import type { MessageAttachmentCardProps } from "./message-attachment-card-types";
 import { getAttachmentFileUrl } from "./message-attachment-viewer-utils";
@@ -14,14 +14,16 @@ export function MessageAttachmentCard({
 	const visual = getAttachmentVisual(attachment);
 	const Icon = visual.icon;
 	const previewUrl = getAttachmentFileUrl(messageId, attachment.id, "preview");
+	const quarantined = attachment.securityStatus === "quarantined";
 
 	return (
 		<button
 			type="button"
-			onClick={() => onPreview(attachment)}
-			className="group flex w-full items-center gap-3 rounded-lg border border-neutral-200 p-2.5 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/40"
+			onClick={() => { if (!quarantined) onPreview(attachment); }}
+			disabled={quarantined}
+			className="group flex w-full items-center gap-3 rounded-lg border border-neutral-200 p-2.5 text-left transition-colors enabled:hover:border-blue-200 enabled:hover:bg-blue-50/40 disabled:bg-neutral-50"
 		>
-			{visual.thumbnail === "image" && (
+			{!quarantined && visual.thumbnail === "image" && (
 				<img
 					src={previewUrl}
 					alt=""
@@ -29,7 +31,7 @@ export function MessageAttachmentCard({
 					className="h-14 w-14 shrink-0 rounded-md bg-neutral-100 object-cover"
 				/>
 			)}
-			{visual.thumbnail === "video" && (
+			{!quarantined && visual.thumbnail === "video" && (
 				<span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-neutral-900">
 					<video
 						src={previewUrl}
@@ -43,20 +45,21 @@ export function MessageAttachmentCard({
 					</span>
 				</span>
 			)}
-			{visual.thumbnail === null && (
+			{!quarantined && visual.thumbnail === null && (
 				<span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-md ${visual.iconClassName}`}>
 					<Icon className="h-6 w-6" />
 				</span>
 			)}
+			{quarantined && <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-red-50 text-red-700"><LockKeyhole className="h-6 w-6" /></span>}
 			<span className="min-w-0 flex-1 text-left">
 				<span className="block truncate text-sm font-medium text-neutral-900">
 					{attachment.filename}
 				</span>
 				<span className="mt-0.5 block truncate text-xs text-neutral-500">
-					{visual.label} · {formatAttachmentSize(attachment.size)}
+					{quarantined ? `Quarantined · ${attachment.securityReason ?? "Unsafe attachment"}` : `${visual.label} · ${formatAttachmentSize(attachment.size)}`}
 				</span>
 			</span>
-			<ArrowDownToLine className="h-4 w-4 shrink-0 text-neutral-400 transition-colors group-hover:text-blue-600" />
+			{quarantined ? <LockKeyhole className="h-4 w-4 shrink-0 text-red-500" /> : <ArrowDownToLine className="h-4 w-4 shrink-0 text-neutral-400 transition-colors group-hover:text-blue-600" />}
 		</button>
 	);
 }

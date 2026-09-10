@@ -72,6 +72,8 @@ export async function saveManagedAccount(account: ManagedAccount): Promise<void>
 			role: account.role,
 			disabled: account.disabled,
 			canManageMailboxes: account.canManageMailboxes,
+			sendRateLimitPerMinute: account.sendRateLimitPerMinute,
+			dailySendLimit: account.dailySendLimit,
 			forwardingEmail: account.forwardingEmail,
 		}),
 	});

@@ -172,6 +172,16 @@ export default function AccountDetailsPage() {
 						Incoming mail will also be sent to this verified Cloudflare Email Routing destination.
 					</p>
 				</div>
+				<div className="grid gap-4 sm:grid-cols-2">
+					<div className="space-y-2">
+						<Label htmlFor="send-rate-limit">Sends per minute</Label>
+						<Input id="send-rate-limit" type="number" min={1} max={10000} value={account.sendRateLimitPerMinute} onChange={(event) => setAccount({ ...account, sendRateLimitPerMinute: Number(event.target.value) })} />
+					</div>
+					<div className="space-y-2">
+						<Label htmlFor="daily-send-limit">Sends per day</Label>
+						<Input id="daily-send-limit" type="number" min={1} max={1000000} value={account.dailySendLimit} onChange={(event) => setAccount({ ...account, dailySendLimit: Number(event.target.value) })} />
+					</div>
+				</div>
 				<label className="flex items-center gap-3 text-sm">
 					<Checkbox checked={!account.disabled} onChange={(event) => setAccount({ ...account, disabled: !event.target.checked })} />
 					Account enabled

@@ -12,8 +12,10 @@
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.mts",
     "test:all": "npm test && npm run test:integration",
+    "ci:quality": "npm run check:dependencies && npm run check:environments && npm run typecheck && npm run typecheck:integration && npm run lint && npm run test:all && npm run build:worker",
     "test:watch": "vitest",
     "check:environments": "node scripts/check-environment-isolation.mjs",
+    "check:dependencies": "node scripts/check-dependency-audit.mjs",
     "drill:restore:staging": "node scripts/staging-restore-drill.mjs",
     "build:worker": "opennextjs-cloudflare build",
     "deploy": "npm run deploy:staging",
@@ -29,7 +31,6 @@
     "upload:production": "npm run build:worker && node scripts/run-wrangler.mjs upload production",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "cf-typegen": "wrangler types --env production --env-interface CloudflareEnv --include-runtime=false ./cloudflare-env.d.ts",
-    "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "npm run db:migrate:staging",
     "db:migrate:staging": "wrangler d1 migrations apply DB --env staging --remote",
@@ -40,7 +41,7 @@
   "cloudflare": {
     "bindings": {
       "CF_TOKEN": {
-        "description": "Runtime Cloudflare API token used by CC Mail onboarding to call the Zones and Email Routing APIs. Cloudflare's deploy/build token is not passed to the app, so create this separately at https://dash.cloudflare.com/profile/api-tokens with `Zone Read`, `Email Routing Edit`, `Email Sending Edit`, and `Email Routing Rules Write` permissions for the zones you will connect. Paste only the token secret value, without `Bearer`."
+        "description": "Runtime Cloudflare API token used by CC Mail onboarding and domain-health checks. Cloudflare's deploy/build token is not passed to the app, so create this separately at https://dash.cloudflare.com/profile/api-tokens with `Zone Read`, `DNS Read`, `Email Routing Edit`, `Email Sending Edit`, and `Email Routing Rules Write` permissions for the zones you will connect. Paste only the token secret value, without `Bearer`."
       },
       "CF_AID": {
         "description": "Cloudflare account ID retained for compatibility with existing deployments."
@@ -105,7 +106,7 @@
     "@types/node": "^20.19.41",
     "@types/react": "^19.1.7",
     "@types/react-dom": "^19.1.7",
-    "drizzle-kit": "^0.31.10",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "^16.3.4",
     "jsdom": "^26.1.0",
@@ -113,5 +114,10 @@
     "typescript": "^5.7.4",
     "vitest": "^4.1.11",
     "wrangler": "^4.127.1"
+  },
+  "overrides": {
+    "miniflare": {
+      "sharp": "^0.35.4"
+    }
   }
 }

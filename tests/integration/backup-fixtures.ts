@@ -73,6 +73,10 @@ export async function seedEveryBackupTable(): Promise<void> {
 			VALUES ('job_backup', 'user_backup', 'message_backup', 'failed', '{}', 'idempotency-backup',
 			 'request-hash', 2, 'E_TEST', ?, ?, ?)`)
 			.bind(timestamp, timestamp, timestamp),
+		db.prepare(`INSERT INTO sender_policies
+			(id, user_id, pattern_type, pattern, action, created_by_user_id, created_at)
+			VALUES ('policy_backup', 'user_backup', 'domain', 'blocked.example', 'block', 'user_backup', ?)`)
+			.bind(timestamp),
 		db.prepare(`INSERT INTO dead_letter_events
 			(id, source_queue, dead_letter_queue, queue_message_id, reference_id, payload, diagnostic_code,
 			 attempt_count, status, replay_count, message_created_at, created_at, updated_at)

@@ -69,6 +69,10 @@ export async function getEmailRoutingDns(
 	};
 }
 
+export async function listZoneDnsRecords(env: CloudflareEnv, zoneId: string): Promise<CfDnsRecord[]> {
+	return cfRequest<CfDnsRecord[]>(env, `/zones/${zoneId}/dns_records?per_page=5000`);
+}
+
 export async function enableEmailRouting(
 	env: CloudflareEnv,
 	zoneId: string,

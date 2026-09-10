@@ -133,6 +133,7 @@ describe("mail path with isolated Workers bindings", () => {
 		})).resolves.toEqual({
 			fromAddr: "\"Delegate on behalf of Support\" <support@alias.test>",
 			mailboxId: fixtureIds.sharedMailbox,
+			domainId: fixtureIds.aliasDomain,
 		});
 
 		await integrationEnv.DB.prepare(
@@ -145,6 +146,7 @@ describe("mail path with isolated Workers bindings", () => {
 		})).resolves.toEqual({
 			fromAddr: "\"Support\" <support@primary.test>",
 			mailboxId: fixtureIds.sharedMailbox,
+			domainId: fixtureIds.primaryDomain,
 		});
 		await expect(getMailboxAccessLevel(db, sessionUser(fixtureIds.stranger), fixtureIds.sharedMailbox))
 			.resolves.toBeNull();
@@ -189,6 +191,74 @@ describe("mail path with isolated Workers bindings", () => {
 		expect(counts).toEqual({ messages: 1, jobs: 1 });
 		expect(job).toEqual({ status: "sent", attempt_count: 2, error: null });
 		expect(providerSend).toHaveBeenCalledTimes(2);
+	});
+
+	it("atomically enforces configured send limits and audits the rejection", async () => {
+		await seedMailboxWorld();
+		await integrationEnv.DB.prepare("UPDATE users SET send_rate_limit_per_minute = 1 WHERE id = ?")
+			.bind(fixtureIds.owner).run();
+		await integrationEnv.DB.prepare("UPDATE domains SET send_rate_limit_per_minute = 1 WHERE id = ?")
+			.bind(fixtureIds.primaryDomain).run();
+		const env = createMailEnv({ OUTBOUND_QUEUE: { send: vi.fn(async () => undefined) } as unknown as Queue });
+		const input = {
+			userId: fixtureIds.owner,
+			mailboxId: fixtureIds.sharedMailbox,
+			from: "support@primary.test",
+			to: "first@example.net",
+			subject: "Limited",
+			text: "First",
+		};
+		await queueEmail(env, input, { idempotencyKey: "limit-first" });
+		await expect(queueEmail(env, { ...input, to: "second@example.net" }, { idempotencyKey: "limit-second" }))
+			.rejects.toThrow("send rate limit");
+		const rejected = await integrationEnv.DB.prepare(
+			"SELECT COUNT(*) AS count FROM audit_logs WHERE action = 'email.send_rejected'",
+		).first<{ count: number }>();
+		expect(rejected?.count).toBe(1);
+	});
+
+	it("refuses queued delivery after a mailbox is disabled", async () => {
+		await seedMailboxWorld();
+		const providerSend = vi.fn(async () => ({ messageId: "must-not-send" }));
+		const env = createMailEnv({
+			OUTBOUND_QUEUE: { send: vi.fn(async () => undefined) } as unknown as Queue,
+			EMAIL: { send: providerSend } as unknown as SendEmail,
+			OUTBOUND_DELIVERY_MODE: "enabled",
+		});
+		const queued = await queueEmail(env, {
+			userId: fixtureIds.owner, mailboxId: fixtureIds.sharedMailbox,
+			from: "support@primary.test", to: "recipient@example.net", subject: "Queued", text: "Body",
+		}, { idempotencyKey: "disable-before-delivery" });
+		await integrationEnv.DB.prepare("UPDATE mailboxes SET disabled = 1 WHERE id = ?")
+			.bind(fixtureIds.sharedMailbox).run();
+		await processOutboundQueue(env, { jobId: queued.jobId }, { attempt: 1 });
+		expect(providerSend).not.toHaveBeenCalled();
+		const message = await integrationEnv.DB.prepare("SELECT status, delivery_status FROM messages WHERE id = ?")
+			.bind(queued.messageId).first<{ status: string; delivery_status: string }>();
+		expect(message).toEqual({ status: "failed", delivery_status: "failed" });
+	});
+
+	it("suppresses a recipient after the provider reports a hard suppression", async () => {
+		await seedMailboxWorld();
+		const providerSend = vi.fn(async () => {
+			throw Object.assign(new Error("suppressed"), { code: "E_RECIPIENT_SUPPRESSED" });
+		});
+		const env = createMailEnv({
+			OUTBOUND_QUEUE: { send: vi.fn(async () => undefined) } as unknown as Queue,
+			EMAIL: { send: providerSend } as unknown as SendEmail,
+			OUTBOUND_DELIVERY_MODE: "enabled",
+		});
+		const input = {
+			userId: fixtureIds.owner, mailboxId: fixtureIds.sharedMailbox,
+			from: "support@primary.test", to: "hard-bounce@example.net", subject: "Test", text: "Body",
+		};
+		const queued = await queueEmail(env, input, { idempotencyKey: "hard-bounce-first" });
+		await processOutboundQueue(env, { jobId: queued.jobId }, { attempt: 1 });
+		await expect(queueEmail(env, input, { idempotencyKey: "hard-bounce-second" }))
+			.rejects.toThrow("Recipient is suppressed");
+		const contact = await integrationEnv.DB.prepare("SELECT blocked FROM contacts WHERE email = ?")
+			.bind("hard-bounce@example.net").first<{ blocked: number }>();
+		expect(contact?.blocked).toBe(1);
 	});
 
 	it("authorizes stored attachments and removes R2 objects when metadata persistence fails", async () => {

@@ -8,6 +8,12 @@ export type MessageDetailResponse = {
 		textBody: string | null;
 	} | null;
 	attachments?: MessageAttachment[];
+	delivery?: {
+		status: "queued" | "sending" | "sent" | "failed";
+		attemptCount: number;
+		error: string | null;
+		updatedAt: string;
+	} | null;
 	unsubscribeUrl?: string | null;
 	error?: string;
 };
@@ -20,6 +26,8 @@ export type MessageAttachment = {
 	messageId: string;
 	size: number;
 	type: string;
+	securityStatus: "safe" | "quarantined";
+	securityReason: string | null;
 };
 
 export type MessageBodyDisplay = ReplyContentParts & {

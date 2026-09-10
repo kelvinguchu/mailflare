@@ -8,6 +8,7 @@ import { countActiveSessions } from "@/lib/auth/session";
 import { requireRecentAuthentication } from "@/lib/auth/recent";
 import type { AccountRouteParams } from "./types";
 import { selectAccountById, updateAccountCredentials } from "./utils";
+import { createAuditLog } from "@/lib/mailboxes/audit";
 
 export async function GET(request: Request, { params }: AccountRouteParams) {
 	const access = await requireAdmin(request);
@@ -34,6 +35,8 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 				&& account.invitationExpiresAt.getTime() <= Date.now(),
 			disabled: account.disabled,
 			canManageMailboxes: account.canManageMailboxes,
+			sendRateLimitPerMinute: account.sendRateLimitPerMinute,
+			dailySendLimit: account.dailySendLimit,
 			activeSessionCount,
 			forwardingEmail: account.forwardingEmail,
 			hasAvatar: !!account.avatarKey,
@@ -59,7 +62,23 @@ export async function PATCH(request: Request, { params }: AccountRouteParams) {
 		role: parsed.data.role,
 		disabled: parsed.data.disabled,
 		canManageMailboxes: parsed.data.canManageMailboxes,
+		sendRateLimitPerMinute: parsed.data.sendRateLimitPerMinute,
+		dailySendLimit: parsed.data.dailySendLimit,
 		...(parsed.data.forwardingEmail !== undefined ? { forwardingEmail: parsed.data.forwardingEmail } : {}),
 	}).where(eq(users.id, id));
+	if (
+		account.sendRateLimitPerMinute !== parsed.data.sendRateLimitPerMinute ||
+		account.dailySendLimit !== parsed.data.dailySendLimit
+	) {
+		await createAuditLog(access.env, {
+			actorUserId: access.user!.id,
+			targetUserId: id,
+			action: "account.send_limits_updated",
+			metadata: {
+				from: { perMinute: account.sendRateLimitPerMinute, daily: account.dailySendLimit },
+				to: { perMinute: parsed.data.sendRateLimitPerMinute, daily: parsed.data.dailySendLimit },
+			},
+		});
+	}
 	return NextResponse.json({ ok: true });
 }

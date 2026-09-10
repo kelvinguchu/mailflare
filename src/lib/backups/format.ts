@@ -1,5 +1,5 @@
 export const DATABASE_BACKUP_FORMAT = "mailflare-database-backup";
-export const DATABASE_BACKUP_VERSION = 5 as const;
+export const DATABASE_BACKUP_VERSION = 6 as const;
 export const MAX_DATABASE_RESTORE_BYTES = 10 * 1024 * 1024;
 export const MAX_BACKUP_OBJECTS = 5_000;
 export const DATABASE_BACKUP_R2_STRATEGY = "independent-copies-v1" as const;
@@ -18,6 +18,7 @@ export const BACKUP_TABLES = [
 	"messages",
 	"message_attachments",
 	"outbound_jobs",
+	"sender_policies",
 	"dead_letter_events",
 	"email_templates",
 	"calendar_events",
@@ -52,7 +53,12 @@ export const LEGACY_V2_V3_BACKUP_TABLES = BACKUP_TABLES.filter(
 
 // Version 4 added dead-letter records but predates secure account-recovery tokens.
 export const LEGACY_V4_BACKUP_TABLES = BACKUP_TABLES.filter(
-	(table) => table !== "account_recovery_tokens",
+	(table) => table !== "account_recovery_tokens" && table !== "sender_policies",
+);
+
+// Version 5 added secure account recovery but predates delivery and abuse controls.
+export const LEGACY_V5_BACKUP_TABLES = BACKUP_TABLES.filter(
+	(table) => table !== "sender_policies",
 );
 
 // These are D1/SQLite bookkeeping tables, not application data. D1 and the

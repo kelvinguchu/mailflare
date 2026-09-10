@@ -79,6 +79,18 @@ export default function DomainsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["domains"] }),
   });
 
+	const saveLimits = useMutation({
+		mutationFn: async (input: { id: string; sendRateLimitPerMinute: number; dailySendLimit: number }) => {
+			const res = await authFetch(`/api/domains/${input.id}`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(input),
+			});
+			if (!res.ok) throw new Error("Failed to update limits");
+		},
+		onSuccess: () => qc.invalidateQueries({ queryKey: ["domains"] }),
+	});
+
   const loadDns = async (id: string) => {
     const res = await authFetch(`/api/domains/${id}/dns`);
     const json = (await res.json()) as { domain: Domain; dns: unknown };
@@ -157,6 +169,7 @@ export default function DomainsPage() {
                 loadDns={loadDns}
                 item={d}
                 remove={remove}
+				saveLimits={saveLimits}
               />
             );
           })}

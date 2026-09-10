@@ -14,6 +14,8 @@ export interface AttachmentMetadata {
 	messageId: string;
 	size: number;
 	type: string;
+	securityStatus: "safe" | "quarantined";
+	securityReason: string | null;
 }
 
 export interface StoredAttachment extends AttachmentMetadata {

@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      promote_production:
+        description: Deploy to production after staging succeeds
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  staging:
+    name: Deploy and verify staging
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+      OPEN_NEXT_DEPLOY: "true"
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run ci:quality
+      - run: npx wrangler d1 migrations apply DB --env staging --remote
+      - run: npx wrangler deploy --env staging --message "git:${RELEASE_SHA}"
+      - name: Verify staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers="$(curl --fail --silent --show-error --retry 4 --dump-header - --output /dev/null https://mailflare-staging.agabio.workers.dev/login)"
+          [[ "$headers" == *"content-security-policy:"* || "$headers" == *"Content-Security-Policy:"* ]]
+          [[ "$headers" != *"unsafe-eval"* ]]
+          status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' https://mailflare-staging.agabio.workers.dev/api/auth/me)"
+          [[ "$status" == "401" ]]
+
+  production:
+    name: Promote verified commit to production
+    if: github.event_name == 'workflow_dispatch' && inputs.promote_production && github.ref == 'refs/heads/main'
+    needs: staging
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+      OPEN_NEXT_DEPLOY: "true"
+      RELEASE_SHA: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build:worker
+      - run: npx wrangler d1 migrations apply DB --env production --remote
+      - run: npx wrangler deploy --env production --message "git:${RELEASE_SHA}"
+      - name: Verify production
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers="$(curl --fail --silent --show-error --retry 4 --dump-header - --output /dev/null https://mail.calibercode.io/login)"
+          [[ "$headers" == *"content-security-policy:"* || "$headers" == *"Content-Security-Policy:"* ]]
+          [[ "$headers" != *"unsafe-eval"* ]]
+          status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' https://mail.calibercode.io/api/auth/me)"
+          [[ "$status" == "401" ]]

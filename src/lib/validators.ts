@@ -63,6 +63,18 @@ export const domainSchema = z.object({
 	hostname: z.string().min(3),
 });
 
+export const updateDomainLimitsSchema = z.object({
+	sendRateLimitPerMinute: z.number().int().min(1).max(100_000),
+	dailySendLimit: z.number().int().min(1).max(10_000_000),
+});
+
+export const senderPolicySchema = z.object({
+	userId: z.string().min(1).max(200).nullable().optional(),
+	patternType: z.enum(["address", "domain"]),
+	pattern: z.string().trim().min(1).max(320),
+	action: z.enum(["allow", "block"]),
+});
+
 export const mailboxSchema = z.object({
 	domainId: z.string().min(1),
 	ownerUserId: z.string().min(1).optional(),
@@ -76,6 +88,8 @@ export const updateManagedAccountSchema = z.object({
 	role: z.enum(["admin", "user"]),
 	disabled: z.boolean(),
 	canManageMailboxes: z.boolean(),
+	sendRateLimitPerMinute: z.number().int().min(1).max(10_000),
+	dailySendLimit: z.number().int().min(1).max(1_000_000),
 	forwardingEmail: z.preprocess(
 		(value) => (typeof value === "string" ? value.trim() : value),
 		z.string().email().or(z.literal("")).optional().transform((value) => value === undefined ? undefined : value || null),

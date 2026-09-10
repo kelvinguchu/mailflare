@@ -9,6 +9,7 @@ import {
 	getEmailRoutingSettings,
 	getSendingSubdomainDns,
 	deleteSendingSubdomain,
+	listZoneDnsRecords,
 	type CfDnsRecord,
 } from "@/lib/cloudflare-api";
 import { deleteEmailRoutingRulesForDomain } from "@/lib/domains/cloudflare-cleanup";
@@ -17,6 +18,7 @@ import { provisionDomainOnCloudflare } from "@/lib/domains/provision";
 export type DomainDnsView = {
 	routing: { records: CfDnsRecord[]; missing: CfDnsRecord[]; status?: string };
 	sending: CfDnsRecord[];
+	zoneRecords: CfDnsRecord[];
 };
 
 export async function listUserDomains(env: CloudflareEnv, userId: string) {
@@ -80,6 +82,7 @@ export async function getDomainDns(
 ): Promise<DomainDnsView> {
 	const routingDns = await getEmailRoutingDns(env, domain.zoneId);
 	const routingSettings = await getEmailRoutingSettings(env, domain.zoneId);
+	const zoneRecords = await listZoneDnsRecords(env, domain.zoneId);
 	let sending: CfDnsRecord[] = [];
 	if (domain.sendingSubdomainTag) {
 		sending = await getSendingSubdomainDns(env, domain.zoneId, domain.sendingSubdomainTag);
@@ -91,6 +94,7 @@ export async function getDomainDns(
 			status: routingSettings.status,
 		},
 		sending,
+		zoneRecords,
 	};
 }
 

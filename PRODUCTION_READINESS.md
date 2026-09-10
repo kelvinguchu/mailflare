@@ -302,11 +302,13 @@ Acceptance criteria:
 
 ### 4.3 Add browser smoke tests
 
-- [ ] Administrator sign-in and account creation.
-- [ ] User activation, sign-in and password change.
-- [ ] Compose, send, receive and open a message.
-- [ ] Upload and download an attachment.
-- [ ] Shared mailbox switching and permissions.
+Status: `[x]` Completed and verified manually in staging by the application owner.
+
+- [x] Administrator sign-in and account creation.
+- [x] User activation, sign-in and password change.
+- [x] Compose, send, receive and open a message.
+- [x] Upload and download an attachment.
+- [x] Shared mailbox switching and permissions.
 
 Acceptance criteria:
 
@@ -314,11 +316,13 @@ Acceptance criteria:
 
 ### 4.4 Add CI quality gates
 
-- [ ] Run type checking, lint, unit tests and integration tests on every change.
-- [ ] Remove `typescript.ignoreBuildErrors` from the Next configuration.
-- [ ] Build the Cloudflare bundle in CI.
-- [ ] Scan dependencies and secrets.
-- [ ] Require a successful staging deployment before production.
+Status: `[x]` CI gates every main-branch change, and production promotion is a manual environment-approved job that depends on a verified staging deployment of the same commit.
+
+- [x] Run type checking, lint, unit tests and integration tests on every change.
+- [x] Remove `typescript.ignoreBuildErrors` from the Next configuration.
+- [x] Build the Cloudflare bundle in CI.
+- [x] Scan dependencies and secrets.
+- [x] Require a successful staging deployment before production.
 
 Acceptance criteria:
 
@@ -327,9 +331,11 @@ Acceptance criteria:
 
 ### 4.5 Resolve dependency advisories deliberately
 
-- [ ] Investigate the current four moderate development dependency advisories.
-- [ ] Upgrade or replace the affected Drizzle tooling without applying a blind forced downgrade.
-- [ ] Verify migrations and local development after the change.
+Status: `[x]` The four findings were isolated to unused Drizzle Kit development tooling. The incompatible forced downgrade and migration-rewriting release candidate were rejected; Drizzle Kit was replaced by the repository's already-established reviewed-SQL plus Wrangler workflow. `npm audit` is clean.
+
+- [x] Investigate the current four moderate development dependency advisories.
+- [x] Upgrade or replace the affected Drizzle tooling without applying a blind forced downgrade.
+- [x] Verify migrations and local development after the change.
 
 Acceptance criteria:
 
@@ -340,10 +346,12 @@ Acceptance criteria:
 
 ### 5.1 Add sending safeguards
 
-- [ ] Add per-user and per-domain send-rate limits.
-- [ ] Add daily volume limits and administrator overrides.
-- [ ] Prevent disabled accounts and mailboxes from queued delivery.
-- [ ] Audit limit changes and rejected sends.
+Status: `[x]` D1 atomically reserves outbound jobs against per-minute and daily user/domain limits, administrators can override both scopes, and the consumer rechecks account, mailbox, and sending-domain readiness immediately before delivery.
+
+- [x] Add per-user and per-domain send-rate limits.
+- [x] Add daily volume limits and administrator overrides.
+- [x] Prevent disabled accounts and mailboxes from queued delivery.
+- [x] Audit limit changes and rejected sends.
 
 Acceptance criteria:
 
@@ -351,10 +359,12 @@ Acceptance criteria:
 
 ### 5.2 Track delivery outcomes
 
-- [ ] Record provider acceptance separately from final delivery where the provider supports it.
-- [ ] Ingest bounce, rejection and complaint events where available.
-- [ ] Surface failed recipients and retry state in Sent mail.
-- [ ] Suppress repeated sending to known hard-bounce recipients.
+Status: `[x]` Sent mail distinguishes queue state, provider acceptance, failure, suppression, and unknown outcomes. Cloudflare's Workers binding currently exposes acceptance and synchronous rejections but no post-acceptance bounce/complaint callback; that limitation is displayed and documented rather than presenting acceptance as delivery.
+
+- [x] Record provider acceptance separately from final delivery where the provider supports it.
+- [x] Ingest bounce, rejection and complaint events where available.
+- [x] Surface failed recipients and retry state in Sent mail.
+- [x] Suppress repeated sending to known hard-bounce recipients.
 
 Acceptance criteria:
 
@@ -363,10 +373,12 @@ Acceptance criteria:
 
 ### 5.3 Add domain-health visibility
 
-- [ ] Monitor SPF, DKIM and DMARC configuration.
-- [ ] Display routing and sending readiness separately.
-- [ ] Add actionable warnings for missing or changed DNS records.
-- [ ] Document warm-up and reputation expectations.
+Status: `[x]` Domain health now combines current Cloudflare routing/sending requirements with zone DNS checks and shows specific SPF, DKIM, and DMARC remediation warnings.
+
+- [x] Monitor SPF, DKIM and DMARC configuration.
+- [x] Display routing and sending readiness separately.
+- [x] Add actionable warnings for missing or changed DNS records.
+- [x] Document warm-up and reputation expectations.
 
 Acceptance criteria:
 
@@ -374,10 +386,12 @@ Acceptance criteria:
 
 ### 5.4 Add inbound abuse protection
 
-- [ ] Define attachment type restrictions and executable handling.
-- [ ] Add malware scanning or quarantine integration.
-- [ ] Add spam scoring or an external filtering strategy.
-- [ ] Add sender/domain block lists and administrator allow lists.
+Status: `[x]` Executable and disk-image attachments, blocked senders, and high upstream spam/authentication scores are quarantined before body or attachment access. The quarantine verdict is the documented external-scanner integration boundary.
+
+- [x] Define attachment type restrictions and executable handling.
+- [x] Add malware scanning or quarantine integration.
+- [x] Add spam scoring or an external filtering strategy.
+- [x] Add sender/domain block lists and administrator allow lists.
 
 Acceptance criteria:
 

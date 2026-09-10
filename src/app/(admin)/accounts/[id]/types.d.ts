@@ -11,6 +11,8 @@ export type ManagedAccount = {
 	invitationExpired: boolean;
 	disabled: boolean;
 	canManageMailboxes: boolean;
+	sendRateLimitPerMinute: number;
+	dailySendLimit: number;
 	activeSessionCount: number;
 	forwardingEmail: string | null;
 	hasAvatar: boolean;

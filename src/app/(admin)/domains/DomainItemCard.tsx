@@ -1,4 +1,6 @@
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import type { UseMutationResult } from "@tanstack/react-query";
 import {
@@ -16,9 +18,12 @@ type DomainItemCardProps = {
   dns?: DnsStatusSummary;
   remove: UseMutationResult<void, Error, string>;
   loadDns: (id: string) => Promise<void>;
+	saveLimits: UseMutationResult<void, Error, { id: string; sendRateLimitPerMinute: number; dailySendLimit: number }>;
 };
 
-export default function DomainItemCard({ item, dns, remove, loadDns }: DomainItemCardProps) {
+export default function DomainItemCard({ item, dns, remove, loadDns, saveLimits }: DomainItemCardProps) {
+	const [perMinute, setPerMinute] = useState(item.sendRateLimitPerMinute);
+	const [perDay, setPerDay] = useState(item.dailySendLimit);
 
   return (
     <div
@@ -86,6 +91,10 @@ export default function DomainItemCard({ item, dns, remove, loadDns }: DomainIte
               {dns.sending.records.join(", ")}
             </span>
           )}
+		  <span className="text-neutral-300">|</span>
+		  <span className="text-neutral-500">
+			SPF {dns.authentication.spf ? "✓" : "!"} · DKIM {dns.authentication.dkim ? "✓" : "!"} · DMARC {dns.authentication.dmarc ? "✓" : "!"}
+		  </span>
           <button
             onClick={() => loadDns(item.id)}
             className="flex items-center gap-0.5 text-blue-600 hover:text-blue-800"
@@ -95,6 +104,17 @@ export default function DomainItemCard({ item, dns, remove, loadDns }: DomainIte
           </button>
         </div>
       )}
+      {dns?.warnings.map((warning) => (
+		<p key={warning} className="text-xs text-amber-700">{warning}</p>
+	  ))}
+	  <details className="text-xs text-neutral-600">
+		<summary className="cursor-pointer">Sending limits</summary>
+		<div className="mt-3 flex flex-wrap items-end gap-3">
+			<label>Per minute<Input className="mt-1 w-28" type="number" min={1} value={perMinute} onChange={(event) => setPerMinute(Number(event.target.value))} /></label>
+			<label>Per day<Input className="mt-1 w-32" type="number" min={1} value={perDay} onChange={(event) => setPerDay(Number(event.target.value))} /></label>
+			<Button size="sm" variant="outline" disabled={saveLimits.isPending} onClick={() => saveLimits.mutate({ id: item.id, sendRateLimitPerMinute: perMinute, dailySendLimit: perDay })}>Save limits</Button>
+		</div>
+	  </details>
     </div>
   );
 }

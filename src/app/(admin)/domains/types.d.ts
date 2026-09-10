@@ -4,6 +4,8 @@ export type Domain = {
 	status: string;
 	routingEnabled: boolean;
 	sendingEnabled: boolean;
+	sendRateLimitPerMinute: number;
+	dailySendLimit: number;
 	zoneId: string;
 };
 
@@ -17,4 +19,6 @@ export type DnsRecord = {
 export type DnsStatusSummary = {
 	routing: { configured: boolean; missing: string[] };
 	sending: { configured: boolean; records: string[] };
+	authentication: { spf: boolean; dkim: boolean; dmarc: boolean };
+	warnings: string[];
 };
