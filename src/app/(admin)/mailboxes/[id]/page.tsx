@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   fetchMailbox,
@@ -217,7 +217,7 @@ export default function MailboxSettingsPage() {
               </p>
             )}
             <div className="flex gap-2">
-              <Select
+              <NativeSelect
                 value={selectedUserId}
                 onChange={(event) => setSelectedUserId(event.target.value)}
                 className="h-10 min-w-0 flex-1 text-sm"
@@ -233,7 +233,7 @@ export default function MailboxSettingsPage() {
                       {account.name} ({account.email})
                     </option>
                   ))}
-              </Select>
+              </NativeSelect>
               <Button
                 type="button"
                 disabled={!selectedUserId || addMember.isPending}

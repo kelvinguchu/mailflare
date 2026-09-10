@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 import type { ManagedAccount, ManagedDomain, ManagedMailbox } from "../types";
 import {
   addManagedMailbox,
@@ -120,7 +120,7 @@ export default function AccountMailboxesPage() {
             placeholder="inbox"
             required
           />
-          <Select
+          <NativeSelect
             value={domainId}
             onChange={(event) => setDomainId(event.target.value)}
             className="rounded-md border border-neutral-200 bg-white px-3 text-sm"
@@ -130,7 +130,7 @@ export default function AccountMailboxesPage() {
                 @{domain.hostname}
               </option>
             ))}
-          </Select>
+          </NativeSelect>
           <Button type="submit" disabled={!account || !domainId || saving}>
             <Plus className="h-4 w-4" />
             {saving ? "Adding..." : "Add inbox"}

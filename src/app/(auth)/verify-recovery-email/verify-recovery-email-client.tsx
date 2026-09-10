@@ -53,7 +53,7 @@ export function VerifyRecoveryEmailClient({ token }: { token: string }) {
 								{error}
 							</p>
 						)}
-						<Button type="button" className="h-11 w-full rounded-full" disabled={loading || !token} onClick={verify}>
+						<Button type="button" className="h-11 w-full" disabled={loading || !token} onClick={verify}>
 							{loading ? "Verifying..." : "Verify recovery email"}
 						</Button>
 					</>

@@ -63,7 +63,7 @@ export function ActivateAccountClient({ token }: { token: string }) {
 						{error}
 					</p>
 				)}
-				<Button type="submit" className="h-11 w-full rounded-full" disabled={loading || !token}>
+				<Button type="submit" className="h-11 w-full" disabled={loading || !token}>
 					{loading ? "Activating..." : "Activate account"}
 				</Button>
 			</form>

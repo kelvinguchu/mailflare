@@ -56,7 +56,7 @@ export function ResetPasswordClient({ token }: { token: string }) {
 					<p className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
 						{message}
 					</p>
-					<Button asChild className="h-11 w-full rounded-full">
+					<Button asChild className="h-11 w-full">
 						<Link href="/login">Sign in</Link>
 					</Button>
 				</div>
@@ -75,7 +75,7 @@ export function ResetPasswordClient({ token }: { token: string }) {
 							{error}
 						</p>
 					)}
-					<Button type="submit" className="h-11 w-full rounded-full" disabled={loading || !token}>
+					<Button type="submit" className="h-11 w-full" disabled={loading || !token}>
 						{loading ? "Resetting..." : "Reset password"}
 					</Button>
 				</form>

@@ -5,7 +5,7 @@ import { FileText, Minimize2, Paperclip, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
 import { useSelectedMailbox } from "@/components/mailbox-provider";
 import { authFetch } from "@/lib/auth/client";
@@ -277,7 +277,7 @@ export function ComposeForm({
 				</div>
 				<div className="border-b border-neutral-100 px-4 py-1">
 					<Label htmlFor={`${mode}-from`} className="sr-only">From</Label>
-					<Select
+					<NativeSelect
 						id={`${mode}-from`}
 						value={selectedMailbox && selectedFrom ? `${selectedMailbox.id}|${selectedFrom}` : ""}
 						onChange={(event) => selectSender(event.target.value)}
@@ -289,7 +289,7 @@ export function ComposeForm({
 						{senderOptions.map(({ mailbox, address }) => (
 							<option key={`${mailbox.id}|${address}`} value={`${mailbox.id}|${address}`}>{address}</option>
 						))}
-					</Select>
+					</NativeSelect>
 				</div>
 				<div className="border-b border-neutral-100 px-4 py-1">
 					<Label htmlFor={`${mode}-to`} className="sr-only">To</Label>

@@ -118,7 +118,7 @@ function MessageListRow({
 	}
 
 	const className =
-		`group relative grid min-h-12 w-full grid-cols-[24px_32px_minmax(160px,240px)_1fr_auto] items-center gap-3 px-6 text-left text-sm hover:z-10 hover:bg-[#f2f6fc] hover:shadow-sm ${
+		`group relative grid min-h-12 w-full grid-cols-[24px_32px_minmax(160px,240px)_minmax(0,1fr)_auto] items-center gap-3 px-6 text-left text-sm hover:z-10 hover:bg-[#f2f6fc] hover:shadow-sm ${
 			active || selected ? "bg-blue-50" : ""
 		} ${draggable ? "cursor-grab active:cursor-grabbing" : ""}`;
 	const content = (
@@ -427,7 +427,7 @@ export function MessageFolderPage({
 				)}
 			</div>
 
-			<div className="min-h-0 flex-1 divide-y divide-neutral-100 overflow-y-auto overscroll-contain scrollbar-gutter-stable">
+			<div className="min-h-0 flex-1 divide-y divide-neutral-100 overflow-x-hidden overflow-y-auto overscroll-contain scrollbar-gutter-stable">
 				{messages.map((message) => (
 					<MessageListRow
 						key={message.id}

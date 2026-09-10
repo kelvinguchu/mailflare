@@ -82,7 +82,7 @@ export function OnboardingClient() {
 					<>
 						<p className="rounded-2xl bg-[#eaf1fb] px-4 py-3 text-sm leading-6 text-neutral-700">
 							Your domain must use Cloudflare DNS on the same account as{" "}
-							<code className="no-font-mono text-xs font-semibold text-blue-800">CF_TOKEN</code>.
+							<code className="no-font-mono text-xs font-semibold text-[#16304e]">CF_TOKEN</code>.
 						</p>
 						<div className="space-y-2">
 							<Label htmlFor="domain">Domain</Label>
@@ -96,7 +96,7 @@ export function OnboardingClient() {
 						<Button
 							onClick={addDomain}
 							disabled={!hostname || loading}
-							className="h-11 w-full rounded-full px-6 active:scale-[0.98]"
+							className="h-11 w-full px-6 active:scale-[0.98]"
 						>
 							{loading ? "Adding..." : "Add domain"}
 						</Button>
@@ -119,7 +119,7 @@ export function OnboardingClient() {
 						<Button
 							onClick={addMailbox}
 							disabled={!localPart || loading}
-							className="h-11 w-full rounded-full px-6 active:scale-[0.98]"
+							className="h-11 w-full px-6 active:scale-[0.98]"
 						>
 							{loading ? "Creating..." : "Go to inbox"}
 						</Button>

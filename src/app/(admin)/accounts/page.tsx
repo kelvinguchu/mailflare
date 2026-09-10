@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
 	PROFILE_AVATAR_ACCEPT,
 	validateProfileAvatar,
@@ -116,12 +116,33 @@ export default function AccountsPage() {
 			{accounts.map((account) => <Link key={account.id} href={`/accounts/${account.id}`} className="flex items-center gap-4 rounded-3xl bg-white p-5 transition-colors hover:bg-blue-50/40"><span className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 font-semibold text-blue-700">{account.name.charAt(0).toUpperCase()}{account.hasAvatar && <img src={`/api/accounts/${account.id}/avatar`} alt="" className="absolute inset-0 h-full w-full object-cover" />}</span><span className="min-w-0"><span className="flex flex-wrap items-center gap-2"><span className="truncate font-semibold text-neutral-900">{account.name}</span><span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium capitalize text-neutral-600">{account.role}</span><span className={`rounded-full px-2 py-0.5 text-xs font-medium ${account.activationStatus === "active" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{getActivationLabel(account)}</span></span><span className="block truncate text-sm text-neutral-500">{account.email}</span></span></Link>)}
 		</div></div>
 		<Dialog open={createOpen} onOpenChange={setCreateOpen}><DialogContent><DialogHeader><DialogTitle>Add user account</DialogTitle><DialogDescription>We will email a single-use activation link so the user can choose their own password.</DialogDescription></DialogHeader><form onSubmit={createAccount} className="space-y-4">
-			<div className="space-y-2"><Label htmlFor="account-username">Email</Label><div className="flex h-10 overflow-hidden rounded-md border border-neutral-200 bg-white"><Input id="account-username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="username" className="min-w-0 flex-1 rounded-none border-0 shadow-none" required /><span className="flex items-center text-sm text-neutral-400">@</span><Select aria-label="Domain" value={domainId} onChange={(event) => setDomainId(event.target.value)} className="max-w-[55%] bg-transparent px-3 text-sm" required><option value="">Select domain</option>{domains.map((domain) => <option key={domain.id} value={domain.id}>{domain.hostname}</option>)}</Select></div></div>
-			<div className="space-y-2"><Label htmlFor="account-name">Person&apos;s name</Label><Input id="account-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Sharon" maxLength={100} required /></div>
-			<div className="space-y-2"><Label htmlFor="account-sender-name">Sender name</Label><Input id="account-sender-name" value={senderName} onChange={(event) => setSenderName(event.target.value)} placeholder={name.trim() && branding.companyName ? `${name.trim()} from ${branding.companyName}` : name.trim() || "Sharon from CaliberCode"} maxLength={100} /><p className="text-xs text-neutral-500">Optional override. If blank, CC Mail combines the person and company names.</p></div>
+			<div className="space-y-2"><Label htmlFor="account-username">Email</Label><div className="flex h-10 items-stretch overflow-hidden rounded-md border border-neutral-200 bg-white transition-colors focus-within:border-blue-600">
+				<Input id="account-username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="username" className="h-full min-w-0 flex-1 rounded-none border-0 bg-transparent px-3 shadow-none focus-visible:border-0" required />
+				<span className="flex select-none items-center pl-1 pr-2 text-sm text-neutral-400">@</span>
+				<div className="flex shrink-0 items-stretch border-l border-neutral-200 bg-neutral-50/60">
+					<Select value={domainId} onValueChange={(value) => setDomainId(value as string)}>
+						<SelectTrigger aria-label="Domain" className="h-full w-auto max-w-56 rounded-none border-0 bg-transparent px-3 hover:bg-neutral-100/60">
+							<SelectValue>
+								{(value) => {
+									const match = domains.find((domain) => domain.id === value);
+									return match ? match.hostname : <span className="text-neutral-400">Select domain</span>;
+								}}
+							</SelectValue>
+						</SelectTrigger>
+						<SelectContent>
+							{domains.map((domain) => <SelectItem key={domain.id} value={domain.id}>{domain.hostname}</SelectItem>)}
+						</SelectContent>
+					</Select>
+				</div>
+			</div></div>
+			<div className="space-y-2"><Label htmlFor="account-name">Person&apos;s name</Label><Input id="account-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="John Doe" maxLength={100} required /></div>
+			<div className="space-y-2"><Label htmlFor="account-sender-name">Sender name</Label><Input id="account-sender-name" value={senderName} onChange={(event) => setSenderName(event.target.value)} placeholder={name.trim() && branding.companyName ? `${name.trim()} from ${branding.companyName}` : name.trim() || "John Doe from CaliberCode"} maxLength={100} /><p className="text-xs text-neutral-500">Optional override. If blank, CC Mail combines the person and company names.</p></div>
 			<div className="space-y-2"><Label htmlFor="account-avatar">Profile picture</Label><Input id="account-avatar" type="file" accept={PROFILE_AVATAR_ACCEPT} onChange={(event) => { const picked = event.target.files?.[0] ?? null; setAvatar(picked); if (picked) setMessage(validateProfileAvatar(picked)); }} /><p className="text-xs text-neutral-500">Optional. The user can change this later in Account settings.</p></div>
 			<div className="space-y-2"><Label htmlFor="account-invitation-email">Invitation email</Label><Input id="account-invitation-email" type="email" autoComplete="email" value={invitationEmail} onChange={(event) => setInvitationEmail(event.target.value)} placeholder="person@example.com" required /><p className="text-xs text-neutral-500">Use an external address the user can access. Activation also verifies it for account recovery.</p></div>
-			<div className="space-y-2"><Label htmlFor="account-role">Role</Label><Select id="account-role" value={role} onChange={(event) => setRole(event.target.value as "admin" | "user")} className="h-10 w-full rounded-md border border-neutral-200 bg-white px-3 text-sm"><option value="user">User</option><option value="admin">Admin</option></Select></div>
+			<div className="space-y-2"><Label htmlFor="account-role">Role</Label><Select value={role} onValueChange={(value) => setRole(value as "admin" | "user")}>
+				<SelectTrigger id="account-role" className="w-full"><SelectValue>{(value) => (value === "admin" ? "Admin" : "User")}</SelectValue></SelectTrigger>
+				<SelectContent><SelectItem value="user">User</SelectItem><SelectItem value="admin">Admin</SelectItem></SelectContent>
+			</Select></div>
 			{message && <p className="text-sm text-red-600">{message}</p>}<Button type="submit" disabled={saving || !domainId}>{saving ? "Creating..." : "Create account"}</Button>
 		</form></DialogContent></Dialog>
 	</div>;

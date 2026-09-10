@@ -21,10 +21,12 @@ import { useSidebar } from "./sidebar-state";
 
 const sections = [
   {
+    id: "overview",
     // label: "Overview",
     links: [{ href: "/admin", label: "Overview", icon: Settings }],
   },
   {
+    id: "email",
     label: "Email",
     links: [
       { href: "/mailboxes", label: "Mailboxes", icon: Mail },
@@ -32,6 +34,7 @@ const sections = [
     ],
   },
   {
+    id: "administration",
     label: "Administration",
     links: [
       { href: "/accounts", label: "Accounts", icon: Users },
@@ -42,6 +45,7 @@ const sections = [
     ],
   },
   {
+    id: "product",
     label: "Product",
     links: [
       { href: "/branding", label: "Branding", icon: Palette },
@@ -63,7 +67,7 @@ export function AdminNav({ className }: { className?: string }) {
           if (links.length === 0) return null;
 
           return (
-            <section key={section.label}>
+            <section key={section.id}>
               {!minimal && section.label && (
                 <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
                   {section.label}

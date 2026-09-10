@@ -2,7 +2,7 @@
 
 import { Archive, Mail, MailOpen, ShieldAlert, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { BulkMessageAction } from "@/app/api/messages/bulk/types";
 import type { BulkMessageToolbarProps } from "./types";
@@ -50,7 +50,7 @@ export function BulkMessageToolbar({
 			</Tooltip>
 			<span className="flex-1" />
 			<Tooltip label="Move selected messages">
-					<Select
+					<NativeSelect
 						className="bg-white text-xs font-medium py-2 text-neutral-700 outline-none"
 						disabled={pending}
 						defaultValue=""
@@ -65,7 +65,7 @@ export function BulkMessageToolbar({
 						<option value="archive">Archived</option>
 						<option value="spam">Spam</option>
 						<option value="trash">Trash</option>
-					</Select>
+					</NativeSelect>
 			</Tooltip>
 			<Tooltip label="Clear selection">
 				<Button variant="ghost" size="sm" onClick={onClearSelection} disabled={pending} aria-label="Clear selection">

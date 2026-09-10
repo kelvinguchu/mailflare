@@ -64,7 +64,7 @@ export function ForgotPasswordClient() {
 					</p>
 				)}
 				<TurnstileField resetSignal={turnstileReset} />
-				<Button type="submit" className="h-11 w-full rounded-full" disabled={loading}>
+				<Button type="submit" className="h-11 w-full" disabled={loading}>
 					{loading ? "Requesting..." : "Send reset link"}
 				</Button>
 				<p className="text-center text-sm text-neutral-500">

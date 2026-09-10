@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 import { importMessageFiles } from "@/components/settings/import-messages-utils";
 import type {
   ImapFormState,
@@ -178,7 +178,7 @@ export default function SettingsImportPage() {
       <div className="space-y-6 rounded-3xl bg-white p-6">
         <div className="flex flex-col gap-2">
           <Label htmlFor="import-source">Import source</Label>
-          <Select
+          <NativeSelect
             id="import-source"
             value={activeTab}
             onChange={(event) => setActiveTab(event.target.value as ImportTab)}
@@ -187,7 +187,7 @@ export default function SettingsImportPage() {
           >
             <option value="file">Backup File</option>
             <option value="imap">IMAP</option>
-          </Select>
+          </NativeSelect>
         </div>
         {/* <Card className="m-2">
           <CardContent className="space-y-2 py-4"> */}

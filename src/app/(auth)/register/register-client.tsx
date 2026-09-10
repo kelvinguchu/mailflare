@@ -131,7 +131,7 @@ export function RegisterClient() {
           </p>
           <Button
             type="button"
-            className="h-11 w-full rounded-full px-6 active:scale-[0.98]"
+            className="h-11 w-full px-6 active:scale-[0.98]"
             onClick={() => router.push("/login")}
           >
             Go to login
@@ -198,7 +198,7 @@ export function RegisterClient() {
           {preparationComplete ? (
             <Button
               type="button"
-              className="h-11 w-full rounded-full px-6 active:scale-[0.98]"
+              className="h-11 w-full px-6 active:scale-[0.98]"
               onClick={() => setStep(hasPrimaryDomain ? 3 : 2)}
             >
               Continue
@@ -207,7 +207,7 @@ export function RegisterClient() {
             <Button
               type="button"
               variant="outline"
-              className="h-11 w-full rounded-full px-6 active:scale-[0.98]"
+              className="h-11 w-full px-6 active:scale-[0.98]"
               disabled={loading}
               onClick={() => void runPreparation()}
             >
@@ -237,7 +237,7 @@ export function RegisterClient() {
           )}
           <Button
             type="submit"
-            className="h-11 w-full rounded-full px-6 active:scale-[0.98]"
+            className="h-11 w-full px-6 active:scale-[0.98]"
             disabled={loading}
           >
             {loading ? "Adding domain..." : "Continue"}
@@ -293,7 +293,7 @@ export function RegisterClient() {
           <TurnstileField resetSignal={turnstileReset} />
           <Button
             type="submit"
-            className="h-11 w-full rounded-full px-6 active:scale-[0.98] mt-8"
+            className="h-11 w-full px-6 active:scale-[0.98] mt-8"
             disabled={loading || hasAdminAccount === null || hasPrimaryDomain === null}
           >
             {loading ? "Creating..." : "Create account"}

@@ -4,12 +4,15 @@
 
 :root {
 	--background: #f6f8fc;
-	--foreground: #202124;
+	--foreground: #1f2328;
 	--card: #ffffff;
 	--muted: #eef3fb;
-	--border: #dadce0;
-	--primary: #0b57d0;
+	--border: #d9d5cd;
+	/* Brand palette, taken from the CC Mail wordmark (navy + orange). */
+	--primary: #16304e;
 	--primary-foreground: #ffffff;
+	--accent: #e8862a;
+	--accent-strong: #c96a15;
 }
 
 @theme inline {
@@ -46,39 +49,39 @@ pre {
 @keyframes dialog-content-show {
 	from {
 		opacity: 0;
-		transform: scale(0.94);
+		transform: translate(-50%, -50%) scale(0.94);
 	}
 	to {
 		opacity: 1;
-		transform: scale(1);
+		transform: translate(-50%, -50%) scale(1);
 	}
 }
 
 @keyframes dialog-content-hide {
 	from {
 		opacity: 1;
-		transform: scale(1);
+		transform: translate(-50%, -50%) scale(1);
 	}
 	to {
 		opacity: 0;
-		transform: scale(0.97);
+		transform: translate(-50%, -50%) scale(0.97);
 	}
 }
 
-.dialog-overlay[data-state="open"] {
+.dialog-overlay[data-open] {
 	animation: dialog-overlay-show 180ms ease-out;
 }
 
-.dialog-overlay[data-state="closed"] {
+.dialog-overlay[data-closed] {
 	animation: dialog-overlay-hide 130ms ease-in;
 }
 
-.dialog-content[data-state="open"] {
+.dialog-content[data-open] {
 	transform-origin: center;
 	animation: dialog-content-show 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-.dialog-content[data-state="closed"] {
+.dialog-content[data-closed] {
 	transform-origin: center;
 	animation: dialog-content-hide 130ms ease-in;
 }
@@ -88,4 +91,124 @@ pre {
 	.dialog-content {
 		animation-duration: 1ms !important;
 	}
+}
+
+/*
+ * Auth surfaces (login, password reset, activation, onboarding).
+ * Scoped to [data-auth-shell] and intentionally unlayered so these win over
+ * the Tailwind utility classes the shared Button/Input primitives ship with,
+ * without forking those primitives for the auth flows.
+ */
+[data-auth-shell] label {
+	display: block;
+	margin-bottom: 0.5rem;
+	font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+	font-size: 0.6875rem;
+	font-weight: 500;
+	letter-spacing: 0.14em;
+	text-transform: uppercase;
+	color: #6c6353;
+}
+
+[data-auth-shell] input:not([type="checkbox"]):not([type="radio"]) {
+	height: 2.875rem;
+	border-radius: 0.5rem;
+	border-color: #ddd6c8;
+	background-color: #fdfcfa;
+	box-shadow: none;
+	color: #2f2a23;
+	font-size: 0.9375rem;
+}
+
+[data-auth-shell] input:not([type="checkbox"]):not([type="radio"])::placeholder {
+	color: #a89c8b;
+}
+
+[data-auth-shell] input:not([type="checkbox"]):not([type="radio"]):focus-visible {
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px rgb(232 134 42 / 0.18);
+	outline: none;
+}
+
+[data-auth-shell] select,
+[data-auth-shell] textarea {
+	border-radius: 0.5rem;
+	border-color: #ddd6c8;
+	background-color: #fdfcfa;
+}
+
+[data-auth-shell] select:focus-visible,
+[data-auth-shell] textarea:focus-visible {
+	border-color: var(--accent);
+	box-shadow: 0 0 0 3px rgb(232 134 42 / 0.18);
+	outline: none;
+}
+
+/* Primary action: the Button primitive's default variant. */
+[data-auth-shell] button.bg-blue-600,
+[data-auth-shell] a.bg-blue-600 {
+	border-radius: 0.5rem;
+	background-color: var(--accent);
+	color: #ffffff;
+	font-weight: 600;
+	letter-spacing: 0.01em;
+}
+
+[data-auth-shell] button.bg-blue-600:hover,
+[data-auth-shell] a.bg-blue-600:hover {
+	background-color: var(--accent-strong);
+}
+
+[data-auth-shell] button.bg-blue-600:focus-visible,
+[data-auth-shell] a.bg-blue-600:focus-visible {
+	outline: 2px solid var(--accent-strong);
+	outline-offset: 2px;
+	--tw-ring-shadow: 0 0 #0000;
+}
+
+[data-auth-shell] a:not([class*="bg-"]):not([class*="text-"]) {
+	color: var(--accent-strong);
+	text-underline-offset: 3px;
+}
+
+[data-auth-shell] a:not([class*="bg-"]):not([class*="text-"]):hover {
+	text-decoration: underline;
+}
+
+/*
+ * Dialog body scroller. The platform scrollbar (with its stepper arrows) is
+ * far too heavy for a 520px panel, so render a slim overlay-style thumb that
+ * only asserts itself on hover.
+ */
+.dialog-scroll {
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	scrollbar-width: thin;
+	scrollbar-color: #d4d4d4 transparent;
+}
+
+.dialog-scroll::-webkit-scrollbar {
+	width: 10px;
+}
+
+.dialog-scroll::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.dialog-scroll::-webkit-scrollbar-thumb {
+	background-color: #d4d4d4;
+	background-clip: content-box;
+	border: 3px solid transparent;
+	border-radius: 9999px;
+}
+
+.dialog-scroll::-webkit-scrollbar-thumb:hover {
+	background-color: #a3a3a3;
+}
+
+/* Chromium still paints steppers unless they are explicitly zeroed out. */
+.dialog-scroll::-webkit-scrollbar-button {
+	display: none;
+	height: 0;
+	width: 0;
 }

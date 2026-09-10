@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select } from "@/components/ui/select";
+import { NativeSelect } from "@/components/ui/native-select";
 import { CardGridSkeleton } from "@/components/page-skeletons";
 import { clearMailboxesCache } from "@/components/mailbox-provider-utils";
 import { authFetch } from "@/lib/auth/client";
@@ -136,7 +136,7 @@ export default function MailboxesPage() {
 							{mailboxes.data?.canCreateShared && (
 								<div className="space-y-2">
 									<Label htmlFor="mailbox-type">Type</Label>
-									<Select
+									<NativeSelect
 										id="mailbox-type"
 										value={mailboxType}
 										onChange={(event) => setMailboxType(event.target.value as "personal" | "shared")}
@@ -144,13 +144,13 @@ export default function MailboxesPage() {
 									>
 										<option value="personal">Personal inbox</option>
 										<option value="shared">Shared inbox</option>
-									</Select>
+									</NativeSelect>
 								</div>
 							)}
 							{mailboxType === "personal" ? (
 							<div className="space-y-2">
 								<Label htmlFor="mailbox-owner">Account</Label>
-								<Select
+								<NativeSelect
 									id="mailbox-owner"
 									value={ownerUserId}
 									onChange={(event) => {
@@ -165,7 +165,7 @@ export default function MailboxesPage() {
 											{owner.name} ({owner.email})
 										</option>
 									))}
-								</Select>
+								</NativeSelect>
 							</div>
 							) : (
 								<p className="rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-800">
@@ -192,7 +192,7 @@ export default function MailboxesPage() {
 										className="min-w-0 flex-1 rounded-none border-0 shadow-none focus-visible:border-0"
 									/>
 									<span className="flex items-center text-sm text-neutral-400">@</span>
-									<Select
+									<NativeSelect
 										aria-label="Domain"
 										className="min-w-0 max-w-[55%] bg-transparent px-3 text-sm text-neutral-700 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
 										value={domainId}
@@ -204,7 +204,7 @@ export default function MailboxesPage() {
 												{domain.hostname}
 											</option>
 										))}
-									</Select>
+									</NativeSelect>
 								</div>
 							</div>
 							{create.isError && (

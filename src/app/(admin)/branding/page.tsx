@@ -72,7 +72,7 @@ export default function BrandingPage() {
 								onChange={(event) => setCompanyName(event.target.value)}
 								placeholder="CaliberCode"
 							/>
-							<p className="text-xs text-neutral-500">Used to suggest sender names such as Sharon from CaliberCode.</p>
+							<p className="text-xs text-neutral-500">Used to suggest sender names such as John Doe from CaliberCode.</p>
 						</div>
 						<div className="space-y-2">
 							<Label>App icon</Label>

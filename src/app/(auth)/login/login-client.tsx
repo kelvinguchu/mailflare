@@ -55,10 +55,10 @@ export function LoginClient() {
   return (
     <AuthShell
       icon={Mail}
-      title="Sign in"
+      title={challengeToken ? "Two-factor check" : "Access your mailbox"}
       description={challengeToken
-        ? "Enter the code from your authenticator app or use a recovery code."
-        : "Open your mailbox and continue from the same inbox workspace."}
+        ? "Enter the code from your authenticator app, or use one of your recovery codes."
+        : "Sign in with the address issued by your administrator."}
     >
       <form method="post" onSubmit={onSubmit} className="space-y-5">
         {challengeToken ? (
@@ -88,9 +88,9 @@ export function LoginClient() {
           />
         </div>
 		<div className="space-y-2">
-			<div className="flex items-center justify-between gap-3">
+			<div className="flex items-baseline justify-between gap-3">
 				<Label htmlFor="password">Password</Label>
-				<Link href="/forgot-password" className="text-sm font-medium text-neutral-600 hover:text-neutral-900">
+				<Link href="/forgot-password" className="font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-[#a89c8b] transition-colors hover:text-[#c96a15]">
 					Forgot password?
 				</Link>
 			</div>
@@ -106,13 +106,16 @@ export function LoginClient() {
           </>
         )}
         {error && (
-          <p className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          <p
+            role="alert"
+            className="border-l-2 border-[#b4331f] bg-[#faeae6] px-4 py-3 text-sm leading-5 text-[#8f2a19]"
+          >
             {error}
           </p>
         )}
         <Button
           type="submit"
-          className="h-11 w-full rounded-full px-6 active:scale-[0.98]"
+          className="h-11 w-full px-6 active:scale-[0.99]"
           disabled={loading}
         >
           {loading ? "Checking..." : challengeToken ? "Verify and sign in" : "Sign in"}
@@ -121,7 +124,7 @@ export function LoginClient() {
           <Button
             type="button"
             variant="ghost"
-            className="w-full rounded-full"
+            className="h-10 w-full text-[#6c6353] hover:bg-[#ece7dc]"
             onClick={() => {
               setChallengeToken(null);
               setError(null);

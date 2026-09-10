@@ -38,7 +38,7 @@ export default function DashboardLayout({
                   </Link>
                   <MailboxSelector />
                 </header>
-                <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-tl-3xl bg-white scrollbar-gutter-stable">
+                <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain rounded-tl-3xl bg-white scrollbar-gutter-stable">
                   {children}
                 </main>
               </div>
