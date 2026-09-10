@@ -22,6 +22,8 @@ export type AccountSettingsResponse = {
 		resetEmail: string | null;
 		resetEmailVerified: boolean;
 		forwardingEmail: string | null;
+		role: "admin" | "user";
+		mfaEnabled: boolean;
 	};
 	error?: unknown;
 };

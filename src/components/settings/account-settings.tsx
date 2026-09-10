@@ -9,6 +9,8 @@ import { MailboxSignatureForm } from "./mailbox-signature-form";
 import { ProfileForm } from "./profile-form";
 import { ProfileAvatarForm } from "./profile-avatar-form";
 import { SessionManagement } from "./session-management";
+import { MfaSettings } from "./mfa-settings";
+import { Reauthentication } from "./reauthentication";
 import type { AccountSettingsResponse } from "./types";
 import { loadAccountSettings } from "./utils";
 
@@ -49,7 +51,7 @@ export function AccountSettings() {
 		<div className="space-y-8 py-4">
 			<div>
 				<h1 className="text-3xl font-medium text-neutral-900">Account</h1>
-				<p className="mt-1 text-sm text-neutral-500">Manage your account details and sign-in password.</p>
+				<p className="mt-1 text-sm text-neutral-500">Manage your account details and sign-in security.</p>
 			</div>
 
 			<Card className="rounded-3xl border-0 bg-white px-6">
@@ -82,6 +84,28 @@ export function AccountSettings() {
 					<CardContent className="pb-6">
 						<ForwardingEmailForm initialForwardingEmail={user.forwardingEmail ?? ""} />
 					</CardContent>
+			</Card>
+
+			{user.role === "admin" && (
+				<Card className="rounded-3xl border-0 bg-white px-6">
+					<CardHeader>
+						<CardTitle>Administrator security</CardTitle>
+						<CardDescription>Require an authenticator code at sign-in and confirm identity before high-risk actions.</CardDescription>
+					</CardHeader>
+					<CardContent className="pb-6">
+						<MfaSettings />
+					</CardContent>
+				</Card>
+			)}
+
+			<Card className="rounded-3xl border-0 bg-white px-6">
+				<CardHeader>
+					<CardTitle>Confirm identity</CardTitle>
+					<CardDescription>Refresh the 15-minute authorization window used by API keys and administrator actions.</CardDescription>
+				</CardHeader>
+				<CardContent className="pb-6">
+					<Reauthentication mfaEnabled={user.mfaEnabled} />
+				</CardContent>
 			</Card>
 
 			<Card className="rounded-3xl border-0 bg-white px-6">

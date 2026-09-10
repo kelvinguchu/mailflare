@@ -29,6 +29,7 @@ export async function GET(request: Request) {
 			resetEmailVerified: !!user.resetEmailVerifiedAt,
 			forwardingEmail: user.forwardingEmail,
 			role: user.role,
+			mfaEnabled: !!user.mfaEnabledAt,
 			canManageMailboxes: user.canManageMailboxes,
 			hasAvatar: !!user.avatarKey,
 		},

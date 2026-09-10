@@ -5,6 +5,7 @@ import { getDb } from "@/db";
 import { users } from "@/db/schema";
 import { verifyPassword } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
+import { createMfaChallenge, isMfaEnabled } from "@/lib/auth/mfa";
 import { createAuthenticatedResponse } from "@/lib/auth/http-response";
 import { loginSchema } from "@/lib/validators";
 import { allowLoginAttempt } from "@/lib/auth/rate-limit";
@@ -43,6 +44,13 @@ export async function POST(request: Request) {
 	}
 	if (user.disabled) {
 		return NextResponse.json({ error: "Account disabled" }, { status: 403 });
+	}
+	if (isMfaEnabled(user)) {
+		const challengeToken = await createMfaChallenge(env, user.id);
+		return NextResponse.json(
+			{ ok: true, mfaRequired: true, challengeToken },
+			{ headers: { "Cache-Control": "no-store" } },
+		);
 	}
 
 	const token = await createSession(env, user.id);

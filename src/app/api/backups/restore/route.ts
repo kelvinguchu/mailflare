@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth/cookies";
 import { MAX_DATABASE_RESTORE_BYTES } from "@/lib/backups/format";
 import { restoreDatabaseRecords, restoreTooLargeError } from "@/lib/backups/restore";
 import { getEnv } from "@/lib/cloudflare";
+import { requireRecentAuthentication } from "@/lib/auth/recent";
 
 const MAX_RESTORE_REQUEST_BYTES = MAX_DATABASE_RESTORE_BYTES + 64 * 1024;
 
@@ -12,6 +13,8 @@ export async function POST(request: Request) {
 	try {
 		const user = await requireUser(env, request);
 		assertAdmin(user);
+		const recentAuthError = await requireRecentAuthentication(env, user.id);
+		if (recentAuthError) return recentAuthError;
 		const contentLength = Number(request.headers.get("content-length"));
 		if (Number.isFinite(contentLength) && contentLength > MAX_RESTORE_REQUEST_BYTES) {
 			return NextResponse.json({ error: restoreTooLargeError().message }, { status: 413 });

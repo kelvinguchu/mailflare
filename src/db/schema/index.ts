@@ -17,6 +17,10 @@ export const users = sqliteTable("users", {
 	activatedAt: integer("activated_at", { mode: "timestamp" }),
 	invitationSentAt: integer("invitation_sent_at", { mode: "timestamp" }),
 	invitationExpiresAt: integer("invitation_expires_at", { mode: "timestamp" }),
+	mfaSecretEncrypted: text("mfa_secret_encrypted"),
+	mfaEnabledAt: integer("mfa_enabled_at", { mode: "timestamp" }),
+	mfaRecoveryCodeHashes: text("mfa_recovery_code_hashes").notNull().default("[]"),
+	mfaLastUsedCounter: integer("mfa_last_used_counter"),
 	disabled: integer("disabled", { mode: "boolean" }).notNull().default(false),
 	canManageMailboxes: integer("can_manage_mailboxes", { mode: "boolean" }).notNull().default(false),
 	createdByUserId: text("created_by_user_id").references((): AnySQLiteColumn => users.id, { onDelete: "set null" }),
@@ -403,6 +407,10 @@ export const sessions = sqliteTable(
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
 		tokenHash: text("token_hash").notNull().unique(),
+		kind: text("kind", { enum: ["authenticated", "mfa_challenge"] })
+			.notNull()
+			.default("authenticated"),
+		authenticatedAt: integer("authenticated_at", { mode: "timestamp" }),
 		expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
 		createdAt: integer("created_at", { mode: "timestamp" })
 			.notNull()

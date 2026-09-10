@@ -9,7 +9,7 @@ Deploy from your controlled source checkout. `wrangler.jsonc` has three delibera
 | Environment | Worker | Exposure | Provider delivery | Cloudflare management API |
 | --- | --- | --- | --- | --- |
 | Local default | `mailflare-local` | Local emulation only | Disabled; no Email Sending binding | Disabled |
-| Staging | `mailflare-staging` | `mailflare-staging.agabio.workers.dev` | Disabled; no Email Sending binding | Disabled; no Cloudflare credential is installed |
+| Staging | `mailflare-staging` | `mailflare-staging.agabio.workers.dev` | Disabled; no Email Sending binding | Disabled; no Cloudflare management credential is installed |
 | Production | `mailflare` | `mail.calibercode.io` | Enabled | Enabled with the production-only `CF_TOKEN` secret |
 
 Bindings and variables are non-inheritable in named Wrangler environments. Every D1, R2, Queue, Durable Object, Workflow, rate-limit, Images, Assets and service binding is therefore declared explicitly for staging and production. The normal `npm run dev`, `npm run deploy`, `npm run upload`, and `npm run db:migrate:remote` paths cannot target production; production always requires a command containing `:production`.
@@ -31,7 +31,7 @@ The deployed resource inventory is:
 | Email Routing | No rule targets the staging Worker | Domain rules target `mailflare` |
 | Email Sending | No binding; runtime mode is `disabled` | Unrestricted `EMAIL` binding; `calibercode.io` is enabled (tag `4c65a4d51af546fdbb837d7ee8151f58`); runtime mode is `enabled` |
 
-The staging Worker cannot access production data because no production stateful identifier appears in its deployed binding manifest. It cannot send through the provider because it has no `EMAIL` binding and the queue consumer fails closed unless `OUTBOUND_DELIVERY_MODE=enabled`. It cannot change Email Routing or Email Sending configuration because `CLOUDFLARE_MANAGEMENT_MODE=disabled` and no Cloudflare API credential is installed.
+The staging Worker cannot access production data because no production stateful identifier appears in its deployed binding manifest. It cannot send through the provider because it has no `EMAIL` binding and the queue consumer fails closed unless `OUTBOUND_DELIVERY_MODE=enabled`. It cannot change Email Routing or Email Sending configuration because `CLOUDFLARE_MANAGEMENT_MODE=disabled` and no Cloudflare management credential is installed. Its independent `MFA_ENCRYPTION_KEY` protects staging-only TOTP material and is never copied to production.
 
 Run `npm run check:environments` before a dry run or deployment. It rejects reused production identifiers, non-`-staging` resource names, staging custom routes, Email Sending bindings, active staging crons, externally owned Durable Objects, and enabled staging delivery or management modes.
 
@@ -78,12 +78,22 @@ CC Mail needs these runtime values:
 
 Secret names and purposes:
 
-- `CF_TOKEN` — production-only runtime credential for zone and email configuration. The staging Worker intentionally has no secrets.
+- `CF_TOKEN` — production-only runtime credential for zone and email configuration. The staging Worker intentionally has no Cloudflare management credential.
+- `MFA_ENCRYPTION_KEY` — required per-environment 32-byte base64url key that encrypts administrator TOTP secrets in D1. Staging and production must use different values. Losing this key makes enrolled TOTP credentials undecryptable; do not rotate it without a planned administrator re-enrollment flow.
 - `TURNSTILE_SECRET_KEY` — optional per-environment server-side Turnstile verification secret.
 - `CF_API_KEY` and `CF_EMAIL` — optional legacy Global API Key pair; do not configure these when `CF_TOKEN` is used.
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` — public build-time Turnstile site key; this is not a secret.
 
 Never copy a production `.dev.vars` file into a build or staging directory. If staging later needs Turnstile, create a distinct staging widget and install only its staging secret with `wrangler secret put TURNSTILE_SECRET_KEY --env staging`.
+
+Generate and install the MFA encryption key without writing it to a file or terminal output. Run this once for staging and once for production; each command generates an independent key:
+
+```powershell
+node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('base64url'))" | npx wrangler secret put MFA_ENCRYPTION_KEY --env staging
+node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('base64url'))" | npx wrangler secret put MFA_ENCRYPTION_KEY --env production
+```
+
+Cloudflare Access was evaluated as an additional gate. Do not place one blanket Access application over the entire CC Mail hostname: inbound email, delivery queues, provider callbacks, public activation/recovery routes, and health checks have different trust requirements. If an organization adds Access, scope it to administrator browser paths and validate every public and service-to-service route separately before enforcing it.
 
 You can use a legacy Global API Key instead of `CF_TOKEN` by setting both `CF_API_KEY` and `CF_EMAIL`.
 

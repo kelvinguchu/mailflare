@@ -6,6 +6,7 @@ import { SESSION_COOKIE } from "./constants";
 
 export { SESSION_COOKIE } from "./constants";
 const SESSION_DAYS = 30;
+export const RECENT_AUTHENTICATION_MINUTES = 15;
 
 export function generateSessionToken(): string {
 	return newId("sess");
@@ -29,6 +30,8 @@ export async function createSession(env: CloudflareEnv, userId: string): Promise
 		id: newId(),
 		userId,
 		tokenHash,
+		kind: "authenticated",
+		authenticatedAt: new Date(),
 		expiresAt,
 	});
 
@@ -45,7 +48,11 @@ export async function getUserFromSession(
 	const [session] = await db
 		.select()
 		.from(sessions)
-		.where(and(eq(sessions.tokenHash, tokenHash), gt(sessions.expiresAt, new Date())))
+		.where(and(
+			eq(sessions.tokenHash, tokenHash),
+			eq(sessions.kind, "authenticated"),
+			gt(sessions.expiresAt, new Date()),
+		))
 		.limit(1);
 	if (!session) return null;
 	const [user] = await db.select().from(users).where(eq(users.id, session.userId)).limit(1);
@@ -66,6 +73,7 @@ export async function revokeOtherSessions(
 	const currentTokenHash = await hashSessionToken(currentToken);
 	const result = await getDb(env).delete(sessions).where(and(
 		eq(sessions.userId, userId),
+		eq(sessions.kind, "authenticated"),
 		ne(sessions.tokenHash, currentTokenHash),
 	));
 	await disconnectUserRealtime(env, userId);
@@ -82,7 +90,11 @@ export async function countActiveSessions(env: CloudflareEnv, userId: string): P
 	const [row] = await getDb(env)
 		.select({ count: sql<number>`count(*)` })
 		.from(sessions)
-		.where(and(eq(sessions.userId, userId), gt(sessions.expiresAt, new Date())));
+		.where(and(
+			eq(sessions.userId, userId),
+			eq(sessions.kind, "authenticated"),
+			gt(sessions.expiresAt, new Date()),
+		));
 	return row?.count ?? 0;
 }
 
@@ -93,15 +105,59 @@ export async function getCurrentSessionDetails(
 ): Promise<{ createdAt: Date; expiresAt: Date } | null> {
 	const tokenHash = await hashSessionToken(token);
 	const [session] = await getDb(env)
-		.select({ createdAt: sessions.createdAt, expiresAt: sessions.expiresAt })
+		.select({
+			createdAt: sessions.createdAt,
+			expiresAt: sessions.expiresAt,
+			authenticatedAt: sessions.authenticatedAt,
+		})
 		.from(sessions)
 		.where(and(
 			eq(sessions.userId, userId),
 			eq(sessions.tokenHash, tokenHash),
+			eq(sessions.kind, "authenticated"),
 			gt(sessions.expiresAt, new Date()),
 		))
 		.limit(1);
 	return session ?? null;
+}
+
+export async function markSessionAuthenticated(
+	env: CloudflareEnv,
+	userId: string,
+	token: string,
+): Promise<boolean> {
+	const tokenHash = await hashSessionToken(token);
+	const result = await getDb(env).update(sessions)
+		.set({ authenticatedAt: new Date() })
+		.where(and(
+			eq(sessions.userId, userId),
+			eq(sessions.tokenHash, tokenHash),
+			eq(sessions.kind, "authenticated"),
+			gt(sessions.expiresAt, new Date()),
+		));
+	return result.meta.changes === 1;
+}
+
+export async function isSessionRecentlyAuthenticated(
+	env: CloudflareEnv,
+	userId: string,
+	token: string,
+	maxAgeMinutes = RECENT_AUTHENTICATION_MINUTES,
+): Promise<boolean> {
+	const tokenHash = await hashSessionToken(token);
+	const cutoff = new Date(Date.now() - maxAgeMinutes * 60_000);
+	const [session] = await getDb(env)
+		.select({ id: sessions.id })
+		.from(sessions)
+		.where(and(
+			eq(sessions.userId, userId),
+			eq(sessions.tokenHash, tokenHash),
+			eq(sessions.kind, "authenticated"),
+			gt(sessions.expiresAt, new Date()),
+			gt(sessions.authenticatedAt, cutoff),
+		))
+		.limit(1);
+	return !!session;
 }
 
 export async function deleteExpiredSessions(env: CloudflareEnv, now = new Date()): Promise<number> {

@@ -17,6 +17,7 @@ import type { DatabaseBackupDocument, DatabaseRecord } from "@/lib/backups/types
 import { backupObjectContents, seedEveryBackupTable } from "./backup-fixtures";
 import { integrationEnv } from "./bindings";
 import { clearApplicationTables, resetIntegrationState } from "./fixtures";
+import { migrateCleanDatabase } from "@/lib/setup/migration";
 
 beforeEach(async () => {
 	await resetIntegrationState();
@@ -141,6 +142,18 @@ describe("database backups with isolated D1 and R2", () => {
 });
 
 describe("D1 migration chain", () => {
+	it("builds a clean setup schema equivalent to the migration chain", async () => {
+		expect(await migrateCleanDatabase(integrationEnv.SETUP_DB)).toBe(true);
+		expect(await migrateCleanDatabase(integrationEnv.SETUP_DB)).toBe(false);
+		expect(await schemaManifest(integrationEnv.SETUP_DB)).toEqual(await schemaManifest(integrationEnv.DB));
+		const migrations = await integrationEnv.SETUP_DB.prepare(
+			"SELECT name FROM d1_migrations ORDER BY name",
+		).all<{ name: string }>();
+		expect(migrations.results.map((row) => row.name)).toEqual(
+			integrationEnv.TEST_MIGRATIONS.map((migration) => migration.name).sort(),
+		);
+	});
+
 	it("applies every migration to the preceding schema and matches the fresh schema", async () => {
 		for (let index = 0; index < integrationEnv.TEST_MIGRATIONS.length; index += 1) {
 			await applyD1Migrations(integrationEnv.MIGRATION_DB, [integrationEnv.TEST_MIGRATIONS[index]!]);
@@ -163,3 +176,36 @@ describe("D1 migration chain", () => {
 		expect(upgraded.results).toEqual(fresh.results);
 	});
 });
+
+async function schemaManifest(db: D1Database) {
+	const tables = await db.prepare(`SELECT name FROM sqlite_master
+		WHERE type = 'table'
+		AND name NOT LIKE 'sqlite_%'
+		AND name NOT LIKE '_cf_%'
+		AND name != 'd1_migrations'
+		ORDER BY name`).all<{ name: string }>();
+	const manifest: Record<string, unknown> = {};
+	for (const { name } of tables.results) {
+		const columns = await db.prepare(`PRAGMA table_info('${name}')`).all();
+		const indexes = await db.prepare(`PRAGMA index_list('${name}')`).all();
+		const indexSignatures: Array<{ unique: unknown; columns: string[] }> = [];
+		for (const index of indexes.results as Array<{ name: string; unique: unknown }>) {
+			const details = await db.prepare(`PRAGMA index_info('${index.name}')`).all<{ name: string }>();
+			indexSignatures.push({
+				unique: index.unique,
+				columns: details.results.map((column) => column.name),
+			});
+		}
+		manifest[name] = {
+			columns: columns.results.map(({ name: columnName, type, notnull, pk }) => ({
+				name: columnName,
+				type,
+				notnull,
+				pk,
+			})).sort((left, right) => String(left.name).localeCompare(String(right.name))),
+			indexes: indexSignatures.sort((left, right) =>
+				JSON.stringify(left).localeCompare(JSON.stringify(right))),
+		};
+	}
+	return manifest;
+}

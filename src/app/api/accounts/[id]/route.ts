@@ -5,6 +5,7 @@ import { users } from "@/db/schema";
 import { updateManagedAccountSchema } from "@/lib/validators";
 import { requireAdmin } from "../utils";
 import { countActiveSessions } from "@/lib/auth/session";
+import { requireRecentAuthentication } from "@/lib/auth/recent";
 import type { AccountRouteParams } from "./types";
 import { selectAccountById, updateAccountCredentials } from "./utils";
 
@@ -43,6 +44,8 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 export async function PATCH(request: Request, { params }: AccountRouteParams) {
 	const access = await requireAdmin(request);
 	if (access.error) return access.error;
+	const recentAuthError = await requireRecentAuthentication(access.env, access.user!.id);
+	if (recentAuthError) return recentAuthError;
 	const { id } = await params;
 	const db = getDb(access.env);
 	const account = await selectAccountById(db, id);

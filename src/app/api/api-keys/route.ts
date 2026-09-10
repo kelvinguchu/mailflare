@@ -7,6 +7,7 @@ import { apiKeys } from "@/db/schema";
 import { requireUser } from "@/lib/auth/cookies";
 import { generateApiKey, scopesToJson } from "@/lib/api-keys";
 import { newId } from "@/lib/ids";
+import { requireRecentAuthentication } from "@/lib/auth/recent";
 
 const createKeySchema = z.object({
 	name: z.string().min(1),
@@ -34,6 +35,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
 	const env = getEnv();
 	const user = await requireUser(env, request);
+	const recentAuthError = await requireRecentAuthentication(env, user.id);
+	if (recentAuthError) return recentAuthError;
 	const parsed = createKeySchema.safeParse(await request.json());
 	if (!parsed.success) {
 		return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });

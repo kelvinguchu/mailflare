@@ -54,6 +54,11 @@ export const loginSchema = z.object({
 	password: z.string().min(1),
 });
 
+export const mfaVerifySchema = z.object({
+	challengeToken: z.string().min(16).max(256),
+	code: z.string().trim().min(6).max(32),
+});
+
 export const domainSchema = z.object({
 	hostname: z.string().min(3),
 });
@@ -160,6 +165,24 @@ export const updateForwardingEmailSchema = z.object({
 export const changePasswordSchema = z.object({
 	currentPassword: z.string().min(1),
 	newPassword: z.string().min(8).max(128),
+});
+
+export const mfaBeginSchema = z.object({
+	currentPassword: z.string().min(1).max(128),
+});
+
+export const mfaCodeSchema = z.object({
+	code: z.string().trim().min(6).max(32),
+});
+
+export const mfaProtectedActionSchema = z.object({
+	currentPassword: z.string().min(1).max(128),
+	code: z.string().trim().min(6).max(32),
+});
+
+export const reauthenticateSchema = z.object({
+	currentPassword: z.string().min(1).max(128),
+	code: z.string().trim().max(32).optional().default(""),
 });
 
 export const passwordResetRequestSchema = z.object({

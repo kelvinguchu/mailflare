@@ -51,6 +51,9 @@
       "TURNSTILE_SECRET_KEY": {
         "description": "Cloudflare Turnstile secret key used to verify login and first-run registration challenges. Pair with NEXT_PUBLIC_TURNSTILE_SITE_KEY at build time."
       },
+      "MFA_ENCRYPTION_KEY": {
+        "description": "Required 32-byte base64url key used only to encrypt administrator TOTP secrets at rest. Generate a different value for every environment and store it as a Worker secret."
+      },
       "NEXT_PUBLIC_TURNSTILE_SITE_KEY": {
         "description": "Cloudflare Turnstile public site key used by the login and first-run registration widgets."
       },

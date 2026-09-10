@@ -18,3 +18,19 @@ export async function submitLogin(form: FormData): Promise<{ ok: boolean; data: 
 		data: (await readAuthSessionResponse(res)) as LoginResult,
 	};
 }
+
+export async function submitMfaChallenge(
+	challengeToken: string,
+	code: FormDataEntryValue | null,
+): Promise<{ ok: boolean; data: LoginResult }> {
+	const res = await fetch("/api/auth/mfa/verify", {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		signal: AbortSignal.timeout(20_000),
+		body: JSON.stringify({ challengeToken, code }),
+	});
+	return {
+		ok: res.ok,
+		data: (await readAuthSessionResponse(res)) as LoginResult,
+	};
+}

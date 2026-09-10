@@ -12,6 +12,7 @@ const MIGRATION_NAMES = [
 	"0010_hard_squirrel_girl.sql",
 	"0011_add_folder_colors.sql",
 	"0012_add_app_settings.sql",
+	"0013_add_license_settings.sql",
 	"0014_add_account_permissions.sql",
 	"0015_add_forwarding_email.sql",
 	"0016_add_message_snooze.sql",
@@ -19,26 +20,33 @@ const MIGRATION_NAMES = [
 	"0018_add_mailbox_domain_aliases.sql",
 	"0019_merge_message_bodies.sql",
 	"0020_add_calendar_templates_schedule.sql",
+	"0021_add_mailbox_signature.sql",
+	"0022_add_mailbox_auto_reply.sql",
 	"0023_rebrand_default_app_name.sql",
 	"0024_rename_app_to_cc_mail.sql",
 	"0025_remove_license_settings.sql",
+	"0026_add_company_name.sql",
 	"0027_add_inbound_delivery_key.sql",
 	"0028_add_outbound_idempotency.sql",
 	"0029_add_dead_letter_events.sql",
 	"0030_add_webhook_delivery_retries.sql",
-	"0031_add_account_recovery.sql",
+	"0031_add_secure_account_recovery.sql",
 	"0032_add_account_activation.sql",
 	"0033_add_session_management_indexes.sql",
+	"0034_add_administrator_mfa.sql",
 ];
 
 const INITIAL_SCHEMA_SQL = `
-CREATE TABLE IF NOT EXISTS users (id text PRIMARY KEY NOT NULL, email text NOT NULL UNIQUE, reset_email text, forwarding_email text, password_hash text NOT NULL, name text NOT NULL, avatar_key text, role text DEFAULT 'user' NOT NULL, disabled integer DEFAULT false NOT NULL, can_manage_mailboxes integer DEFAULT false NOT NULL, created_by_user_id text REFERENCES users(id) ON DELETE set null, created_at integer NOT NULL);
+CREATE TABLE IF NOT EXISTS users (id text PRIMARY KEY NOT NULL, email text NOT NULL UNIQUE, reset_email text, reset_email_verified_at integer, forwarding_email text, password_hash text NOT NULL, name text NOT NULL, avatar_key text, role text DEFAULT 'user' NOT NULL, activation_status text DEFAULT 'active' NOT NULL, activated_at integer, invitation_sent_at integer, invitation_expires_at integer, mfa_secret_encrypted text, mfa_enabled_at integer, mfa_recovery_code_hashes text DEFAULT '[]' NOT NULL, mfa_last_used_counter integer, disabled integer DEFAULT false NOT NULL, can_manage_mailboxes integer DEFAULT false NOT NULL, created_by_user_id text REFERENCES users(id) ON DELETE set null, created_at integer NOT NULL);
 CREATE INDEX IF NOT EXISTS users_created_by_idx ON users(created_by_user_id);
 CREATE TABLE IF NOT EXISTS domains (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, hostname text NOT NULL, zone_id text NOT NULL, status text DEFAULT 'pending' NOT NULL, routing_status text, sending_subdomain_tag text, sending_enabled integer DEFAULT false NOT NULL, routing_enabled integer DEFAULT false NOT NULL, created_at integer NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS domains_hostname_idx ON domains(hostname);
 CREATE INDEX IF NOT EXISTS domains_user_idx ON domains(user_id);
-CREATE TABLE IF NOT EXISTS mailboxes (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, domain_id text NOT NULL REFERENCES domains(id) ON DELETE cascade, local_part text NOT NULL, display_name text, avatar_key text, type text DEFAULT 'personal' NOT NULL, use_all_domains integer DEFAULT true NOT NULL, disabled integer DEFAULT false NOT NULL, created_at integer NOT NULL);
+CREATE TABLE IF NOT EXISTS mailboxes (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, domain_id text NOT NULL REFERENCES domains(id) ON DELETE cascade, local_part text NOT NULL, display_name text, signature text, auto_reply_enabled integer DEFAULT false NOT NULL, auto_reply_subject text DEFAULT 'Out of office' NOT NULL, auto_reply_body text DEFAULT '' NOT NULL, avatar_key text, type text DEFAULT 'personal' NOT NULL, use_all_domains integer DEFAULT true NOT NULL, disabled integer DEFAULT false NOT NULL, created_at integer NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS mailboxes_address_idx ON mailboxes(domain_id, local_part);
+CREATE TABLE IF NOT EXISTS auto_reply_deliveries (id text PRIMARY KEY NOT NULL, mailbox_id text NOT NULL REFERENCES mailboxes(id) ON DELETE cascade, recipient text NOT NULL, sent_at integer NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS auto_reply_deliveries_mailbox_recipient_idx ON auto_reply_deliveries(mailbox_id, recipient);
+CREATE INDEX IF NOT EXISTS auto_reply_deliveries_sent_idx ON auto_reply_deliveries(sent_at);
 CREATE TABLE IF NOT EXISTS mailbox_access (id text PRIMARY KEY NOT NULL, mailbox_id text NOT NULL REFERENCES mailboxes(id) ON DELETE cascade, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, permission text DEFAULT 'read_only' NOT NULL, created_by_user_id text REFERENCES users(id) ON DELETE set null, created_at integer NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS mailbox_access_mailbox_user_idx ON mailbox_access(mailbox_id, user_id);
 CREATE INDEX IF NOT EXISTS mailbox_access_user_idx ON mailbox_access(user_id);
@@ -73,17 +81,25 @@ CREATE TABLE IF NOT EXISTS webhooks (id text PRIMARY KEY NOT NULL, user_id text 
 CREATE TABLE IF NOT EXISTS webhook_deliveries (id text PRIMARY KEY NOT NULL, webhook_id text NOT NULL REFERENCES webhooks(id) ON DELETE cascade, event_type text NOT NULL, payload text NOT NULL, status text DEFAULT 'pending' NOT NULL, attempts integer DEFAULT 0 NOT NULL, last_attempt_at integer, next_attempt_at integer, delivered_at integer, last_status_code integer, last_error text, created_at integer NOT NULL);
 CREATE INDEX IF NOT EXISTS webhook_deliveries_webhook_created_idx ON webhook_deliveries(webhook_id, created_at);
 CREATE INDEX IF NOT EXISTS webhook_deliveries_status_next_idx ON webhook_deliveries(status, next_attempt_at);
-CREATE TABLE IF NOT EXISTS sessions (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, token_hash text NOT NULL UNIQUE, expires_at integer NOT NULL, created_at integer NOT NULL);
+CREATE TABLE IF NOT EXISTS sessions (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, token_hash text NOT NULL UNIQUE, kind text DEFAULT 'authenticated' NOT NULL, authenticated_at integer, expires_at integer NOT NULL, created_at integer NOT NULL);
+CREATE INDEX IF NOT EXISTS sessions_user_expires_idx ON sessions(user_id, expires_at);
+CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at);
+CREATE INDEX IF NOT EXISTS sessions_kind_expires_idx ON sessions(kind, expires_at);
+CREATE TABLE IF NOT EXISTS account_recovery_tokens (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, purpose text NOT NULL, token_hash text NOT NULL, email text NOT NULL, expires_at integer NOT NULL, used_at integer, created_at integer NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS account_recovery_tokens_hash_idx ON account_recovery_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS account_recovery_tokens_user_purpose_idx ON account_recovery_tokens(user_id, purpose, created_at);
+CREATE INDEX IF NOT EXISTS account_recovery_tokens_expires_idx ON account_recovery_tokens(expires_at);
 CREATE TABLE IF NOT EXISTS audit_logs (id text PRIMARY KEY NOT NULL, actor_user_id text REFERENCES users(id) ON DELETE set null, target_user_id text REFERENCES users(id) ON DELETE set null, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, message_id text REFERENCES messages(id) ON DELETE set null, action text NOT NULL, metadata text, created_at integer NOT NULL);
 CREATE INDEX IF NOT EXISTS audit_logs_actor_idx ON audit_logs(actor_user_id);
 CREATE INDEX IF NOT EXISTS audit_logs_mailbox_idx ON audit_logs(mailbox_id);
 CREATE INDEX IF NOT EXISTS audit_logs_created_idx ON audit_logs(created_at);
+CREATE INDEX IF NOT EXISTS audit_logs_target_action_created_idx ON audit_logs(target_user_id, action, created_at);
 CREATE TABLE IF NOT EXISTS backup_settings (id text PRIMARY KEY NOT NULL, enabled integer DEFAULT false NOT NULL, schedule_type text DEFAULT 'daily' NOT NULL, schedule_value integer, retention_enabled integer DEFAULT false NOT NULL, retention_days integer DEFAULT 30 NOT NULL, updated_at integer NOT NULL);
 INSERT OR IGNORE INTO backup_settings (id, enabled, schedule_type, retention_enabled, retention_days, updated_at) VALUES ('default', false, 'daily', false, 30, unixepoch());
 CREATE TABLE IF NOT EXISTS backups (id text PRIMARY KEY NOT NULL, status text DEFAULT 'queued' NOT NULL, trigger text NOT NULL, r2_key text, filename text, size integer, error text, created_by_user_id text REFERENCES users(id) ON DELETE set null, created_at integer NOT NULL, started_at integer, completed_at integer);
 CREATE INDEX IF NOT EXISTS backups_created_idx ON backups(created_at);
 CREATE INDEX IF NOT EXISTS backups_status_idx ON backups(status);
-CREATE TABLE IF NOT EXISTS app_settings (id text PRIMARY KEY NOT NULL, app_name text DEFAULT 'CC Mail' NOT NULL, icon_key text, updated_at integer NOT NULL);
+CREATE TABLE IF NOT EXISTS app_settings (id text PRIMARY KEY NOT NULL, app_name text DEFAULT 'CC Mail' NOT NULL, company_name text DEFAULT '' NOT NULL, icon_key text, updated_at integer NOT NULL);
 INSERT OR IGNORE INTO app_settings (id, app_name, updated_at) VALUES ('default', 'CC Mail', unixepoch());
 CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL);
 `;

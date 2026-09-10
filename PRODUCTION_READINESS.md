@@ -239,15 +239,17 @@ Acceptance criteria:
 
 ### 3.4 Add stronger administrator authentication
 
-- [ ] Add TOTP or WebAuthn/passkey MFA, beginning with administrator accounts.
-- [ ] Generate and securely store recovery codes.
-- [ ] Require recent authentication for high-risk actions.
-- [ ] Consider Cloudflare Access as an additional outer gate for the internal deployment.
+Status: `[x]` Administrator-first TOTP MFA now uses encrypted secrets, hashed one-time recovery codes, replay-resistant verification, audited recovery/disable operations, and recent-authentication gates for privileged mutations.
+
+- [x] Add TOTP or WebAuthn/passkey MFA, beginning with administrator accounts.
+- [x] Generate and securely store recovery codes.
+- [x] Require recent authentication for high-risk actions.
+- [x] Consider Cloudflare Access as an additional outer gate for the internal deployment. A blanket hostname gate is rejected because public mail and recovery endpoints share the Worker; any future Access policy must be restricted to administrator browser paths and separately validate service routes.
 
 Acceptance criteria:
 
-- Administrator compromise requires more than a reused password.
-- Recovery does not require bypassing authentication in the database.
+- [x] An enrolled administrator cannot authenticate with a reused password alone.
+- [x] Recovery uses one-time codes and does not require bypassing authentication in the database.
 
 ### 3.5 Harden email-content privacy
 
@@ -500,10 +502,10 @@ Acceptance criteria:
 
 This extends Phase 3.4 and should begin with administrator accounts.
 
-- [ ] Add enrollment, verification, disable and recovery flows with recent-password confirmation.
-- [ ] Encrypt TOTP secrets at rest with an application secret that is not stored in D1.
-- [ ] Generate one-time recovery codes and store only their hashes.
-- [ ] Add rate limits, replay protection, audit events and administrator recovery rules.
+- [x] Add enrollment, verification, disable and recovery flows with recent-password confirmation.
+- [x] Encrypt TOTP secrets at rest with an application secret that is not stored in D1.
+- [x] Generate one-time recovery codes and store only their hashes.
+- [x] Add rate limits, replay protection, audit events and administrator recovery rules.
 - [ ] Support an enforce-MFA policy beginning with administrators, then optionally all users.
 
 Acceptance criteria:
@@ -612,6 +614,7 @@ The migration should then preserve behavior first and improve architecture secon
 | 2026-09-09 | Webhook delivery uses a dedicated Queue and a stable delivery ID across automatic and manual attempts; temporary failures retry at most five total attempts, and delivery records expire after 30 days. | Delivery must not block email processing, receivers need a durable deduplication key, and retry history must remain useful without growing forever. |
 | 2026-09-09 | Administrator-created accounts begin pending with a random unusable password hash; activation requires a 72-hour, hashed, single-use invitation sent to an external address, and successful activation also verifies that address for recovery. | Administrators never handle user passwords, existing accounts remain active through the migration, and resend, revoke or provider failure makes every displaced link unusable. |
 | 2026-09-09 | Session revocation deletes D1 credentials before closing every realtime socket for the account; the current browser reconnects only when its preserved session remains valid. Recent sign-in history is derived from owner-scoped successful-login audit records. | Database-first invalidation prevents an established socket from extending a revoked credential, while preserving the initiating session avoids an unnecessary password-change logout and owner scoping prevents cross-account activity disclosure. |
+| 2026-09-10 | Administrator TOTP secrets use per-environment AES-GCM keys stored as Worker secrets; recovery codes are hashed and single-use, TOTP counters reject replay, and privileged mutations require authentication within 15 minutes. Cloudflare Access is not applied to the shared hostname as a blanket gate. | A stolen password alone cannot authenticate an enrolled administrator, D1 and backups never contain plaintext recovery codes or TOTP seeds, and a broad Access policy cannot accidentally block inbound mail, callbacks, activation, or recovery routes. |
 
 ## Progress log
 

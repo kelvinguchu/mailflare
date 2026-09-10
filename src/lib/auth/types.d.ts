@@ -13,6 +13,10 @@ export type SessionUser = {
 	activatedAt: Date | null;
 	invitationSentAt: Date | null;
 	invitationExpiresAt: Date | null;
+	mfaSecretEncrypted: string | null;
+	mfaEnabledAt: Date | null;
+	mfaRecoveryCodeHashes: string;
+	mfaLastUsedCounter: number | null;
 	disabled: boolean;
 	canManageMailboxes: boolean;
 	createdByUserId: string | null;

@@ -9,6 +9,8 @@ import {
 	deleteExpiredSessions,
 	getCurrentSessionDetails,
 	getUserFromSession,
+	isSessionRecentlyAuthenticated,
+	markSessionAuthenticated,
 	revokeAllSessions,
 	revokeOtherSessions,
 } from "@/lib/auth/session";
@@ -66,6 +68,18 @@ describe("session management with isolated D1", () => {
 
 		expect(await deleteExpiredSessions(env, new Date())).toBe(1);
 		expect(await countActiveSessions(env, fixtureIds.owner)).toBe(1);
+	});
+
+	it("requires and refreshes recent authentication for sensitive actions", async () => {
+		const env = createMailEnv();
+		const token = await createSession(env, fixtureIds.owner);
+		expect(await isSessionRecentlyAuthenticated(env, fixtureIds.owner, token)).toBe(true);
+		await integrationEnv.DB.prepare(
+			"UPDATE sessions SET authenticated_at = ? WHERE user_id = ?",
+		).bind(1_700_000_000, fixtureIds.owner).run();
+		expect(await isSessionRecentlyAuthenticated(env, fixtureIds.owner, token)).toBe(false);
+		expect(await markSessionAuthenticated(env, fixtureIds.owner, token)).toBe(true);
+		expect(await isSessionRecentlyAuthenticated(env, fixtureIds.owner, token)).toBe(true);
 	});
 
 	it("returns only the account owner's recent successful sign-ins", async () => {

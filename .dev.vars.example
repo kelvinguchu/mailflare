@@ -5,6 +5,8 @@ CF_TOKEN=your_api_token_with_zone_email_permissions
 # Optional account id. Read by the database backup workflow.
 CF_AID=your_account_id
 CF_EMAIL_WORKER_NAME=mailflare
+# Required for administrator MFA. Use a 32-byte random base64url value.
+MFA_ENCRYPTION_KEY=replace_with_a_32_byte_base64url_key
 
 # Optional: lets the admin dashboard trigger the GitHub update workflow.
 
