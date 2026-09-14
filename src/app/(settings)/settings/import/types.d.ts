@@ -15,7 +15,8 @@ export type ImapFormState = {
 	limit: string;
 };
 
-export type ImportSourceSection = "inbox" | "sent" | "drafts" | "archived" | "spam" | "trash" | "others";
+export type ImportSourceSection =
+	"inbox" | "sent" | "drafts" | "archived" | "spam" | "trash" | "others";
 
 export type ImportSourceOption = {
 	value: ImportSourceSection;

@@ -36,7 +36,9 @@ export default function WebhooksPage() {
 		queryKey: ["webhook-deliveries", activeWebhookId],
 		enabled: !!activeWebhookId,
 		queryFn: async () => {
-			const res = await authFetch(`/api/webhooks/${encodeURIComponent(activeWebhookId!)}/deliveries`);
+			const res = await authFetch(
+				`/api/webhooks/${encodeURIComponent(activeWebhookId!)}/deliveries`,
+			);
 			if (!res.ok) throw new Error("Failed to load webhook deliveries");
 			return (await res.json()) as { deliveries: WebhookDelivery[] };
 		},
@@ -125,11 +127,15 @@ export default function WebhooksPage() {
 							<p className="text-sm text-muted-foreground">No deliveries yet.</p>
 						)}
 						{(deliveryData?.deliveries ?? []).map((delivery) => (
-							<div key={delivery.id} className="flex items-center justify-between gap-4 rounded-md border p-3">
+							<div
+								key={delivery.id}
+								className="flex items-center justify-between gap-4 rounded-md border p-3"
+							>
 								<div className="min-w-0 text-sm">
 									<p className="truncate font-medium">{delivery.eventType}</p>
 									<p className="text-xs text-muted-foreground">
-										{delivery.status} · {delivery.attempts} attempt{delivery.attempts === 1 ? "" : "s"}
+										{delivery.status} · {delivery.attempts} attempt
+										{delivery.attempts === 1 ? "" : "s"}
 										{delivery.lastStatusCode ? ` · HTTP ${delivery.lastStatusCode}` : ""}
 									</p>
 									<p className="text-xs text-muted-foreground">

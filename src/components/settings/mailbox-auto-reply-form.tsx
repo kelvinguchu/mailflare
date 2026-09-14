@@ -39,7 +39,7 @@ export function MailboxAutoReplyForm() {
 		selectedMailbox?.autoReplyBody,
 	]);
 
-	async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+	async function onSubmit(event: React.SubmitEvent<HTMLFormElement>) {
 		event.preventDefault();
 		if (!selectedMailbox) return;
 		if (settings.enabled && !settings.body.trim()) {
@@ -67,7 +67,8 @@ export function MailboxAutoReplyForm() {
 	}
 
 	if (isLoading) return <p className="text-sm text-neutral-500">Loading inbox…</p>;
-	if (!selectedMailbox) return <p className="text-sm text-neutral-500">Select an inbox to configure auto-reply.</p>;
+	if (!selectedMailbox)
+		return <p className="text-sm text-neutral-500">Select an inbox to configure auto-reply.</p>;
 
 	const address = `${selectedMailbox.localPart}@${selectedMailbox.hostname}`;
 	const canManage = selectedMailbox.permission === "full_access";
@@ -82,7 +83,9 @@ export function MailboxAutoReplyForm() {
 					disabled={!canManage || saving}
 				/>
 				<span>
-					<span className="block text-sm font-medium text-neutral-900">Enable auto-reply for {address}</span>
+					<span className="block text-sm font-medium text-neutral-900">
+						Enable auto-reply for {address}
+					</span>
 					<span className="mt-1 block text-sm text-neutral-500">
 						Each sender receives at most one automatic response every 24 hours.
 					</span>
@@ -113,7 +116,9 @@ export function MailboxAutoReplyForm() {
 				<Button type="submit" disabled={!canManage || saving || !changed}>
 					{saving ? "Saving..." : "Save auto-reply"}
 				</Button>
-				{!canManage && <p className="text-sm text-neutral-500">Full access is required to edit auto-reply.</p>}
+				{!canManage && (
+					<p className="text-sm text-neutral-500">Full access is required to edit auto-reply.</p>
+				)}
 				{status && <p className="text-sm text-neutral-500">{status}</p>}
 			</div>
 		</form>

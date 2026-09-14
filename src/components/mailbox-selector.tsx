@@ -8,10 +8,7 @@ import { useSelectedMailbox } from "@/components/mailbox-provider";
 import { useMessageCounts } from "@/hooks/use-message-counts";
 import { authFetch } from "@/lib/auth/client";
 import { logoutClientSession } from "@/lib/auth/logout";
-import {
-	PROFILE_AVATAR_CHANGED_EVENT,
-	getProfileAvatarUrl,
-} from "@/lib/profile/avatar-client";
+import { PROFILE_AVATAR_CHANGED_EVENT, getProfileAvatarUrl } from "@/lib/profile/avatar-client";
 import type { ProfileAvatarChangedDetail } from "@/lib/profile/types";
 import { MAILBOX_AVATAR_CHANGED_EVENT } from "@/lib/mailboxes/avatar-client";
 import type { MailboxAvatarChangedDetail } from "@/lib/mailboxes/avatar-client-types";
@@ -60,7 +57,7 @@ function AccountAvatar({
 
 	return (
 		<div
-			className={`${sizeClass} flex shrink-0 items-center justify-center rounded-full bg-blue-600 font-semibold text-white`}
+			className={`${sizeClass} flex shrink-0 items-center justify-center rounded-full bg-primary font-semibold text-white`}
 			aria-hidden="true"
 		>
 			{getAccountInitial(name)}
@@ -87,7 +84,11 @@ function MailboxAccountRow({ mailbox, unread, avatarUrl, onSelect }: MailboxAcco
 					<p className="truncate text-sm font-semibold text-neutral-900">{name}</p>
 					{mailbox.type === "shared" && (
 						<Tooltip label="Shared inbox">
-							<span title="Shared inbox" aria-label="Shared inbox" className="shrink-0 text-blue-600">
+							<span
+								title="Shared inbox"
+								aria-label="Shared inbox"
+								className="shrink-0 text-primary"
+							>
 								<UsersRound className="h-3.5 w-3.5" />
 							</span>
 						</Tooltip>
@@ -96,7 +97,7 @@ function MailboxAccountRow({ mailbox, unread, avatarUrl, onSelect }: MailboxAcco
 				<p className="truncate text-xs text-neutral-500">{getMailboxAddress(mailbox)}</p>
 			</div>
 			{unread > 0 && (
-				<span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+				<span className="rounded-full bg-primary/12 px-2 py-0.5 text-[11px] font-semibold text-primary">
 					{unread > 99 ? "99+" : unread}
 				</span>
 			)}
@@ -165,8 +166,10 @@ export function MailboxSelector() {
 		return <Skeleton className="h-10 w-10 rounded-full" />;
 	}
 
-	const selectedName = selectedMailbox ? getMailboxName(selectedMailbox) : user?.name ?? "Account";
-	const selectedEmail = selectedMailbox ? getMailboxAddress(selectedMailbox) : user?.email ?? "";
+	const selectedName = selectedMailbox
+		? getMailboxName(selectedMailbox)
+		: (user?.name ?? "Account");
+	const selectedEmail = selectedMailbox ? getMailboxAddress(selectedMailbox) : (user?.email ?? "");
 	const selectedMailboxAvatarUrl = selectedMailbox
 		? mailboxAvatarUrls[selectedMailbox.id]
 		: undefined;
@@ -178,7 +181,7 @@ export function MailboxSelector() {
 	const selectedAvatarUrl = selectedMailbox
 		? selectedMailbox.type === "personal"
 			? avatarUrl
-			: selectedMailboxAvatarUrl ?? `/api/mailboxes/${selectedMailbox.id}/avatar`
+			: (selectedMailboxAvatarUrl ?? `/api/mailboxes/${selectedMailbox.id}/avatar`)
 		: avatarUrl;
 	const otherMailboxes = mailboxes.filter((mailbox) => mailbox.id !== selectedMailbox?.id);
 	const adminActive = isAdminPath(pathname);
@@ -227,17 +230,19 @@ export function MailboxSelector() {
 									<p className="truncate text-lg font-semibold text-neutral-900">{selectedName}</p>
 									{selectedMailbox?.type === "shared" && (
 										<Tooltip label="Shared inbox">
-											<span title="Shared inbox" aria-label="Shared inbox" className="shrink-0 text-blue-600">
+											<span
+												title="Shared inbox"
+												aria-label="Shared inbox"
+												className="shrink-0 text-primary"
+											>
 												<UsersRound className="h-4 w-4" />
 											</span>
 										</Tooltip>
 									)}
 								</div>
-								<p className="truncate text-sm text-neutral-500">
-									{selectedEmail}
-								</p>
+								<p className="truncate text-sm text-neutral-500">{selectedEmail}</p>
 							</div>
-							<Check className="h-5 w-5 shrink-0 text-blue-600" />
+							<Check className="h-5 w-5 shrink-0 text-primary" />
 						</div>
 						<Link
 							href="/calendar"
@@ -263,13 +268,17 @@ export function MailboxSelector() {
 								Other accounts
 							</p>
 							{otherMailboxes.map((mailbox) => {
-								const mailboxCount = counts.mailboxes.find((count) => count.mailboxId === mailbox.id);
+								const mailboxCount = counts.mailboxes.find(
+									(count) => count.mailboxId === mailbox.id,
+								);
 								return (
 									<MailboxAccountRow
 										key={mailbox.id}
 										mailbox={mailbox}
 										unread={mailboxCount?.unread ?? 0}
-										avatarUrl={mailbox.type === "personal" ? avatarUrl : mailboxAvatarUrls[mailbox.id]}
+										avatarUrl={
+											mailbox.type === "personal" ? avatarUrl : mailboxAvatarUrls[mailbox.id]
+										}
 										onSelect={() => {
 											setSelectedMailbox(mailbox);
 											setOpen(false);
@@ -285,11 +294,11 @@ export function MailboxSelector() {
 							<Link
 								href="/admin"
 								onClick={() => setOpen(false)}
-								className={`flex items-center gap-3 border-t border-neutral-100 px-5 py-4 text-sm font-medium text-neutral-800 hover:bg-[#f2f6fc] ${adminActive ? "bg-blue-50" : ""}`}
+								className={`flex items-center gap-3 border-t border-neutral-100 px-5 py-4 text-sm font-medium text-neutral-800 hover:bg-[#f2f6fc] ${adminActive ? "bg-primary/8" : ""}`}
 							>
 								<ShieldCheck className="h-5 w-5 text-neutral-600" />
 								Admin
-								{adminActive && <Check className="ml-auto h-4 w-4 text-blue-600" />}
+								{adminActive && <Check className="ml-auto h-4 w-4 text-primary" />}
 							</Link>
 						)}
 						<button

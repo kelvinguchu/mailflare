@@ -1,4 +1,4 @@
-import { Archive, Clock, MailOpen, Send, ShieldAlert, Star, Trash2 } from "lucide-react";
+import { Archive, Clock, Send, ShieldAlert, Star, Trash2 } from "lucide-react";
 import type { MessageFolderConfig } from "./types";
 
 export const inboxFolderConfig: MessageFolderConfig = {

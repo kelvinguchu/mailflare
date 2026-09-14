@@ -87,11 +87,11 @@ describe("email HTML sanitizer", () => {
 		const result = sanitizeEmailHtml(
 			[
 				'<div onclick="alert(1)">Safe text</div>',
-				'<script>alert(1)</script>',
-				'<style>body{background:url(https://tracker.example/css)}</style>',
+				"<script>alert(1)</script>",
+				"<style>body{background:url(https://tracker.example/css)}</style>",
 				'<iframe src="https://tracker.example/frame"></iframe>',
 				'<svg><a href="javascript:alert(1)"><text>bad</text></a></svg>',
-				'<math><mtext>bad</mtext></math>',
+				"<math><mtext>bad</mtext></math>",
 				'<form action="https://evil.example"><input name="secret"></form>',
 			].join(""),
 		);
@@ -114,10 +114,12 @@ describe("email HTML sanitizer", () => {
 			].join(""),
 		);
 		const fragment = parseFragment(result.html);
-		const safeLink = Array.from(fragment.querySelectorAll("a"))
-			.find((link) => link.textContent === "Safe");
-		const unsafeLinks = Array.from(fragment.querySelectorAll("a"))
-			.filter((link) => ["JS", "Data", "Relative"].includes(link.textContent ?? ""));
+		const safeLink = Array.from(fragment.querySelectorAll("a")).find(
+			(link) => link.textContent === "Safe",
+		);
+		const unsafeLinks = Array.from(fragment.querySelectorAll("a")).filter((link) =>
+			["JS", "Data", "Relative"].includes(link.textContent ?? ""),
+		);
 
 		expect(safeLink?.getAttribute("target")).toBe("_blank");
 		expect(safeLink?.getAttribute("rel")).toBe("noopener noreferrer");
@@ -125,9 +127,7 @@ describe("email HTML sanitizer", () => {
 	});
 
 	it("does not report images nested inside content that is dropped wholesale", () => {
-		const result = sanitizeEmailHtml(
-			'<form><img src="https://tracker.example/hidden.png"></form>',
-		);
+		const result = sanitizeEmailHtml('<form><img src="https://tracker.example/hidden.png"></form>');
 
 		expect(result.html).toBe("");
 		expect(result.blockedRemoteImageCount).toBe(0);

@@ -9,6 +9,14 @@ function getOptionalFormValue(form: FormData, key: string): string | undefined {
 	return typeof value === "string" && value ? value : undefined;
 }
 
+function getOptionalBooleanFormValue(form: FormData, key: string): boolean | undefined {
+	const value = form.get(key);
+	if (value === null || value === "") return undefined;
+	if (value === "true") return true;
+	if (value === "false") return false;
+	throw new Error(`${key} must be true or false`);
+}
+
 export async function parseSendRequest(request: Request): Promise<SendRequestPayload> {
 	if (!request.headers.get("content-type")?.includes("multipart/form-data")) {
 		return readJsonBody<SendRequestPayload>(request, MAX_SEND_REQUEST_SIZE);
@@ -32,7 +40,9 @@ export async function parseSendRequest(request: Request): Promise<SendRequestPay
 		subject: String(form.get("subject") ?? ""),
 		text: getOptionalFormValue(form, "text"),
 		html: getOptionalFormValue(form, "html"),
+		includeSignature: getOptionalBooleanFormValue(form, "includeSignature"),
 		mailboxId: getOptionalFormValue(form, "mailboxId"),
+		replyToMessageId: getOptionalFormValue(form, "replyToMessageId"),
 		attachments,
 	};
 }

@@ -17,11 +17,11 @@ type CloudflareSocketConnect = (
 async function getCloudflareSocketConnect(): Promise<CloudflareSocketConnect> {
 	try {
 		const moduleName = "cloudflare:sockets";
-		const sockets = await import(
+		const sockets = (await import(
 			/* webpackIgnore: true */
 			/* @vite-ignore */
 			moduleName
-		) as { connect: CloudflareSocketConnect };
+		)) as { connect: CloudflareSocketConnect };
 		return sockets.connect;
 	} catch {
 		throw new Error("IMAP import requires the Cloudflare Workers socket runtime");
@@ -149,7 +149,9 @@ export async function fetchImapMessages(input: ImapImportInput): Promise<ImportM
 	const imap = new ImapConnection(socket);
 	try {
 		await imap.readGreeting();
-		await imap.command(`LOGIN ${quoteImapString(input.username)} ${quoteImapString(input.password)}`);
+		await imap.command(
+			`LOGIN ${quoteImapString(input.username)} ${quoteImapString(input.password)}`,
+		);
 		await imap.command(`SELECT ${quoteImapString(input.folder)}`);
 		const searchLines = await imap.command("UID SEARCH ALL");
 		const uids = searchLines.flatMap(parseSearchUids).slice(-input.limit);
@@ -167,7 +169,9 @@ export async function fetchImapMessages(input: ImapImportInput): Promise<ImportM
 	}
 }
 
-export async function listImapFolders(input: Omit<ImapImportInput, "folder" | "limit">): Promise<string[]> {
+export async function listImapFolders(
+	input: Omit<ImapImportInput, "folder" | "limit">,
+): Promise<string[]> {
 	assertSafeImapHost(input.host);
 	const connect = await getCloudflareSocketConnect();
 	const socket = connect(
@@ -177,10 +181,14 @@ export async function listImapFolders(input: Omit<ImapImportInput, "folder" | "l
 	const imap = new ImapConnection(socket);
 	try {
 		await imap.readGreeting();
-		await imap.command(`LOGIN ${quoteImapString(input.username)} ${quoteImapString(input.password)}`);
+		await imap.command(
+			`LOGIN ${quoteImapString(input.username)} ${quoteImapString(input.password)}`,
+		);
 		const lines = await imap.command('LIST "" "*"');
 		await imap.command("LOGOUT").catch(() => undefined);
-		return Array.from(new Set(lines.map(parseListMailboxName).filter((name): name is string => !!name)));
+		return Array.from(
+			new Set(lines.map(parseListMailboxName).filter((name): name is string => !!name)),
+		);
 	} finally {
 		await imap.close();
 	}

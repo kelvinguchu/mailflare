@@ -8,10 +8,7 @@ import {
 	replayDeadLetterEvent,
 } from "@/lib/queues/dead-letters";
 
-export async function POST(
-	request: Request,
-	{ params }: { params: Promise<{ id: string }> },
-) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
 	const env = getEnv();
 	let actorUserId: string;
 	try {
@@ -33,7 +30,9 @@ export async function POST(
 		if (error instanceof DeadLetterReplayBlockedError) {
 			return NextResponse.json({ error: error.message }, { status: 409 });
 		}
-		console.error(JSON.stringify({ event: "dead_letter_replay_failed", errorCode: "REPLAY_FAILED" }));
+		console.error(
+			JSON.stringify({ event: "dead_letter_replay_failed", errorCode: "REPLAY_FAILED" }),
+		);
 		return NextResponse.json({ error: "Failed to replay this delivery" }, { status: 500 });
 	}
 }

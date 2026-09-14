@@ -1,11 +1,7 @@
-import {
-	createScheduledBackupIfDue,
-	startBackupWorkflow,
-} from "./service";
+import { createScheduledBackupIfDue, startBackupWorkflow } from "./service";
 
 export type ScheduledBackupResult =
-	| { outcome: "skipped" }
-	| { outcome: "queued"; backupId: string };
+	{ outcome: "skipped" } | { outcome: "queued"; backupId: string };
 
 export async function runScheduledBackup(
 	env: CloudflareEnv,

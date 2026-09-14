@@ -1,5 +1,10 @@
 import { authFetch } from "@/lib/auth/client";
-import type { InboxRule, InboxRuleInput, InboxRulesResponse, RuleFoldersResponse } from "./inbox-rules-types";
+import type {
+	InboxRule,
+	InboxRuleInput,
+	InboxRulesResponse,
+	RuleFoldersResponse,
+} from "./inbox-rules-types";
 
 export async function fetchInboxRules(mailboxId: string): Promise<InboxRulesResponse> {
 	const params = new URLSearchParams({ mailboxId });

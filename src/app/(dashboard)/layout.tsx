@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { HelpCircle } from "lucide-react";
 import { AuthGuard } from "@/components/auth/auth-guard";
+import { ReminderNotifier } from "@/components/calendar/reminder-notifier";
 import { ComposeProvider } from "@/components/compose/compose-context";
 import { FloatingComposer } from "@/components/compose/floating-composer";
 import { MailSearchInput } from "@/components/mail-search/mail-search-input";
@@ -12,42 +13,39 @@ import { MailboxSelector } from "@/components/mailbox-selector";
 import { DashboardNav } from "@/components/dashboard-nav";
 import { SidebarProvider } from "@/components/sidebar-state";
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <AuthGuard>
-      <SidebarProvider>
-      <MailboxProvider>
-        <ComposeProvider>
-          <MailSearchProvider>
-            <div className="grid h-dvh grid-cols-[var(--sidebar-width)_minmax(0,1fr)] overflow-hidden bg-[#f6f8fc] transition-[grid-template-columns] duration-200">
-              <aside className="min-h-0 overflow-y-auto overscroll-contain px-3 py-4 scrollbar-gutter-stable">
-                <DashboardNav />
-              </aside>
-              <div className="flex min-h-0 min-w-0 flex-col">
-                <header className="flex h-16 w-full shrink-0 items-center gap-4 pr-4 text-sm">
-                  <MailSearchInput />
-                  <Link
-                    href="/settings"
-                    className="flex h-10 w-10 items-center justify-center rounded-full text-neutral-600 hover:bg-neutral-200"
-                  >
-                    <HelpCircle className="h-5 w-5" />
-                  </Link>
-                  <MailboxSelector />
-                </header>
-                <main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain rounded-tl-3xl bg-white scrollbar-gutter-stable">
-                  {children}
-                </main>
-              </div>
-              <FloatingComposer />
-            </div>
-          </MailSearchProvider>
-        </ComposeProvider>
-      </MailboxProvider>
-      </SidebarProvider>
-    </AuthGuard>
-  );
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+	return (
+		<AuthGuard>
+			<SidebarProvider>
+				<MailboxProvider>
+					<ComposeProvider>
+						<MailSearchProvider>
+							<div className="grid h-dvh grid-cols-[var(--sidebar-width)_minmax(0,1fr)] overflow-hidden bg-[#f6f8fc] transition-[grid-template-columns] duration-200">
+								<aside className="min-h-0 overflow-y-auto overscroll-contain px-3 py-4 scrollbar-gutter-stable">
+									<DashboardNav />
+								</aside>
+								<div className="flex min-h-0 min-w-0 flex-col">
+									<header className="flex h-16 w-full shrink-0 items-center gap-4 pr-4 text-sm">
+										<MailSearchInput />
+										<Link
+											href="/settings"
+											className="flex h-10 w-10 items-center justify-center rounded-full text-neutral-600 hover:bg-neutral-200"
+										>
+											<HelpCircle className="h-5 w-5" />
+										</Link>
+										<MailboxSelector />
+									</header>
+									<main className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain rounded-tl-3xl bg-white scrollbar-gutter-stable">
+										{children}
+									</main>
+								</div>
+								<FloatingComposer />
+								<ReminderNotifier />
+							</div>
+						</MailSearchProvider>
+					</ComposeProvider>
+				</MailboxProvider>
+			</SidebarProvider>
+		</AuthGuard>
+	);
 }

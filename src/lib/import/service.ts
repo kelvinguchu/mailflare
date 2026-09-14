@@ -8,6 +8,11 @@ import { newId } from "@/lib/ids";
 import { getImportMessagePlacement } from "./destination";
 import type { ImportDestination } from "./destination-types";
 import type { ImportMailboxResult, ImportMessageInput } from "./types";
+import {
+	createOutboundProviderMessageId,
+	normalizeProviderMessageId,
+	resolveThreadAssignment,
+} from "@/lib/email/threading";
 
 export async function importMessagesToMailbox(
 	env: CloudflareEnv,
@@ -35,7 +40,9 @@ export async function importMessagesToMailbox(
 			}
 		} catch (error) {
 			result.skipped += 1;
-			result.errors.push(`${message.filename}: ${error instanceof Error ? error.message : "Import failed"}`);
+			result.errors.push(
+				`${message.filename}: ${error instanceof Error ? error.message : "Import failed"}`,
+			);
 		}
 	}
 	return result;
@@ -53,20 +60,38 @@ async function importMessageToMailbox(
 ): Promise<boolean> {
 	const parsed = await parseRawMime(input.raw);
 	const db = getDb(env);
-	const providerMessageId = parsed.messageId ?? `import:${input.filename}:${input.raw.byteLength}`;
+	const messageId = newId("msg");
+	const placement = getImportMessagePlacement(input.destination);
+	const fromAddr = parsed.fromAddr ?? "unknown";
+	const toAddr = parsed.toAddr ?? "";
+	const createdAt = parsed.date ?? new Date();
+	const providerMessageId =
+		parsed.messageId ??
+		(placement.direction === "outbound"
+			? createOutboundProviderMessageId(messageId, fromAddr)
+			: normalizeProviderMessageId(`${messageId}@import.local`)) ??
+		`<${messageId}@import.local>`;
 
 	const [existing] = await db
 		.select({ id: messages.id })
 		.from(messages)
-		.where(and(eq(messages.mailboxId, input.mailboxId), eq(messages.providerMessageId, providerMessageId)))
+		.where(
+			and(
+				eq(messages.mailboxId, input.mailboxId),
+				eq(messages.providerMessageId, providerMessageId),
+			),
+		)
 		.limit(1);
 	if (existing) return false;
 
-	const messageId = newId("msg");
-	const fromAddr = parsed.fromAddr ?? "unknown";
-	const toAddr = parsed.toAddr ?? "";
-	const createdAt = parsed.date ?? new Date();
-	const placement = getImportMessagePlacement(input.destination);
+	const threading = await resolveThreadAssignment(db, {
+		mailboxId: input.mailboxId,
+		inReplyTo: parsed.inReplyTo,
+		references: parsed.references,
+		subject: parsed.subject,
+		fromAddr,
+		createdAt,
+	});
 
 	await db.insert(messages).values({
 		id: messageId,
@@ -75,6 +100,9 @@ async function importMessageToMailbox(
 		folderId: placement.folderId,
 		direction: placement.direction,
 		providerMessageId,
+		inReplyTo: parsed.inReplyTo,
+		references: JSON.stringify(parsed.references),
+		replyToMessageId: threading.replyToMessageId,
 		fromAddr,
 		toAddr,
 		subject: parsed.subject,
@@ -83,7 +111,7 @@ async function importMessageToMailbox(
 		htmlBody: parsed.html,
 		status: placement.status,
 		read: placement.direction === "outbound",
-		threadId: parsed.messageId,
+		threadId: threading.threadId,
 		createdAt,
 	});
 

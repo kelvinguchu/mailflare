@@ -2,40 +2,227 @@ import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getDb } from "@/db";
 import { calendarEvents } from "@/db/schema";
+import { requireCalendarMailboxAccess, requireCalendarSender } from "@/lib/calendar/access";
+import type { CalendarEventInput } from "@/lib/calendar/types";
+import { createCalendarInvitation } from "@/lib/calendar/utils";
+import {
+	CalendarInputError,
+	calendarAttendees,
+	calendarInstant,
+	calendarText,
+	calendarTimezone,
+	calendarTitle,
+	parseStoredAttendees,
+	rejectCalendarRecurrence,
+} from "@/lib/calendar/validation";
 import { requireUser } from "@/lib/auth/cookies";
 import { getEnv } from "@/lib/cloudflare";
-import { createCalendarInvitation } from "@/lib/calendar/utils";
-import { queueEmail } from "@/lib/email/send";
-import type { CalendarEventInput } from "../types";
-import type { CalendarEventRouteParams } from "./types";
+import { getEmailAddress } from "@/lib/email/address";
 import {
 	createScopedIdempotencyKey,
 	normalizeIdempotencyKey,
 } from "@/lib/email/outbound-idempotency";
+import { queueEmail } from "@/lib/email/send";
+import type { CalendarEventRouteParams } from "./types";
+
+export async function GET(request: Request, { params }: CalendarEventRouteParams) {
+	const env = getEnv();
+	const user = await requireUser(env, request);
+	try {
+		const { eventId } = await params;
+		return NextResponse.json({ event: await requireOwnedEvent(env, user.id, eventId) });
+	} catch (error) {
+		if (error instanceof CalendarInputError) {
+			return NextResponse.json({ error: error.message }, { status: error.status });
+		}
+		throw error;
+	}
+}
 
 export async function PATCH(request: Request, { params }: CalendarEventRouteParams) {
 	const env = getEnv();
 	const user = await requireUser(env, request);
-	const idempotencyKey = normalizeIdempotencyKey(request.headers.get("Idempotency-Key"));
-	const { eventId } = await params;
-	const input = await request.json() as CalendarEventInput;
-	const startsAt = new Date(input.startsAt);
-	const endsAt = new Date(input.endsAt);
-	if (!input.title?.trim() || Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || endsAt <= startsAt) return NextResponse.json({ error: "Enter a title and valid event times" }, { status: 400 });
-	const db = getDb(env);
-	const [existing] = await db.select().from(calendarEvents).where(and(eq(calendarEvents.id, eventId), eq(calendarEvents.userId, user.id))).limit(1);
-	if (!existing) return NextResponse.json({ error: "Event not found" }, { status: 404 });
-	const attendees = (input.attendees ?? []).map((email) => email.trim()).filter((email) => /^\S+@\S+\.\S+$/.test(email));
-	const event = { ...existing, title: input.title.trim(), description: input.description?.trim() ?? "", location: input.location?.trim() ?? "", attendees: JSON.stringify(attendees), startsAt, endsAt };
-	await db.update(calendarEvents).set({ title: event.title, description: event.description, location: event.location, attendees: event.attendees, startsAt, endsAt, updatedAt: new Date() }).where(eq(calendarEvents.id, eventId));
-	if (attendees.length && existing.mailboxId && input.from) { const file = createCalendarInvitation({ ...event, uid: eventId, stamp: startsAt }); await Promise.all(attendees.map(async (to) => queueEmail(env, { userId: user.id, mailboxId: existing.mailboxId!, from: input.from!, to, subject: `Updated invitation: ${event.title}`, text: event.description || `This event has been updated: ${event.title}.`, attachments: [{ filename: "invite.ics", type: "text/calendar; charset=utf-8", content: new Uint8Array(file).buffer }] }, { idempotencyKey: await createScopedIdempotencyKey("calendar-update", user.id, eventId, idempotencyKey, to) }))); }
-	return NextResponse.json({ ok: true }, { headers: { "Idempotency-Key": idempotencyKey } });
+	try {
+		const idempotencyKey = normalizeIdempotencyKey(request.headers.get("Idempotency-Key"));
+		const { eventId } = await params;
+		const input = (await request.json()) as CalendarEventInput;
+		rejectCalendarRecurrence(input.recurrenceRule);
+		const existing = await requireOwnedEvent(env, user.id, eventId);
+		const allDay = input.allDay ?? existing.allDay;
+		const startsAt = requiredDate(input.startsAt, allDay, "an event start");
+		const endsAt = requiredDate(input.endsAt, allDay, "an event end");
+		if (endsAt <= startsAt) throw new CalendarInputError("Event end must be after its start");
+		const attendees = calendarAttendees(input.attendees);
+		let mailboxId = input.mailboxId === undefined ? existing.mailboxId : input.mailboxId;
+		let organizer = existing.organizer;
+		if (attendees.length > 0) {
+			const sender = await requireCalendarSender(
+				env,
+				user,
+				mailboxId,
+				input.from ?? existing.organizer,
+			);
+			mailboxId = sender.mailboxId;
+			organizer = getEmailAddress(sender.fromAddr).toLowerCase();
+		} else {
+			await requireCalendarMailboxAccess(env, user, mailboxId);
+		}
+		const sequence = existing.sequence + 1;
+		await getDb(env)
+			.update(calendarEvents)
+			.set({
+				mailboxId,
+				title: calendarTitle(input.title, "event title"),
+				description: calendarText(input.description),
+				location: calendarText(input.location, 500),
+				attendees: JSON.stringify(attendees),
+				organizer,
+				startsAt,
+				endsAt,
+				timezone: calendarTimezone(input.timezone ?? existing.timezone),
+				allDay,
+				sequence,
+				updatedAt: new Date(),
+			})
+			.where(and(eq(calendarEvents.id, eventId), eq(calendarEvents.userId, user.id)));
+		const event = await requireOwnedEvent(env, user.id, eventId);
+		await sendEventUpdate(env, event, attendees, idempotencyKey);
+		return NextResponse.json({ event }, { headers: { "Idempotency-Key": idempotencyKey } });
+	} catch (error) {
+		if (error instanceof CalendarInputError) {
+			return NextResponse.json({ error: error.message }, { status: error.status });
+		}
+		throw error;
+	}
 }
 
-export async function DELETE(_request: Request, { params }: CalendarEventRouteParams) {
+export async function DELETE(request: Request, { params }: CalendarEventRouteParams) {
 	const env = getEnv();
-	const user = await requireUser(env, _request);
-	const { eventId } = await params;
-	await getDb(env).delete(calendarEvents).where(and(eq(calendarEvents.id, eventId), eq(calendarEvents.userId, user.id)));
-	return NextResponse.json({ ok: true });
+	const user = await requireUser(env, request);
+	try {
+		const idempotencyKey = normalizeIdempotencyKey(request.headers.get("Idempotency-Key"));
+		const { eventId } = await params;
+		const event = await requireOwnedEvent(env, user.id, eventId);
+		const attendees = parseStoredAttendees(event.attendees);
+		if (event.mailboxId && event.organizer && attendees.length > 0) {
+			const mailboxId = event.mailboxId;
+			const organizer = event.organizer;
+			await requireCalendarSender(env, user, mailboxId, organizer);
+			const sequence = event.sequence + 1;
+			const file = createCalendarInvitation({
+				...event,
+				uid: event.id,
+				method: "CANCEL",
+				status: "CANCELLED",
+				organizer,
+				attendees,
+				sequence,
+			});
+			await Promise.all(
+				attendees.map(async (to) =>
+					queueEmail(
+						env,
+						{
+							userId: user.id,
+							mailboxId,
+							from: organizer,
+							to,
+							subject: `Cancelled: ${event.title}`,
+							text: `${event.title} has been cancelled.`,
+							attachments: [
+								{
+									filename: "cancel.ics",
+									type: "text/calendar; charset=utf-8",
+									content: new Uint8Array(file).buffer,
+								},
+							],
+						},
+						{
+							idempotencyKey: await createScopedIdempotencyKey(
+								"calendar-cancel",
+								event.id,
+								sequence,
+								idempotencyKey,
+								to,
+							),
+						},
+					),
+				),
+			);
+		}
+		await getDb(env)
+			.delete(calendarEvents)
+			.where(and(eq(calendarEvents.id, eventId), eq(calendarEvents.userId, user.id)));
+		return NextResponse.json({ ok: true }, { headers: { "Idempotency-Key": idempotencyKey } });
+	} catch (error) {
+		if (error instanceof CalendarInputError) {
+			return NextResponse.json({ error: error.message }, { status: error.status });
+		}
+		throw error;
+	}
+}
+
+async function sendEventUpdate(
+	env: CloudflareEnv,
+	event: typeof calendarEvents.$inferSelect,
+	attendees: string[],
+	requestKey: string,
+): Promise<void> {
+	if (!event.mailboxId || !event.organizer || attendees.length === 0) return;
+	const mailboxId = event.mailboxId;
+	const organizer = event.organizer;
+	const file = createCalendarInvitation({
+		...event,
+		uid: event.id,
+		organizer,
+		attendees,
+		sequence: event.sequence,
+	});
+	await Promise.all(
+		attendees.map(async (to) =>
+			queueEmail(
+				env,
+				{
+					userId: event.userId,
+					mailboxId,
+					from: organizer,
+					to,
+					subject: `Updated invitation: ${event.title}`,
+					text: event.description || `This event has been updated: ${event.title}.`,
+					attachments: [
+						{
+							filename: "invite.ics",
+							type: "text/calendar; charset=utf-8",
+							content: new Uint8Array(file).buffer,
+						},
+					],
+				},
+				{
+					idempotencyKey: await createScopedIdempotencyKey(
+						"calendar-update",
+						event.id,
+						event.sequence,
+						requestKey,
+						to,
+					),
+				},
+			),
+		),
+	);
+}
+
+async function requireOwnedEvent(env: CloudflareEnv, userId: string, eventId: string) {
+	const [event] = await getDb(env)
+		.select()
+		.from(calendarEvents)
+		.where(and(eq(calendarEvents.id, eventId), eq(calendarEvents.userId, userId)))
+		.limit(1);
+	if (!event) throw new CalendarInputError("Event not found", 404);
+	return event;
+}
+
+function requiredDate(value: string, allDay: boolean, label: string): Date {
+	const parsed = calendarInstant(value, { allDay, label });
+	if (!parsed) throw new CalendarInputError(`Enter ${label}`);
+	return parsed;
 }

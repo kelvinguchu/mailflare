@@ -48,7 +48,9 @@ function isAllowedUnsubscribeUrl(value: string): boolean {
 }
 
 function getCandidates(value: string): string[] {
-	const bracketed = [...value.matchAll(/<([^>]+)>/g)].map((match) => normalizeCandidate(match[1] ?? ""));
+	const bracketed = [...value.matchAll(/<([^>]+)>/g)].map((match) =>
+		normalizeCandidate(match[1] ?? ""),
+	);
 	const bare = value.split(",").map(normalizeCandidate);
 	return [...bracketed, ...bare].filter(Boolean);
 }
@@ -57,12 +59,19 @@ export function extractUnsubscribeUrlFromRaw(raw: ArrayBuffer): UnsubscribeUrl {
 	const headers = parseHeaders(getHeaderBlock(raw));
 	const values = headers.get("list-unsubscribe") ?? [];
 	const candidates = values.flatMap(getCandidates).filter(isAllowedUnsubscribeUrl);
-	return candidates.find((candidate) => candidate.startsWith("https://") || candidate.startsWith("http://"))
-		?? candidates.find((candidate) => candidate.startsWith("mailto:"))
-		?? null;
+	return (
+		candidates.find(
+			(candidate) => candidate.startsWith("https://") || candidate.startsWith("http://"),
+		) ??
+		candidates.find((candidate) => candidate.startsWith("mailto:")) ??
+		null
+	);
 }
 
-export async function getUnsubscribeUrlFromRawR2Key(env: CloudflareEnv, rawR2Key: string | null): Promise<UnsubscribeUrl> {
+export async function getUnsubscribeUrlFromRawR2Key(
+	env: CloudflareEnv,
+	rawR2Key: string | null,
+): Promise<UnsubscribeUrl> {
 	if (!rawR2Key) return null;
 	const raw = await env.BUCKET.get(rawR2Key, { range: { offset: 0, length: maxHeaderBytes } });
 	if (!raw) return null;

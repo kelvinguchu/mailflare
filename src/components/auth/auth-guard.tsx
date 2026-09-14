@@ -6,7 +6,12 @@ import { authFetch } from "@/lib/auth/client";
 import type { AuthGuardProps } from "./auth-guard-types";
 import { LoadingTransition } from "@/components/loading-transition";
 
-export function AuthGuard({ children, mode = "protected", requireMailbox, requireRole }: AuthGuardProps) {
+export function AuthGuard({
+	children,
+	mode = "protected",
+	requireMailbox,
+	requireRole,
+}: AuthGuardProps) {
 	const pathname = usePathname();
 	const router = useRouter();
 	const [authorized, setAuthorized] = useState(mode === "public");
@@ -29,13 +34,23 @@ export function AuthGuard({ children, mode = "protected", requireMailbox, requir
 					return;
 				}
 
-				const data = (await response.json()) as { hasMailboxes?: boolean; isSetup?: boolean; user?: { role?: string } };
+				const data = (await response.json()) as {
+					hasMailboxes?: boolean;
+					isSetup?: boolean;
+					user?: { role?: string };
+				};
 				if (mode === "public") {
 					router.replace("/inbox");
 					return;
 				}
 
-				if (requireMailbox && data.hasMailboxes === false && data.user?.role === "admin" && data.isSetup === false && pathname !== "/setup") {
+				if (
+					requireMailbox &&
+					data.hasMailboxes === false &&
+					data.user?.role === "admin" &&
+					data.isSetup === false &&
+					pathname !== "/setup"
+				) {
 					router.replace("/setup");
 					return;
 				}

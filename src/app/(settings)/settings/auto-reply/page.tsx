@@ -14,7 +14,9 @@ export default function SettingsAutoReplyPage() {
 			<Card className="rounded-3xl border-0 bg-white px-6">
 				<CardHeader>
 					<CardTitle>Automatic response</CardTitle>
-					<CardDescription>Configure the subject and message for the inbox currently selected above.</CardDescription>
+					<CardDescription>
+						Configure the subject and message for the inbox currently selected above.
+					</CardDescription>
 				</CardHeader>
 				<CardContent className="pb-6">
 					<MailboxAutoReplyForm />

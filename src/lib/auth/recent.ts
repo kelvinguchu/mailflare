@@ -7,7 +7,7 @@ export async function requireRecentAuthentication(
 	userId: string,
 ): Promise<NextResponse | null> {
 	const token = (await cookies()).get(SESSION_COOKIE)?.value;
-	if (token && await isSessionRecentlyAuthenticated(env, userId, token)) return null;
+	if (token && (await isSessionRecentlyAuthenticated(env, userId, token))) return null;
 	return NextResponse.json(
 		{
 			error: "Confirm your password and multi-factor code before this action.",

@@ -10,6 +10,7 @@ import { readJsonBody } from "@/lib/http/request";
 import { RequestBodyTooLargeError } from "@/lib/http/errors";
 import type { DraftPayload } from "./types";
 import { getDraftSender } from "./utils";
+import { buildOutboundThreading } from "@/lib/email/threading";
 
 export async function GET(request: Request) {
 	const env = getEnv();
@@ -52,12 +53,31 @@ export async function POST(request: Request) {
 	const draftId = newId("msg");
 	const text = input.text ?? "";
 	const html = input.html ?? "";
+	let threading: Awaited<ReturnType<typeof buildOutboundThreading>>;
+	try {
+		threading = await buildOutboundThreading(db, {
+			messageId: draftId,
+			mailboxId: sender.mailboxId,
+			fromAddr: sender.fromAddr,
+			replyToMessageId: input.replyToMessageId,
+		});
+	} catch (error) {
+		return NextResponse.json(
+			{ error: error instanceof Error ? error.message : "Invalid reply message" },
+			{ status: 400 },
+		);
+	}
 
 	await db.insert(messages).values({
 		id: draftId,
 		userId: user.id,
 		mailboxId: sender.mailboxId,
 		direction: "outbound",
+		providerMessageId: threading.providerMessageId,
+		inReplyTo: threading.inReplyTo,
+		references: threading.references,
+		replyToMessageId: threading.replyToMessageId,
+		threadId: threading.threadId,
 		fromAddr: sender.fromAddr,
 		toAddr: input.to ?? "",
 		subject: input.subject ?? null,

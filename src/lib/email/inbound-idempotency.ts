@@ -7,6 +7,9 @@ export type InboundMessageWrite = {
 	mailboxId: string;
 	folderId: string | null;
 	providerMessageId: string | null;
+	inReplyTo?: string | null;
+	references?: string;
+	replyToMessageId?: string | null;
 	fromAddr: string;
 	toAddr: string;
 	subject: string | null;
@@ -35,11 +38,9 @@ export async function createInboundDeliveryKey(
 	raw: ArrayBuffer,
 ): Promise<string> {
 	const rawDigest = await sha256(raw);
-	const material = new TextEncoder().encode([
-		from.trim().toLowerCase(),
-		to.trim().toLowerCase(),
-		toHex(rawDigest),
-	].join("\u0000"));
+	const material = new TextEncoder().encode(
+		[from.trim().toLowerCase(), to.trim().toLowerCase(), toHex(rawDigest)].join("\u0000"),
+	);
 	return toHex(await sha256(material));
 }
 
@@ -72,16 +73,23 @@ export async function commitInboundMessage(
 
 	const createdAt = Math.floor(message.createdAt.getTime() / 1_000);
 	const statements = [
-		db.prepare(`INSERT INTO messages (
-			id, user_id, mailbox_id, direction, provider_message_id, folder_id,
+		db
+			.prepare(
+				`INSERT INTO messages (
+			id, user_id, mailbox_id, direction, provider_message_id, in_reply_to, "references",
+			reply_to_message_id, folder_id,
 			from_addr, to_addr, subject, snippet, text_body, html_body, raw_r2_key,
 			status, thread_id, inbound_delivery_key, security_status, security_reason, spam_score, created_at
-		) VALUES (?, ?, ?, 'inbound', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+		) VALUES (?, ?, ?, 'inbound', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			)
 			.bind(
 				message.id,
 				message.userId,
 				message.mailboxId,
 				message.providerMessageId,
+				message.inReplyTo ?? null,
+				message.references ?? "[]",
+				message.replyToMessageId ?? null,
 				message.folderId,
 				message.fromAddr,
 				message.toAddr,
@@ -99,9 +107,12 @@ export async function commitInboundMessage(
 				createdAt,
 			),
 		...attachments.map((attachment) =>
-			db.prepare(`INSERT INTO message_attachments (
+			db
+				.prepare(
+					`INSERT INTO message_attachments (
 				id, message_id, filename, content_type, size, disposition, content_id, security_status, security_reason, r2_key, created_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				)
 				.bind(
 					attachment.id,
 					attachment.messageId,
@@ -133,7 +144,5 @@ async function sha256(value: BufferSource): Promise<ArrayBuffer> {
 }
 
 function toHex(value: ArrayBuffer): string {
-	return [...new Uint8Array(value)]
-		.map((byte) => byte.toString(16).padStart(2, "0"))
-		.join("");
+	return [...new Uint8Array(value)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }

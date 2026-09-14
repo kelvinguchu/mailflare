@@ -22,44 +22,54 @@ describe("dead-letter handling", () => {
 	});
 
 	it("requeues work that never reached the provider", () => {
-		expect(decideOutboundDeadLetterReplay({
-			status: "queued",
-			deliveryStartedAt: null,
-			error: "E_STORED_ATTACHMENT_MISSING",
-			messageId: "msg_1",
-		})).toBe("enqueue");
+		expect(
+			decideOutboundDeadLetterReplay({
+				status: "queued",
+				deliveryStartedAt: null,
+				error: "E_STORED_ATTACHMENT_MISSING",
+				messageId: "msg_1",
+			}),
+		).toBe("enqueue");
 	});
 
 	it("permits a failed provider rejection to be retried after an operator fix", () => {
-		expect(decideOutboundDeadLetterReplay({
-			status: "failed",
-			deliveryStartedAt: new Date(),
-			error: "E_SENDER_NOT_VERIFIED",
-			messageId: "msg_1",
-		})).toBe("reset_and_enqueue");
+		expect(
+			decideOutboundDeadLetterReplay({
+				status: "failed",
+				deliveryStartedAt: new Date(),
+				error: "E_SENDER_NOT_VERIFIED",
+				messageId: "msg_1",
+			}),
+		).toBe("reset_and_enqueue");
 	});
 
 	it("never replays an ambiguous provider outcome", () => {
-		expect(decideOutboundDeadLetterReplay({
-			status: "failed",
-			deliveryStartedAt: new Date(),
-			error: "E_DELIVERY_OUTCOME_UNKNOWN",
-			messageId: "msg_1",
-		})).toBe("blocked_unknown_outcome");
-		expect(decideOutboundDeadLetterReplay({
-			status: "sending",
-			deliveryStartedAt: new Date(),
-			error: null,
-			messageId: "msg_1",
-		})).toBe("blocked_in_flight");
+		expect(
+			decideOutboundDeadLetterReplay({
+				status: "failed",
+				deliveryStartedAt: new Date(),
+				error: "E_DELIVERY_OUTCOME_UNKNOWN",
+				messageId: "msg_1",
+			}),
+		).toBe("blocked_unknown_outcome");
+		expect(
+			decideOutboundDeadLetterReplay({
+				status: "sending",
+				deliveryStartedAt: new Date(),
+				error: null,
+				messageId: "msg_1",
+			}),
+		).toBe("blocked_in_flight");
 	});
 
 	it("treats an already-sent job as an idempotent no-op", () => {
-		expect(decideOutboundDeadLetterReplay({
-			status: "sent",
-			deliveryStartedAt: new Date(),
-			error: null,
-			messageId: "msg_1",
-		})).toBe("already_sent");
+		expect(
+			decideOutboundDeadLetterReplay({
+				status: "sent",
+				deliveryStartedAt: new Date(),
+				error: null,
+				messageId: "msg_1",
+			}),
+		).toBe("already_sent");
 	});
 });

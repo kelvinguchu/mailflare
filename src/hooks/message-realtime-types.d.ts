@@ -1,13 +1,19 @@
-export interface NewMessageEvent {
-	from: string;
-	fromName: string | null;
-	mailboxId: string;
-	messageId: string;
-	subject: string | null;
-	type: "new_message";
+import type { NewMessageNotification } from "@/lib/realtime/types";
+
+export type NewMessageEvent = NewMessageNotification;
+
+export interface NewMessageToast {
+	count: number;
+	latest: NewMessageEvent;
+}
+
+export interface RealtimeAnnouncement {
+	id: string;
+	text: string;
 }
 
 export interface MessageRealtimeState {
 	dismissNotification: () => void;
-	notification: NewMessageEvent | null;
+	notification: NewMessageToast | null;
+	announcement: RealtimeAnnouncement | null;
 }

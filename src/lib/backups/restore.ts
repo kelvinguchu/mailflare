@@ -4,14 +4,8 @@ import type {
 	DatabaseRecord,
 	NormalizedDatabaseBackupDocument,
 } from "./types";
-import {
-	BACKUP_TABLES,
-	MAX_DATABASE_RESTORE_BYTES,
-} from "./format";
-import {
-	assertDatabaseBackupCoverage,
-	parseDatabaseBackup,
-} from "./export";
+import { BACKUP_TABLES, MAX_DATABASE_RESTORE_BYTES } from "./format";
+import { assertDatabaseBackupCoverage, parseDatabaseBackup } from "./export";
 import { createBackupBundle } from "./bundle";
 import {
 	deleteBackupBundle,
@@ -75,10 +69,8 @@ export async function restoreDatabaseRecords(
 		await createStagingTables(env.DB, stagingTables);
 		await loadStagingTables(env.DB, document, stagingTables, selectedColumns);
 		try {
-			await restoreDatabaseBackupObjects(
-				env.BUCKET,
-				document,
-				(sourceKey) => mutatedObjectKeys.push(sourceKey),
+			await restoreDatabaseBackupObjects(env.BUCKET, document, (sourceKey) =>
+				mutatedObjectKeys.push(sourceKey),
 			);
 			const finalStatements = createFinalRestoreStatements(
 				document,
@@ -91,11 +83,14 @@ export async function restoreDatabaseRecords(
 			try {
 				await rollbackDatabaseBackupObjects(env.BUCKET, mutatedObjectKeys, recovery.document);
 			} catch (rollbackError) {
-				console.error(JSON.stringify({
-					event: "database_restore_object_rollback_failed",
-					recoveryBackupId: recovery.id,
-					error: rollbackError instanceof Error ? rollbackError.message : "Unknown rollback error",
-				}));
+				console.error(
+					JSON.stringify({
+						event: "database_restore_object_rollback_failed",
+						recoveryBackupId: recovery.id,
+						error:
+							rollbackError instanceof Error ? rollbackError.message : "Unknown rollback error",
+					}),
+				);
 				throw new Error(
 					`Restore failed and R2 rollback needs intervention. Recovery backup: ${recovery.id}`,
 					{ cause: error },
@@ -108,11 +103,13 @@ export async function restoreDatabaseRecords(
 		try {
 			await dropStagingTables(env.DB, stagingTables);
 		} catch (error) {
-			console.error(JSON.stringify({
-				event: "database_restore_staging_cleanup_failed",
-				restoreId,
-				error: error instanceof Error ? error.message : "Unknown cleanup error",
-			}));
+			console.error(
+				JSON.stringify({
+					event: "database_restore_staging_cleanup_failed",
+					restoreId,
+					error: error instanceof Error ? error.message : "Unknown cleanup error",
+				}),
+			);
 		}
 	}
 }
@@ -164,7 +161,8 @@ export function validateDatabaseBackupColumns(
 		}
 
 		for (const definition of liveColumns) {
-			const required = definition.pk > 0 || (definition.notnull === 1 && definition.dflt_value === null);
+			const required =
+				definition.pk > 0 || (definition.notnull === 1 && definition.dflt_value === null);
 			if (required && !columns.includes(definition.name)) {
 				throw new Error(`Backup is missing required column ${table}.${definition.name}`);
 			}
@@ -174,7 +172,11 @@ export function validateDatabaseBackupColumns(
 	return selected;
 }
 
-function validateColumnValue(table: DatabaseBackupTable, column: TableColumn, value: DatabaseRecord[string]): void {
+function validateColumnValue(
+	table: DatabaseBackupTable,
+	column: TableColumn,
+	value: DatabaseRecord[string],
+): void {
 	if (value === null) {
 		if (column.pk > 0 || column.notnull === 1) {
 			throw new Error(`Backup contains null for required column ${table}.${column.name}`);
@@ -184,11 +186,18 @@ function validateColumnValue(table: DatabaseBackupTable, column: TableColumn, va
 
 	const declaredType = column.type.toUpperCase();
 	if (declaredType.includes("INT")) {
-		if (typeof value !== "number" || !Number.isSafeInteger(value)) throw invalidColumnTypeError(table, column.name);
+		if (typeof value !== "number" || !Number.isSafeInteger(value))
+			throw invalidColumnTypeError(table, column.name);
 		return;
 	}
-	if (declaredType.includes("REAL") || declaredType.includes("FLOA") || declaredType.includes("DOUB") || declaredType.includes("NUM")) {
-		if (typeof value !== "number" || !Number.isFinite(value)) throw invalidColumnTypeError(table, column.name);
+	if (
+		declaredType.includes("REAL") ||
+		declaredType.includes("FLOA") ||
+		declaredType.includes("DOUB") ||
+		declaredType.includes("NUM")
+	) {
+		if (typeof value !== "number" || !Number.isFinite(value))
+			throw invalidColumnTypeError(table, column.name);
 		return;
 	}
 	if (declaredType.includes("BLOB")) {
@@ -216,16 +225,20 @@ async function createRecoveryBackup(
 		document: bundle.document,
 	};
 	try {
-		await env.DB.prepare(recoveryBackupInsertSql()).bind(...recoveryBackupValues(recovery)).run();
+		await env.DB.prepare(recoveryBackupInsertSql())
+			.bind(...recoveryBackupValues(recovery))
+			.run();
 	} catch (error) {
 		try {
 			await deleteBackupBundle(env.BUCKET, id);
 		} catch (cleanupError) {
-			console.error(JSON.stringify({
-				event: "database_restore_recovery_bundle_cleanup_failed",
-				backupId: id,
-				error: cleanupError instanceof Error ? cleanupError.message : "Unknown cleanup error",
-			}));
+			console.error(
+				JSON.stringify({
+					event: "database_restore_recovery_bundle_cleanup_failed",
+					backupId: id,
+					error: cleanupError instanceof Error ? cleanupError.message : "Unknown cleanup error",
+				}),
+			);
 		}
 		throw error;
 	}
@@ -238,7 +251,9 @@ async function createStagingTables(
 ): Promise<void> {
 	await db.batch(
 		BACKUP_TABLES.map((table) =>
-			db.prepare(`CREATE TABLE ${quoteIdentifier(stagingTables[table])} AS SELECT * FROM ${quoteIdentifier(table)} WHERE 0`),
+			db.prepare(
+				`CREATE TABLE ${quoteIdentifier(stagingTables[table])} AS SELECT * FROM ${quoteIdentifier(table)} WHERE 0`,
+			),
 		),
 	);
 }
@@ -284,7 +299,12 @@ function createFinalRestoreStatements(
 	for (const table of BACKUP_TABLES) {
 		// Restoring authentication sessions would revive old credentials. The
 		// sessions table is emptied above and deliberately not copied back.
-		if (table === "sessions" || table === "account_recovery_tokens" || document.tables[table].length === 0) continue;
+		if (
+			table === "sessions" ||
+			table === "account_recovery_tokens" ||
+			document.tables[table].length === 0
+		)
+			continue;
 		const columns = selectedColumns[table];
 		const identifiers = columns.map(quoteIdentifier).join(", ");
 		statements.push({
@@ -327,7 +347,7 @@ function recoveryBackupValues(recovery: RecoveryBackup): readonly (string | numb
 }
 
 function quoteIdentifier(value: string): string {
-	return `\"${value.replaceAll("\"", "\"\"")}\"`;
+	return `\"${value.replaceAll('"', '""')}\"`;
 }
 
 function quoteString(value: string): string {
@@ -335,5 +355,7 @@ function quoteString(value: string): string {
 }
 
 export function restoreTooLargeError(): Error {
-	return new Error(`Backup file exceeds the ${MAX_DATABASE_RESTORE_BYTES / (1024 * 1024)} MiB restore limit`);
+	return new Error(
+		`Backup file exceeds the ${MAX_DATABASE_RESTORE_BYTES / (1024 * 1024)} MiB restore limit`,
+	);
 }

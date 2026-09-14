@@ -72,9 +72,10 @@ export function accountListItemFromUser(user: {
 		activatedAt: user.activatedAt,
 		invitationSentAt: user.invitationSentAt,
 		invitationExpiresAt: user.invitationExpiresAt,
-		invitationExpired: user.activationStatus === "pending"
-			&& !!user.invitationExpiresAt
-			&& user.invitationExpiresAt.getTime() <= Date.now(),
+		invitationExpired:
+			user.activationStatus === "pending" &&
+			!!user.invitationExpiresAt &&
+			user.invitationExpiresAt.getTime() <= Date.now(),
 		disabled: user.disabled,
 		hasAvatar: !!user.avatarKey,
 		canManageMailboxes: !!user.canManageMailboxes,

@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/cloudflare";
 import { requireUser } from "@/lib/auth/cookies";
@@ -7,6 +8,7 @@ import { parseSendRequest } from "./utils";
 import { RequestBodyTooLargeError } from "@/lib/http/errors";
 import { getSendErrorStatus } from "./error-utils";
 import { IdempotencyConflictError } from "@/lib/email/outbound-idempotency";
+import { parseUndoSendDelay } from "@/lib/email/undo-send";
 
 export async function POST(request: Request) {
 	const env = getEnv();
@@ -21,7 +23,7 @@ export async function POST(request: Request) {
 	const { attachments, ...fields } = input;
 	const parsed = sendEmailSchema.omit({ attachments: true }).safeParse(fields);
 	if (!parsed.success) {
-		return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+		return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
 	}
 
 	try {
@@ -32,10 +34,16 @@ export async function POST(request: Request) {
 				...parsed.data,
 				attachments,
 			},
-			{ idempotencyKey: request.headers.get("Idempotency-Key") },
+			{
+				idempotencyKey: request.headers.get("Idempotency-Key"),
+				undoDelaySeconds: parseUndoSendDelay(request.headers.get("X-Undo-Send-Delay-Seconds")),
+			},
 		);
 		return NextResponse.json(result, {
-			status: result.status === "queued" || result.status === "sending" ? 202 : 200,
+			status:
+				result.status === "scheduled" || result.status === "queued" || result.status === "sending"
+					? 202
+					: 200,
 			headers: { "Idempotency-Key": result.idempotencyKey },
 		});
 	} catch (err) {

@@ -1,5 +1,5 @@
 export const DATABASE_BACKUP_FORMAT = "mailflare-database-backup";
-export const DATABASE_BACKUP_VERSION = 6 as const;
+export const DATABASE_BACKUP_VERSION = 8 as const;
 export const MAX_DATABASE_RESTORE_BYTES = 10 * 1024 * 1024;
 export const MAX_BACKUP_OBJECTS = 5_000;
 export const DATABASE_BACKUP_R2_STRATEGY = "independent-copies-v1" as const;
@@ -10,6 +10,7 @@ export const BACKUP_TABLES = [
 	"users",
 	"domains",
 	"mailboxes",
+	"signature_assets",
 	"auto_reply_deliveries",
 	"mailbox_access",
 	"contacts",
@@ -22,6 +23,9 @@ export const BACKUP_TABLES = [
 	"dead_letter_events",
 	"email_templates",
 	"calendar_events",
+	"calendar_tasks",
+	"calendar_reminders",
+	"calendar_reminder_deliveries",
 	"routing_rules",
 	"webhooks",
 	"webhook_deliveries",
@@ -57,8 +61,19 @@ export const LEGACY_V4_BACKUP_TABLES = BACKUP_TABLES.filter(
 );
 
 // Version 5 added secure account recovery but predates delivery and abuse controls.
-export const LEGACY_V5_BACKUP_TABLES = BACKUP_TABLES.filter(
-	(table) => table !== "sender_policies",
+export const LEGACY_V5_BACKUP_TABLES = BACKUP_TABLES.filter((table) => table !== "sender_policies");
+
+// Version 6 added delivery and abuse controls but predates calendar tasks and reminders.
+export const LEGACY_V6_BACKUP_TABLES = BACKUP_TABLES.filter(
+	(table) =>
+		table !== "calendar_tasks" &&
+		table !== "calendar_reminders" &&
+		table !== "calendar_reminder_deliveries",
+);
+
+// Version 7 added task assignments but predates rich signatures and their R2 assets.
+export const LEGACY_V7_BACKUP_TABLES = BACKUP_TABLES.filter(
+	(table) => table !== "signature_assets",
 );
 
 // These are D1/SQLite bookkeeping tables, not application data. D1 and the
@@ -68,13 +83,16 @@ export const DATABASE_SYSTEM_TABLES = [
 	"_cf_KV",
 	"_cf_METADATA",
 	"d1_migrations",
+	"message_search",
+	"message_search_config",
+	"message_search_content",
+	"message_search_data",
+	"message_search_docsize",
+	"message_search_idx",
 	"sqlite_sequence",
 ] as const;
 
-const CLASSIFIED_DATABASE_TABLES = new Set<string>([
-	...BACKUP_TABLES,
-	...DATABASE_SYSTEM_TABLES,
-]);
+const CLASSIFIED_DATABASE_TABLES = new Set<string>([...BACKUP_TABLES, ...DATABASE_SYSTEM_TABLES]);
 
 export function getUnclassifiedDatabaseTables(tableNames: readonly string[]): string[] {
 	return tableNames.filter((table) => !CLASSIFIED_DATABASE_TABLES.has(table)).sort();

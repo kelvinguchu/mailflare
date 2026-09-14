@@ -2,11 +2,7 @@
 	"extends": "./tsconfig.json",
 	"compilerOptions": {
 		"incremental": true,
-		"types": [
-			"./env.d.ts",
-			"node",
-			"@cloudflare/workers-types"
-		]
+		"types": ["./env.d.ts", "node", "@cloudflare/workers-types"]
 	},
 	"include": [
 		"next-env.d.ts",
@@ -15,12 +11,5 @@
 		".next/types/**/*.ts",
 		".next/dev/types/**/*.ts"
 	],
-	"exclude": [
-		"node_modules",
-		"tests",
-		"worker.ts",
-		"worker-utils.ts",
-		".open-next",
-		".wrangler"
-	]
+	"exclude": ["node_modules", "tests", "worker.ts", "worker-utils.ts", ".open-next", ".wrangler"]
 }

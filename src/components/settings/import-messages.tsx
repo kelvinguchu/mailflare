@@ -1,6 +1,6 @@
 "use client";
 
-import type { FormEvent } from "react";
+import type { SubmitEvent } from "react";
 import { useState } from "react";
 import { Upload } from "lucide-react";
 import { useSelectedMailbox } from "@/components/mailbox-provider";
@@ -18,7 +18,7 @@ export function ImportMessages({ destination, sourceLabel }: ImportMessagesProps
 	const [result, setResult] = useState<ImportMessagesResult | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
-	async function onSubmit(event: FormEvent<HTMLFormElement>) {
+	async function onSubmit(event: SubmitEvent<HTMLFormElement>) {
 		event.preventDefault();
 		if (!selectedMailbox?.id || files.length === 0) return;
 
@@ -61,7 +61,8 @@ export function ImportMessages({ destination, sourceLabel }: ImportMessagesProps
 							className="block w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm shadow-sm shadow-neutral-200/50 file:mr-3 file:rounded-md file:border-0 file:bg-neutral-100 file:px-3 file:py-1.5 file:text-sm file:font-medium"
 						/>
 						<p className="text-xs leading-5 text-neutral-500">
-							Imports up to 100 messages and 25 MB per upload. Duplicate Message-ID values are skipped.
+							Imports up to 100 messages and 25 MB per upload. Duplicate Message-ID values are
+							skipped.
 						</p>
 					</div>
 

@@ -21,7 +21,8 @@ export async function POST(
 		.from(messages)
 		.where(eq(messages.id, messageId))
 		.limit(1);
-	if (!message?.mailboxId) return NextResponse.json({ error: "Message not found" }, { status: 404 });
+	if (!message?.mailboxId)
+		return NextResponse.json({ error: "Message not found" }, { status: 404 });
 
 	const access = await getMailboxAccessLevel(db, user, message.mailboxId);
 	if (!access?.canRead) return NextResponse.json({ error: "Message not found" }, { status: 404 });

@@ -15,12 +15,16 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 	if (!account || (account.id !== access.user!.id && account.createdByUserId !== access.user!.id)) {
 		return NextResponse.json({ error: "Account not found" }, { status: 404 });
 	}
-	const rows = await db.select({
-		id: mailboxes.id,
-		localPart: mailboxes.localPart,
-		displayName: mailboxes.displayName,
-		domainId: mailboxes.domainId,
-		hostname: domains.hostname,
-	}).from(mailboxes).innerJoin(domains, eq(mailboxes.domainId, domains.id)).where(eq(mailboxes.userId, id));
+	const rows = await db
+		.select({
+			id: mailboxes.id,
+			localPart: mailboxes.localPart,
+			displayName: mailboxes.displayName,
+			domainId: mailboxes.domainId,
+			hostname: domains.hostname,
+		})
+		.from(mailboxes)
+		.innerJoin(domains, eq(mailboxes.domainId, domains.id))
+		.where(eq(mailboxes.userId, id));
 	return NextResponse.json({ mailboxes: rows });
 }

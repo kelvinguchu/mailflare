@@ -8,9 +8,7 @@ interface CloudflareEnv {
 	ASSETS: Fetcher;
 	IMAGES: ImagesBinding;
 	WORKER_SELF_REFERENCE: Fetcher;
-	REALTIME: DurableObjectNamespace<
-		import("./src/lib/realtime/hub").RealtimeHub
-	>;
+	REALTIME: DurableObjectNamespace<import("./src/lib/realtime/hub").RealtimeHub>;
 	DATABASE_BACKUP_WORKFLOW?: Workflow<import("./src/lib/backups/types").BackupWorkflowParams>;
 	LOGIN_RATE_LIMIT?: RateLimit;
 	PASSWORD_RESET_RATE_LIMIT?: RateLimit;

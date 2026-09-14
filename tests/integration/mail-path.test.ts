@@ -11,6 +11,9 @@ import { stageInboundMessageAttachments } from "@/lib/email/inbound-attachments"
 import { resolveInboundAddress } from "@/lib/email/routing";
 import { getAuthorizedSenderAddress } from "@/lib/email/sender";
 import { OutboundRetryError, processOutboundQueue, queueEmail } from "@/lib/email/send";
+import { claimOutboundDelivery } from "@/lib/email/outbound-claim";
+import { cancelScheduledOutboundJob } from "@/lib/email/undo-send";
+import { resolveThreadAssignment } from "@/lib/email/threading";
 import {
 	deleteExpiredWebhookDeliveries,
 	dispatchWebhooks,
@@ -19,7 +22,11 @@ import {
 	redeliverWebhookForUser,
 	WebhookRetryError,
 } from "@/lib/email/webhooks";
-import { getMailboxAccessLevel } from "@/lib/mailboxes/access";
+import { getMailboxAccessLevel, listAccessibleMailboxes } from "@/lib/mailboxes/access";
+import { listMessageThreads } from "@/app/api/messages/route";
+import { applyMessageBulkAction } from "@/app/api/messages/bulk/route";
+import { and, eq } from "drizzle-orm";
+import { messages } from "@/db/schema";
 import {
 	createMailEnv,
 	fixtureIds,
@@ -38,20 +45,327 @@ beforeEach(async () => {
 });
 
 describe("mail path with isolated Workers bindings", () => {
+	it("assigns threads by reply headers before the guarded subject fallback", async () => {
+		await seedMailboxWorld();
+		const db = createDb(integrationEnv.DB);
+		await integrationEnv.DB.batch([
+			integrationEnv.DB.prepare(
+				`INSERT INTO messages
+				(id, user_id, mailbox_id, direction, provider_message_id, from_addr, to_addr,
+				 subject, status, thread_id, created_at)
+				VALUES (?, ?, ?, 'inbound', ?, ?, ?, ?, 'received', ?, ?)`,
+			).bind(
+				"msg_parent",
+				fixtureIds.owner,
+				fixtureIds.sharedMailbox,
+				"<parent@example.net>",
+				"maya@example.net",
+				"support@primary.test",
+				"Quarterly status",
+				"thr_parent",
+				1_787_900_000,
+			),
+			integrationEnv.DB.prepare(
+				`INSERT INTO messages
+				(id, user_id, mailbox_id, direction, provider_message_id, from_addr, to_addr,
+				 subject, status, thread_id, created_at)
+				VALUES (?, ?, ?, 'inbound', ?, ?, ?, ?, 'received', ?, ?)`,
+			).bind(
+				"msg_reference",
+				fixtureIds.owner,
+				fixtureIds.sharedMailbox,
+				"<reference@example.net>",
+				"maya@example.net",
+				"support@primary.test",
+				"Other",
+				"thr_reference",
+				1_787_900_010,
+			),
+		]);
+		const createdAt = new Date(1_787_900_100 * 1_000);
+		await expect(
+			resolveThreadAssignment(db, {
+				mailboxId: fixtureIds.sharedMailbox,
+				inReplyTo: "parent@example.net",
+				references: ["<reference@example.net>"],
+				subject: "Unrelated",
+				fromAddr: "maya@example.net",
+				createdAt,
+			}),
+		).resolves.toEqual({ threadId: "thr_parent", replyToMessageId: "msg_parent" });
+		await expect(
+			resolveThreadAssignment(db, {
+				mailboxId: fixtureIds.sharedMailbox,
+				references: ["<parent@example.net>", "<reference@example.net>"],
+				subject: "Unrelated",
+				fromAddr: "maya@example.net",
+				createdAt,
+			}),
+		).resolves.toEqual({ threadId: "thr_reference", replyToMessageId: "msg_reference" });
+		await expect(
+			resolveThreadAssignment(db, {
+				mailboxId: fixtureIds.sharedMailbox,
+				subject: "RE: Fwd: quarterly   status",
+				fromAddr: "Maya <maya@example.net>",
+				createdAt,
+			}),
+		).resolves.toEqual({ threadId: "thr_parent", replyToMessageId: "msg_parent" });
+
+		const concurrent = await Promise.all(
+			[1, 2].map(() =>
+				resolveThreadAssignment(db, {
+					mailboxId: fixtureIds.sharedMailbox,
+					inReplyTo: "<parent@example.net>",
+					fromAddr: "maya@example.net",
+					createdAt,
+				}),
+			),
+		);
+		expect(new Set(concurrent.map((item) => item.threadId))).toEqual(new Set(["thr_parent"]));
+
+		const outsideWindow = await resolveThreadAssignment(db, {
+			mailboxId: fixtureIds.sharedMailbox,
+			subject: "Quarterly status",
+			fromAddr: "maya@example.net",
+			createdAt: new Date(createdAt.getTime() + 31 * 24 * 60 * 60 * 1_000),
+		});
+		expect(outsideWindow.threadId).not.toBe("thr_parent");
+		const crossMailbox = await resolveThreadAssignment(db, {
+			mailboxId: fixtureIds.localMailbox,
+			inReplyTo: "<parent@example.net>",
+			fromAddr: "maya@example.net",
+			createdAt,
+		});
+		expect(crossMailbox.threadId).not.toBe("thr_parent");
+	});
+
+	it("queues replies in the parent thread with provider-compatible headers", async () => {
+		await seedMailboxWorld();
+		await integrationEnv.DB.prepare(
+			`INSERT INTO messages
+			(id, user_id, mailbox_id, direction, provider_message_id, "references", from_addr,
+			 to_addr, subject, status, thread_id, created_at)
+			VALUES (?, ?, ?, 'inbound', ?, ?, ?, ?, ?, 'received', ?, ?)`,
+		)
+			.bind(
+				"msg_reply_parent",
+				fixtureIds.owner,
+				fixtureIds.sharedMailbox,
+				"<parent@example.net>",
+				JSON.stringify(["<root@example.net>"]),
+				"maya@example.net",
+				"support@primary.test",
+				"Question",
+				"thr_reply",
+				1_787_900_000,
+			)
+			.run();
+		const env = createMailEnv({
+			OUTBOUND_QUEUE: { send: vi.fn(async () => undefined) } as unknown as Queue,
+		});
+		const queued = await queueEmail(
+			env,
+			{
+				userId: fixtureIds.owner,
+				mailboxId: fixtureIds.sharedMailbox,
+				from: "support@primary.test",
+				to: "maya@example.net",
+				subject: "Re: Question",
+				text: "Answer",
+				replyToMessageId: "msg_reply_parent",
+			},
+			{ idempotencyKey: "threaded-reply" },
+		);
+		const row = await integrationEnv.DB.prepare(
+			`SELECT thread_id, provider_message_id, in_reply_to, "references", reply_to_message_id
+			 FROM messages WHERE id = ?`,
+		)
+			.bind(queued.messageId)
+			.first<{
+				thread_id: string;
+				provider_message_id: string;
+				in_reply_to: string;
+				references: string;
+				reply_to_message_id: string;
+			}>();
+		expect(row).toMatchObject({
+			thread_id: "thr_reply",
+			in_reply_to: "<parent@example.net>",
+			reply_to_message_id: "msg_reply_parent",
+		});
+		expect(row?.provider_message_id).toMatch(/^<msg_.+@primary\.test>$/);
+		expect(JSON.parse(row?.references ?? "[]")).toEqual([
+			"<root@example.net>",
+			"<parent@example.net>",
+		]);
+		const job = await integrationEnv.DB.prepare("SELECT payload FROM outbound_jobs WHERE id = ?")
+			.bind(queued.jobId)
+			.first<{ payload: string }>();
+		expect(JSON.parse(job?.payload ?? "{}").headers).toMatchObject({
+			"In-Reply-To": "<parent@example.net>",
+			References: "<root@example.net> <parent@example.net>",
+		});
+		await expect(
+			queueEmail(
+				env,
+				{
+					userId: fixtureIds.owner,
+					mailboxId: fixtureIds.localMailbox,
+					from: "local@primary.test",
+					to: "maya@example.net",
+					subject: "Re: Question",
+					text: "Wrong mailbox",
+					replyToMessageId: "msg_reply_parent",
+				},
+				{ idempotencyKey: "cross-mailbox-reply" },
+			),
+		).rejects.toThrow("selected mailbox");
+	});
+
+	it("paginates matching threads by their newest visible message", async () => {
+		await seedMailboxWorld();
+		await integrationEnv.DB.batch([
+			integrationEnv.DB.prepare(
+				`INSERT INTO messages
+				(id, user_id, mailbox_id, direction, from_addr, to_addr, subject, status,
+				 thread_id, read, created_at)
+				VALUES (?, ?, ?, 'inbound', ?, ?, ?, 'received', ?, 0, ?)`,
+			).bind(
+				"msg_thread_old",
+				fixtureIds.owner,
+				fixtureIds.sharedMailbox,
+				"maya@example.net",
+				"support@primary.test",
+				"Question",
+				"thr_list_one",
+				1_787_900_000,
+			),
+			integrationEnv.DB.prepare(
+				`INSERT INTO messages
+				(id, user_id, mailbox_id, direction, from_addr, to_addr, subject, status,
+				 thread_id, read, created_at)
+				VALUES (?, ?, ?, 'outbound', ?, ?, ?, 'sent', ?, 1, ?)`,
+			).bind(
+				"msg_thread_reply",
+				fixtureIds.owner,
+				fixtureIds.sharedMailbox,
+				"support@primary.test",
+				"maya@example.net",
+				"Re: Question",
+				"thr_list_one",
+				1_787_900_200,
+			),
+			integrationEnv.DB.prepare(
+				`INSERT INTO messages
+				(id, user_id, mailbox_id, direction, from_addr, to_addr, subject, status,
+				 thread_id, read, created_at)
+				VALUES (?, ?, ?, 'inbound', ?, ?, ?, 'received', ?, 1, ?)`,
+			).bind(
+				"msg_thread_two",
+				fixtureIds.owner,
+				fixtureIds.sharedMailbox,
+				"lin@example.net",
+				"support@primary.test",
+				"Another",
+				"thr_list_two",
+				1_787_900_100,
+			),
+		]);
+		const db = createDb(integrationEnv.DB);
+		const accessibleMailboxes = await listAccessibleMailboxes(db, sessionUser(fixtureIds.owner));
+		const response = await listMessageThreads({
+			env: createMailEnv(),
+			matchingWhere: and(
+				eq(messages.mailboxId, fixtureIds.sharedMailbox),
+				eq(messages.status, "received"),
+			),
+			accessWhere: eq(messages.mailboxId, fixtureIds.sharedMailbox),
+			accessibleMailboxes,
+			includeTrash: false,
+			includeSpam: false,
+			limit: 1,
+			offset: 0,
+		});
+		const data = (await response.json()) as {
+			total: number;
+			messages: Array<{
+				id: string;
+				read: boolean;
+				thread: { id: string; messageCount: number; unreadCount: number };
+			}>;
+		};
+		expect(data.total).toBe(2);
+		expect(data.messages[0]).toMatchObject({
+			id: "msg_thread_reply",
+			read: false,
+			thread: { id: "thr_list_one", messageCount: 2, unreadCount: 1 },
+		});
+	});
+
+	it("applies thread actions without archiving outbound replies", async () => {
+		await seedMailboxWorld();
+		await integrationEnv.DB.batch([
+			integrationEnv.DB.prepare(
+				`INSERT INTO messages
+				(id, user_id, mailbox_id, direction, from_addr, to_addr, status, thread_id, read, created_at)
+				VALUES ('msg_bulk_in_1', ?, ?, 'inbound', 'maya@example.net', 'support@primary.test',
+				'received', 'thr_bulk', 0, 1787900000)`,
+			).bind(fixtureIds.owner, fixtureIds.sharedMailbox),
+			integrationEnv.DB.prepare(
+				`INSERT INTO messages
+				(id, user_id, mailbox_id, direction, from_addr, to_addr, status, thread_id, read, created_at)
+				VALUES ('msg_bulk_out', ?, ?, 'outbound', 'support@primary.test', 'maya@example.net',
+				'sent', 'thr_bulk', 1, 1787900010)`,
+			).bind(fixtureIds.owner, fixtureIds.sharedMailbox),
+			integrationEnv.DB.prepare(
+				`INSERT INTO messages
+				(id, user_id, mailbox_id, direction, from_addr, to_addr, status, thread_id, read, created_at)
+				VALUES ('msg_bulk_in_2', ?, ?, 'inbound', 'maya@example.net', 'support@primary.test',
+				'received', 'thr_bulk', 0, 1787900020)`,
+			).bind(fixtureIds.owner, fixtureIds.sharedMailbox),
+		]);
+		const db = createDb(integrationEnv.DB);
+		let rows = await db
+			.select()
+			.from(messages)
+			.where(eq(messages.threadId, "thr_bulk"))
+			.orderBy(messages.createdAt);
+		await applyMessageBulkAction(db, rows.toReversed(), "unread", true);
+		const unread = await integrationEnv.DB.prepare(
+			"SELECT id FROM messages WHERE thread_id = 'thr_bulk' AND direction = 'inbound' AND read = 0",
+		).all<{ id: string }>();
+		expect(unread.results.map((row) => row.id)).toEqual(["msg_bulk_in_2"]);
+
+		rows = await db.select().from(messages).where(eq(messages.threadId, "thr_bulk"));
+		await applyMessageBulkAction(db, rows, "archive", true);
+		const statuses = await integrationEnv.DB.prepare(
+			"SELECT id, status FROM messages WHERE thread_id = 'thr_bulk' ORDER BY id",
+		).all<{ id: string; status: string }>();
+		expect(statuses.results).toEqual([
+			{ id: "msg_bulk_in_1", status: "archived" },
+			{ id: "msg_bulk_in_2", status: "archived" },
+			{ id: "msg_bulk_out", status: "sent" },
+		]);
+	});
 	it("routes exact and all-domain alias addresses without crossing owners", async () => {
 		await seedMailboxWorld();
 		const db = createDb(integrationEnv.DB);
 
-		await expect(resolveInboundAddress(db, "Support <support@primary.test>"))
-			.resolves.toMatchObject({ action: "store", mailbox: { mailboxId: fixtureIds.sharedMailbox } });
-		await expect(resolveInboundAddress(db, "support@alias.test"))
-			.resolves.toMatchObject({ action: "store", mailbox: { mailboxId: fixtureIds.sharedMailbox } });
+		await expect(
+			resolveInboundAddress(db, "Support <support@primary.test>"),
+		).resolves.toMatchObject({ action: "store", mailbox: { mailboxId: fixtureIds.sharedMailbox } });
+		await expect(resolveInboundAddress(db, "support@alias.test")).resolves.toMatchObject({
+			action: "store",
+			mailbox: { mailboxId: fixtureIds.sharedMailbox },
+		});
 		await expect(resolveInboundAddress(db, "missing@primary.test")).resolves.toBeNull();
 	});
 
 	it("makes an inbound retry converge on one D1 message, attachment row, and R2 object", async () => {
 		await seedMailboxWorld();
-		const raw = new TextEncoder().encode("From: sender@example.net\r\nTo: support@primary.test\r\n\r\nHello").buffer;
+		const raw = new TextEncoder().encode(
+			"From: sender@example.net\r\nTo: support@primary.test\r\n\r\nHello",
+		).buffer;
 		const deliveryKey = await createInboundDeliveryKey(
 			"sender@example.net",
 			"support@primary.test",
@@ -85,24 +399,34 @@ describe("mail path with isolated Workers bindings", () => {
 		};
 
 		await integrationEnv.BUCKET.put(write.rawR2Key, raw);
-		expect(await commitInboundMessage(integrationEnv.DB, write, attachments))
-			.toEqual({ created: true, messageId });
+		expect(await commitInboundMessage(integrationEnv.DB, write, attachments)).toEqual({
+			created: true,
+			messageId,
+		});
 		const retryAttachments = await stageInboundMessageAttachments(
 			integrationEnv,
 			messageId,
 			deliveryKey,
 			[{ filename: "note.txt", type: "text/plain", content }],
 		);
-		expect(await commitInboundMessage(integrationEnv.DB, write, retryAttachments))
-			.toEqual({ created: false, messageId });
+		expect(await commitInboundMessage(integrationEnv.DB, write, retryAttachments)).toEqual({
+			created: false,
+			messageId,
+		});
 
 		const messageCount = await integrationEnv.DB.prepare(
 			"SELECT COUNT(*) AS count FROM messages WHERE inbound_delivery_key = ?",
-		).bind(deliveryKey).first<{ count: number }>();
+		)
+			.bind(deliveryKey)
+			.first<{ count: number }>();
 		const attachmentCount = await integrationEnv.DB.prepare(
 			"SELECT COUNT(*) AS count FROM message_attachments WHERE message_id = ?",
-		).bind(messageId).first<{ count: number }>();
-		const storedObjects = await integrationEnv.BUCKET.list({ prefix: `attachments/inbound/${deliveryKey}/` });
+		)
+			.bind(messageId)
+			.first<{ count: number }>();
+		const storedObjects = await integrationEnv.BUCKET.list({
+			prefix: `attachments/inbound/${deliveryKey}/`,
+		});
 		expect(messageCount?.count).toBe(1);
 		expect(attachmentCount?.count).toBe(1);
 		expect(storedObjects.objects).toHaveLength(1);
@@ -113,50 +437,68 @@ describe("mail path with isolated Workers bindings", () => {
 		const db = createDb(integrationEnv.DB);
 		await integrationEnv.DB.prepare(
 			"INSERT INTO mailbox_access (id, mailbox_id, user_id, permission, created_at) VALUES (?, ?, ?, 'read_only', ?)",
-		).bind("access_delegate", fixtureIds.sharedMailbox, fixtureIds.delegate, 1_700_000_000).run();
+		)
+			.bind("access_delegate", fixtureIds.sharedMailbox, fixtureIds.delegate, 1_700_000_000)
+			.run();
 
-		const readOnly = await getMailboxAccessLevel(db, sessionUser(fixtureIds.delegate), fixtureIds.sharedMailbox);
+		const readOnly = await getMailboxAccessLevel(
+			db,
+			sessionUser(fixtureIds.delegate),
+			fixtureIds.sharedMailbox,
+		);
 		expect(readOnly).toMatchObject({ canRead: true, canSendOnBehalf: false, canManage: false });
-		await expect(getAuthorizedSenderAddress(createMailEnv(), {
-			userId: fixtureIds.delegate,
-			mailboxId: fixtureIds.sharedMailbox,
-			from: "support@primary.test",
-		})).rejects.toThrow("permission");
+		await expect(
+			getAuthorizedSenderAddress(createMailEnv(), {
+				userId: fixtureIds.delegate,
+				mailboxId: fixtureIds.sharedMailbox,
+				from: "support@primary.test",
+			}),
+		).rejects.toThrow("permission");
 
 		await integrationEnv.DB.prepare(
 			"UPDATE mailbox_access SET permission = 'send_on_behalf' WHERE id = ?",
-		).bind("access_delegate").run();
-		await expect(getAuthorizedSenderAddress(createMailEnv(), {
-			userId: fixtureIds.delegate,
-			mailboxId: fixtureIds.sharedMailbox,
-			from: "support@alias.test",
-		})).resolves.toEqual({
-			fromAddr: "\"Delegate on behalf of Support\" <support@alias.test>",
+		)
+			.bind("access_delegate")
+			.run();
+		await expect(
+			getAuthorizedSenderAddress(createMailEnv(), {
+				userId: fixtureIds.delegate,
+				mailboxId: fixtureIds.sharedMailbox,
+				from: "support@alias.test",
+			}),
+		).resolves.toEqual({
+			fromAddr: '"Delegate on behalf of Support" <support@alias.test>',
 			mailboxId: fixtureIds.sharedMailbox,
 			domainId: fixtureIds.aliasDomain,
 		});
 
-		await integrationEnv.DB.prepare(
-			"UPDATE mailbox_access SET permission = 'send_as' WHERE id = ?",
-		).bind("access_delegate").run();
-		await expect(getAuthorizedSenderAddress(createMailEnv(), {
-			userId: fixtureIds.delegate,
-			mailboxId: fixtureIds.sharedMailbox,
-			from: "support@primary.test",
-		})).resolves.toEqual({
-			fromAddr: "\"Support\" <support@primary.test>",
+		await integrationEnv.DB.prepare("UPDATE mailbox_access SET permission = 'send_as' WHERE id = ?")
+			.bind("access_delegate")
+			.run();
+		await expect(
+			getAuthorizedSenderAddress(createMailEnv(), {
+				userId: fixtureIds.delegate,
+				mailboxId: fixtureIds.sharedMailbox,
+				from: "support@primary.test",
+			}),
+		).resolves.toEqual({
+			fromAddr: '"Support" <support@primary.test>',
 			mailboxId: fixtureIds.sharedMailbox,
 			domainId: fixtureIds.primaryDomain,
 		});
-		await expect(getMailboxAccessLevel(db, sessionUser(fixtureIds.stranger), fixtureIds.sharedMailbox))
-			.resolves.toBeNull();
+		await expect(
+			getMailboxAccessLevel(db, sessionUser(fixtureIds.stranger), fixtureIds.sharedMailbox),
+		).resolves.toBeNull();
 	});
 
 	it("retries a transient outbound failure once and never duplicates the durable job or delivery", async () => {
 		await seedMailboxWorld();
 		const queueSend = vi.fn(async () => undefined);
-		const providerSend = vi.fn()
-			.mockRejectedValueOnce(Object.assign(new Error("rate limited"), { code: "E_RATE_LIMIT_EXCEEDED" }))
+		const providerSend = vi
+			.fn()
+			.mockRejectedValueOnce(
+				Object.assign(new Error("rate limited"), { code: "E_RATE_LIMIT_EXCEEDED" }),
+			)
 			.mockResolvedValueOnce({ messageId: "provider-1" });
 		const env = createMailEnv({
 			OUTBOUND_QUEUE: { send: queueSend } as unknown as Queue,
@@ -176,30 +518,136 @@ describe("mail path with isolated Workers bindings", () => {
 		const replay = await queueEmail(env, input, { idempotencyKey: "integration-send-1" });
 		expect(replay).toEqual(first);
 		expect(queueSend).toHaveBeenCalledTimes(2);
-		await expect(processOutboundQueue(env, { jobId: first.jobId }, { attempt: 1 }))
-			.rejects.toBeInstanceOf(OutboundRetryError);
+		await expect(
+			processOutboundQueue(env, { jobId: first.jobId }, { attempt: 1 }),
+		).rejects.toBeInstanceOf(OutboundRetryError);
 		await processOutboundQueue(env, { jobId: first.jobId }, { attempt: 2 });
 		await processOutboundQueue(env, { jobId: first.jobId }, { attempt: 3 });
 
-		const counts = await integrationEnv.DB.prepare(`SELECT
+		const counts = await integrationEnv.DB.prepare(
+			`SELECT
 			(SELECT COUNT(*) FROM messages WHERE id = ?) AS messages,
-			(SELECT COUNT(*) FROM outbound_jobs WHERE id = ?) AS jobs`
-		).bind(first.messageId, first.jobId).first<{ messages: number; jobs: number }>();
+			(SELECT COUNT(*) FROM outbound_jobs WHERE id = ?) AS jobs`,
+		)
+			.bind(first.messageId, first.jobId)
+			.first<{ messages: number; jobs: number }>();
 		const job = await integrationEnv.DB.prepare(
 			"SELECT status, attempt_count, error FROM outbound_jobs WHERE id = ?",
-		).bind(first.jobId).first<{ status: string; attempt_count: number; error: string | null }>();
+		)
+			.bind(first.jobId)
+			.first<{ status: string; attempt_count: number; error: string | null }>();
 		expect(counts).toEqual({ messages: 1, jobs: 1 });
 		expect(job).toEqual({ status: "sent", attempt_count: 2, error: null });
 		expect(providerSend).toHaveBeenCalledTimes(2);
 	});
 
+	it("cancels throughout the advertised Undo Send window without calling the provider", async () => {
+		await seedMailboxWorld();
+		const queueSend = vi.fn(async () => undefined);
+		const providerSend = vi.fn(async () => ({ messageId: "must-not-send" }));
+		const env = createMailEnv({
+			OUTBOUND_QUEUE: { send: queueSend } as unknown as Queue,
+			EMAIL: { send: providerSend } as unknown as SendEmail,
+			OUTBOUND_DELIVERY_MODE: "enabled",
+		});
+		const scheduled = await queueEmail(
+			env,
+			{
+				userId: fixtureIds.owner,
+				mailboxId: fixtureIds.sharedMailbox,
+				from: "support@primary.test",
+				to: "recipient@example.net",
+				subject: "Undo me",
+				text: "Still editable",
+			},
+			{ idempotencyKey: "undo-send-success", undoDelaySeconds: 10 },
+		);
+
+		expect(scheduled).toMatchObject({ status: "scheduled" });
+		expect(scheduled.undoDeadline).toBeTruthy();
+		expect(queueSend).toHaveBeenCalledWith(
+			{ jobId: scheduled.jobId },
+			{ delaySeconds: expect.any(Number) },
+		);
+		await processOutboundQueue(env, { jobId: scheduled.jobId }, { attempt: 1 });
+		expect(providerSend).not.toHaveBeenCalled();
+
+		await expect(
+			cancelScheduledOutboundJob(env, fixtureIds.owner, scheduled.jobId),
+		).resolves.toMatchObject({ outcome: "canceled", messageId: scheduled.messageId });
+		await expect(
+			cancelScheduledOutboundJob(env, fixtureIds.owner, scheduled.jobId),
+		).resolves.toMatchObject({ outcome: "canceled" });
+		await expect(
+			cancelScheduledOutboundJob(env, fixtureIds.stranger, scheduled.jobId),
+		).resolves.toEqual({ outcome: "not_found" });
+		await processOutboundQueue(env, { jobId: scheduled.jobId }, { attempt: 2 });
+		expect(providerSend).not.toHaveBeenCalled();
+
+		const state = await integrationEnv.DB.prepare(
+			`SELECT j.status, j.canceled_at, m.status AS message_status,
+			        m.delivery_status
+			 FROM outbound_jobs j JOIN messages m ON m.id = j.message_id
+			 WHERE j.id = ?`,
+		)
+			.bind(scheduled.jobId)
+			.first<{
+				status: string;
+				canceled_at: number | null;
+				message_status: string;
+				delivery_status: string;
+			}>();
+		expect(state).toMatchObject({
+			status: "canceled",
+			message_status: "canceled",
+			delivery_status: "canceled",
+		});
+		expect(state?.canceled_at).toBeTypeOf("number");
+	});
+
+	it("stops advertising Undo as soon as the atomic provider claim wins", async () => {
+		await seedMailboxWorld();
+		const env = createMailEnv({
+			OUTBOUND_QUEUE: { send: vi.fn(async () => undefined) } as unknown as Queue,
+		});
+		const scheduled = await queueEmail(
+			env,
+			{
+				userId: fixtureIds.owner,
+				mailboxId: fixtureIds.sharedMailbox,
+				from: "support@primary.test",
+				to: "recipient@example.net",
+				subject: "Race",
+				text: "Only one transition wins",
+			},
+			{ idempotencyKey: "undo-send-claim-wins", undoDelaySeconds: 10 },
+		);
+		const claimTime = new Date();
+		await integrationEnv.DB.prepare("UPDATE outbound_jobs SET send_not_before = ? WHERE id = ?")
+			.bind(Math.floor(claimTime.getTime() / 1_000), scheduled.jobId)
+			.run();
+
+		await expect(
+			claimOutboundDelivery(integrationEnv.DB, scheduled.jobId, claimTime),
+		).resolves.toBe(true);
+		await expect(
+			cancelScheduledOutboundJob(env, fixtureIds.owner, scheduled.jobId, claimTime),
+		).resolves.toMatchObject({ outcome: "unavailable", status: "sending" });
+	});
+
 	it("atomically enforces configured send limits and audits the rejection", async () => {
 		await seedMailboxWorld();
 		await integrationEnv.DB.prepare("UPDATE users SET send_rate_limit_per_minute = 1 WHERE id = ?")
-			.bind(fixtureIds.owner).run();
-		await integrationEnv.DB.prepare("UPDATE domains SET send_rate_limit_per_minute = 1 WHERE id = ?")
-			.bind(fixtureIds.primaryDomain).run();
-		const env = createMailEnv({ OUTBOUND_QUEUE: { send: vi.fn(async () => undefined) } as unknown as Queue });
+			.bind(fixtureIds.owner)
+			.run();
+		await integrationEnv.DB.prepare(
+			"UPDATE domains SET send_rate_limit_per_minute = 1 WHERE id = ?",
+		)
+			.bind(fixtureIds.primaryDomain)
+			.run();
+		const env = createMailEnv({
+			OUTBOUND_QUEUE: { send: vi.fn(async () => undefined) } as unknown as Queue,
+		});
 		const input = {
 			userId: fixtureIds.owner,
 			mailboxId: fixtureIds.sharedMailbox,
@@ -209,8 +657,9 @@ describe("mail path with isolated Workers bindings", () => {
 			text: "First",
 		};
 		await queueEmail(env, input, { idempotencyKey: "limit-first" });
-		await expect(queueEmail(env, { ...input, to: "second@example.net" }, { idempotencyKey: "limit-second" }))
-			.rejects.toThrow("send rate limit");
+		await expect(
+			queueEmail(env, { ...input, to: "second@example.net" }, { idempotencyKey: "limit-second" }),
+		).rejects.toThrow("send rate limit");
 		const rejected = await integrationEnv.DB.prepare(
 			"SELECT COUNT(*) AS count FROM audit_logs WHERE action = 'email.send_rejected'",
 		).first<{ count: number }>();
@@ -225,16 +674,28 @@ describe("mail path with isolated Workers bindings", () => {
 			EMAIL: { send: providerSend } as unknown as SendEmail,
 			OUTBOUND_DELIVERY_MODE: "enabled",
 		});
-		const queued = await queueEmail(env, {
-			userId: fixtureIds.owner, mailboxId: fixtureIds.sharedMailbox,
-			from: "support@primary.test", to: "recipient@example.net", subject: "Queued", text: "Body",
-		}, { idempotencyKey: "disable-before-delivery" });
+		const queued = await queueEmail(
+			env,
+			{
+				userId: fixtureIds.owner,
+				mailboxId: fixtureIds.sharedMailbox,
+				from: "support@primary.test",
+				to: "recipient@example.net",
+				subject: "Queued",
+				text: "Body",
+			},
+			{ idempotencyKey: "disable-before-delivery" },
+		);
 		await integrationEnv.DB.prepare("UPDATE mailboxes SET disabled = 1 WHERE id = ?")
-			.bind(fixtureIds.sharedMailbox).run();
+			.bind(fixtureIds.sharedMailbox)
+			.run();
 		await processOutboundQueue(env, { jobId: queued.jobId }, { attempt: 1 });
 		expect(providerSend).not.toHaveBeenCalled();
-		const message = await integrationEnv.DB.prepare("SELECT status, delivery_status FROM messages WHERE id = ?")
-			.bind(queued.messageId).first<{ status: string; delivery_status: string }>();
+		const message = await integrationEnv.DB.prepare(
+			"SELECT status, delivery_status FROM messages WHERE id = ?",
+		)
+			.bind(queued.messageId)
+			.first<{ status: string; delivery_status: string }>();
 		expect(message).toEqual({ status: "failed", delivery_status: "failed" });
 	});
 
@@ -249,15 +710,21 @@ describe("mail path with isolated Workers bindings", () => {
 			OUTBOUND_DELIVERY_MODE: "enabled",
 		});
 		const input = {
-			userId: fixtureIds.owner, mailboxId: fixtureIds.sharedMailbox,
-			from: "support@primary.test", to: "hard-bounce@example.net", subject: "Test", text: "Body",
+			userId: fixtureIds.owner,
+			mailboxId: fixtureIds.sharedMailbox,
+			from: "support@primary.test",
+			to: "hard-bounce@example.net",
+			subject: "Test",
+			text: "Body",
 		};
 		const queued = await queueEmail(env, input, { idempotencyKey: "hard-bounce-first" });
 		await processOutboundQueue(env, { jobId: queued.jobId }, { attempt: 1 });
-		await expect(queueEmail(env, input, { idempotencyKey: "hard-bounce-second" }))
-			.rejects.toThrow("Recipient is suppressed");
+		await expect(queueEmail(env, input, { idempotencyKey: "hard-bounce-second" })).rejects.toThrow(
+			"Recipient is suppressed",
+		);
 		const contact = await integrationEnv.DB.prepare("SELECT blocked FROM contacts WHERE email = ?")
-			.bind("hard-bounce@example.net").first<{ blocked: number }>();
+			.bind("hard-bounce@example.net")
+			.first<{ blocked: number }>();
 		expect(contact?.blocked).toBe(1);
 	});
 
@@ -265,37 +732,60 @@ describe("mail path with isolated Workers bindings", () => {
 		await seedMailboxWorld();
 		await integrationEnv.DB.prepare(
 			"INSERT INTO mailbox_access (id, mailbox_id, user_id, permission, created_at) VALUES (?, ?, ?, 'read_only', ?)",
-		).bind("access_reader", fixtureIds.sharedMailbox, fixtureIds.delegate, 1_700_000_000).run();
-		await integrationEnv.DB.prepare(`INSERT INTO messages
-			(id, user_id, mailbox_id, direction, from_addr, to_addr, status, created_at)
-			VALUES (?, ?, ?, 'inbound', ?, ?, 'received', ?)`)
-			.bind("msg_attachment", fixtureIds.owner, fixtureIds.sharedMailbox, "sender@example.net", "support@primary.test", 1_700_000_000)
+		)
+			.bind("access_reader", fixtureIds.sharedMailbox, fixtureIds.delegate, 1_700_000_000)
 			.run();
-		const [stored] = await storeMessageAttachments(createMailEnv(), "msg_attachment", [{
-			filename: "report.txt",
-			type: "text/plain",
-			content: new TextEncoder().encode("private").buffer,
-		}]);
+		await integrationEnv.DB.prepare(
+			`INSERT INTO messages
+			(id, user_id, mailbox_id, direction, from_addr, to_addr, status, created_at)
+			VALUES (?, ?, ?, 'inbound', ?, ?, 'received', ?)`,
+		)
+			.bind(
+				"msg_attachment",
+				fixtureIds.owner,
+				fixtureIds.sharedMailbox,
+				"sender@example.net",
+				"support@primary.test",
+				1_700_000_000,
+			)
+			.run();
+		const [stored] = await storeMessageAttachments(createMailEnv(), "msg_attachment", [
+			{
+				filename: "report.txt",
+				type: "text/plain",
+				content: new TextEncoder().encode("private").buffer,
+			},
+		]);
 		expect(stored).toBeDefined();
-		await expect(getAttachmentForUser(
-			createMailEnv(),
-			sessionUser(fixtureIds.delegate),
-			"msg_attachment",
-			stored!.id,
-		)).resolves.toBeTruthy();
-		await expect(getAttachmentForUser(
-			createMailEnv(),
-			sessionUser(fixtureIds.stranger),
-			"msg_attachment",
-			stored!.id,
-		)).resolves.toBeNull();
+		await expect(
+			getAttachmentForUser(
+				createMailEnv(),
+				sessionUser(fixtureIds.delegate),
+				"msg_attachment",
+				stored!.id,
+			),
+		).resolves.toBeTruthy();
+		await expect(
+			getAttachmentForUser(
+				createMailEnv(),
+				sessionUser(fixtureIds.stranger),
+				"msg_attachment",
+				stored!.id,
+			),
+		).resolves.toBeNull();
 
-		await expect(storeMessageAttachments(createMailEnv(), "missing_message", [{
-			filename: "orphan.txt",
-			type: "text/plain",
-			content: new TextEncoder().encode("must be cleaned").buffer,
-		}])).rejects.toThrow();
-		const orphanObjects = await integrationEnv.BUCKET.list({ prefix: "attachments/missing_message/" });
+		await expect(
+			storeMessageAttachments(createMailEnv(), "missing_message", [
+				{
+					filename: "orphan.txt",
+					type: "text/plain",
+					content: new TextEncoder().encode("must be cleaned").buffer,
+				},
+			]),
+		).rejects.toThrow();
+		const orphanObjects = await integrationEnv.BUCKET.list({
+			prefix: "attachments/missing_message/",
+		});
 		expect(orphanObjects.objects).toHaveLength(0);
 	});
 
@@ -315,22 +805,43 @@ describe("mail path with isolated Workers bindings", () => {
 		await sendMailboxAutoReply(env, { ...base, headers: { "Auto-Submitted": "auto-generated" } });
 		await sendMailboxAutoReply(env, { ...base, fromAddress: "local@primary.test", headers: {} });
 		expect(queueSend).not.toHaveBeenCalled();
+		await integrationEnv.DB.prepare(
+			`INSERT INTO messages
+			(id, user_id, mailbox_id, direction, provider_message_id, from_addr, to_addr,
+			 subject, status, thread_id, created_at)
+			VALUES (?, ?, ?, 'inbound', ?, ?, ?, ?, 'received', ?, ?)`,
+		)
+			.bind(
+				base.sourceMessageId,
+				fixtureIds.owner,
+				fixtureIds.sharedMailbox,
+				base.incomingMessageId,
+				base.fromAddress,
+				base.deliveredAddress,
+				"Incoming",
+				"thr_auto_reply",
+				1_787_900_000,
+			)
+			.run();
 
 		await sendMailboxAutoReply(env, { ...base, headers: {} });
 		await sendMailboxAutoReply(env, { ...base, sourceMessageId: "msg_source_2", headers: {} });
 		expect(queueSend).toHaveBeenCalledTimes(1);
-		const counts = await integrationEnv.DB.prepare(`SELECT
+		const counts = await integrationEnv.DB.prepare(
+			`SELECT
 			(SELECT COUNT(*) FROM auto_reply_deliveries) AS deliveries,
-			(SELECT COUNT(*) FROM outbound_jobs) AS jobs`
+			(SELECT COUNT(*) FROM outbound_jobs) AS jobs`,
 		).first<{ deliveries: number; jobs: number }>();
 		expect(counts).toEqual({ deliveries: 1, jobs: 1 });
 	});
 
 	it("queues signed webhooks, retries transient failures, deduplicates replay, and supports redelivery", async () => {
 		await seedMailboxWorld();
-		await integrationEnv.DB.prepare(`INSERT INTO webhooks
+		await integrationEnv.DB.prepare(
+			`INSERT INTO webhooks
 			(id, user_id, url, secret, events, enabled, created_at)
-			VALUES (?, ?, ?, ?, ?, 1, ?)`)
+			VALUES (?, ?, ?, ?, ?, 1, ?)`,
+		)
 			.bind(
 				"hook_1",
 				fixtureIds.owner,
@@ -338,7 +849,8 @@ describe("mail path with isolated Workers bindings", () => {
 				"integration-secret",
 				JSON.stringify(["message.inbound"]),
 				1_700_000_000,
-			).run();
+			)
+			.run();
 		const queued: Array<{ deliveryId: string }> = [];
 		const queueSend = vi.fn(async (message: { deliveryId: string }) => {
 			queued.push(message);
@@ -354,9 +866,11 @@ describe("mail path with isolated Workers bindings", () => {
 		});
 		vi.stubGlobal("fetch", fetchSpy);
 
-		await expect(dispatchWebhooks(env, fixtureIds.owner, "message.inbound", {
-			messageId: "msg_webhook",
-		})).resolves.toBeUndefined();
+		await expect(
+			dispatchWebhooks(env, fixtureIds.owner, "message.inbound", {
+				messageId: "msg_webhook",
+			}),
+		).resolves.toBeUndefined();
 		expect(fetchSpy).not.toHaveBeenCalled();
 		expect(queued).toHaveLength(1);
 		const deliveryId = queued[0]!.deliveryId;
@@ -367,13 +881,15 @@ describe("mail path with isolated Workers bindings", () => {
 		} satisfies Partial<WebhookRetryError>);
 		let delivery = await integrationEnv.DB.prepare(
 			"SELECT status, attempts, next_attempt_at, last_status_code, last_error FROM webhook_deliveries WHERE id = ?",
-		).bind(deliveryId).first<{
-			status: string;
-			attempts: number;
-			next_attempt_at: number | null;
-			last_status_code: number | null;
-			last_error: string | null;
-		}>();
+		)
+			.bind(deliveryId)
+			.first<{
+				status: string;
+				attempts: number;
+				next_attempt_at: number | null;
+				last_status_code: number | null;
+				last_error: string | null;
+			}>();
 		expect(delivery).toMatchObject({
 			status: "failed",
 			attempts: 1,
@@ -387,7 +903,9 @@ describe("mail path with isolated Workers bindings", () => {
 		expect(fetchSpy).toHaveBeenCalledTimes(2);
 		delivery = await integrationEnv.DB.prepare(
 			"SELECT status, attempts, next_attempt_at, last_status_code, last_error FROM webhook_deliveries WHERE id = ?",
-		).bind(deliveryId).first();
+		)
+			.bind(deliveryId)
+			.first();
 		expect(delivery).toEqual({
 			status: "delivered",
 			attempts: 2,
@@ -422,23 +940,17 @@ describe("mail path with isolated Workers bindings", () => {
 		const history = await listWebhookDeliveriesForUser(env, fixtureIds.owner, "hook_1");
 		expect(history).toHaveLength(1);
 		expect(history[0]).toMatchObject({ id: deliveryId, status: "delivered", attempts: 2 });
-		await expect(redeliverWebhookForUser(
-			env,
-			fixtureIds.stranger,
-			"hook_1",
-			deliveryId,
-		)).resolves.toBe(false);
-		await expect(redeliverWebhookForUser(
-			env,
-			fixtureIds.owner,
-			"hook_1",
-			deliveryId,
-		)).resolves.toBe(true);
+		await expect(
+			redeliverWebhookForUser(env, fixtureIds.stranger, "hook_1", deliveryId),
+		).resolves.toBe(false);
+		await expect(
+			redeliverWebhookForUser(env, fixtureIds.owner, "hook_1", deliveryId),
+		).resolves.toBe(true);
 		expect(queueSend).toHaveBeenCalledTimes(2);
 
-		await integrationEnv.DB.prepare(
-			"UPDATE webhook_deliveries SET created_at = ? WHERE id = ?",
-		).bind(1_600_000_000, deliveryId).run();
+		await integrationEnv.DB.prepare("UPDATE webhook_deliveries SET created_at = ? WHERE id = ?")
+			.bind(1_600_000_000, deliveryId)
+			.run();
 		await deleteExpiredWebhookDeliveries(env, new Date("2026-09-09T00:00:00Z"));
 		const retained = await integrationEnv.DB.prepare(
 			"SELECT COUNT(*) AS count FROM webhook_deliveries",

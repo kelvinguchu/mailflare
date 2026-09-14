@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { useIsFetching } from "@tanstack/react-query";
 import { useBranding } from "@/components/branding-provider";
 import { PageLoadingContext } from "@/components/page-loading";
@@ -33,7 +34,8 @@ export function LoadingTransition({ children, ready }: LoadingTransitionProps) {
 		setPendingLoads(loadingIds.current.size);
 	}, []);
 	const loadingContext = useMemo(() => ({ reportLoading }), [reportLoading]);
-	const canComplete = ready && pageMounted && (dataWaitExpired || (pendingLoads === 0 && fetchingQueries === 0));
+	const canComplete =
+		ready && pageMounted && (dataWaitExpired || (pendingLoads === 0 && fetchingQueries === 0));
 
 	useEffect(() => {
 		setIconUrl(branding.iconUrl);
@@ -91,16 +93,19 @@ export function LoadingTransition({ children, ready }: LoadingTransitionProps) {
 					}`}
 				>
 					<div className="flex w-64 flex-col items-center gap-6">
-						<img
+						<Image
 							src={iconUrl}
 							onError={() => setIconUrl("/cc-mail-logo.png")}
 							alt={`${branding.appName} icon`}
+							width={144}
+							height={80}
+							unoptimized
 							className="h-20 w-36 object-contain"
 						/>
 						<div className="w-full">
-							<div className="h-1.5 overflow-hidden rounded-full bg-blue-100">
+							<div className="h-1.5 overflow-hidden rounded-full bg-primary/12">
 								<div
-									className="h-full rounded-full bg-blue-600 transition-[width] duration-200 ease-out"
+									className="h-full rounded-full bg-primary transition-[width] duration-200 ease-out"
 									style={{ width: `${progress}%` }}
 								/>
 							</div>

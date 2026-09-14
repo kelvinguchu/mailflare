@@ -13,11 +13,10 @@ import {
 	LEGACY_V2_V3_BACKUP_TABLES,
 	LEGACY_V4_BACKUP_TABLES,
 	LEGACY_V5_BACKUP_TABLES,
+	LEGACY_V6_BACKUP_TABLES,
+	LEGACY_V7_BACKUP_TABLES,
 } from "./format";
-import {
-	normalizeDatabaseBackupR2,
-	validateDatabaseBackupObjectCoverage,
-} from "./objects";
+import { normalizeDatabaseBackupR2, validateDatabaseBackupObjectCoverage } from "./objects";
 import { mergeLegacyMessageBodies } from "./utils";
 
 export function getD1ExportConfigurationStatus(_env?: CloudflareEnv) {
@@ -46,27 +45,46 @@ export function serializeDatabaseBackup(document: DatabaseBackupDocument): Uint8
 
 export function parseDatabaseBackup(content: ArrayBuffer): NormalizedDatabaseBackupDocument {
 	let value: unknown;
-	try { value = JSON.parse(new TextDecoder().decode(content)); } catch { throw new Error("The selected file is not a valid CC Mail backup"); }
+	try {
+		value = JSON.parse(new TextDecoder().decode(content));
+	} catch {
+		throw new Error("The selected file is not a valid CC Mail backup");
+	}
 	return normalizeDatabaseBackupDocument(value);
 }
 
 export function normalizeDatabaseBackupDocument(value: unknown): NormalizedDatabaseBackupDocument {
 	if (!isRecord(value)) throw invalidBackupError();
 	if (value.format !== DATABASE_BACKUP_FORMAT) throw invalidBackupError();
-	if (value.version !== 1 && value.version !== 2 && value.version !== 3 && value.version !== 4 && value.version !== 5 && value.version !== DATABASE_BACKUP_VERSION) throw invalidBackupError();
+	if (
+		value.version !== 1 &&
+		value.version !== 2 &&
+		value.version !== 3 &&
+		value.version !== 4 &&
+		value.version !== 5 &&
+		value.version !== 6 &&
+		value.version !== 7 &&
+		value.version !== DATABASE_BACKUP_VERSION
+	)
+		throw invalidBackupError();
 	if (typeof value.createdAt !== "string" || !isRecord(value.tables)) throw invalidBackupError();
 	const sourceVersion = value.version;
 
 	const sourceTables = value.tables;
-	const requiredTables = value.version === 1
-		? LEGACY_V1_BACKUP_TABLES
-		: value.version === 2 || value.version === 3
-			? LEGACY_V2_V3_BACKUP_TABLES
-			: value.version === 4
-				? LEGACY_V4_BACKUP_TABLES
-				: value.version === 5
-					? LEGACY_V5_BACKUP_TABLES
-					: BACKUP_TABLES;
+	const requiredTables =
+		value.version === 1
+			? LEGACY_V1_BACKUP_TABLES
+			: value.version === 2 || value.version === 3
+				? LEGACY_V2_V3_BACKUP_TABLES
+				: value.version === 4
+					? LEGACY_V4_BACKUP_TABLES
+					: value.version === 5
+						? LEGACY_V5_BACKUP_TABLES
+						: value.version === 6
+							? LEGACY_V6_BACKUP_TABLES
+							: value.version === 7
+								? LEGACY_V7_BACKUP_TABLES
+								: BACKUP_TABLES;
 	const requiredTableSet = new Set<string>(requiredTables);
 	for (const table of requiredTables) validateTableRows(table, sourceTables[table]);
 
@@ -75,7 +93,8 @@ export function normalizeDatabaseBackupDocument(value: unknown): NormalizedDatab
 		const rows = sourceTables[table];
 		if (
 			rows === undefined &&
-			(value.version < DATABASE_BACKUP_VERSION && !requiredTableSet.has(table))
+			value.version < DATABASE_BACKUP_VERSION &&
+			!requiredTableSet.has(table)
 		) {
 			tables[table] = [];
 			continue;
@@ -90,9 +109,10 @@ export function normalizeDatabaseBackupDocument(value: unknown): NormalizedDatab
 		createdAt: value.createdAt,
 		tables,
 		sourceVersion,
-		r2: sourceVersion >= 3
-			? normalizeDatabaseBackupR2(value.r2)
-			: { strategy: "live-references", objects: [] },
+		r2:
+			sourceVersion >= 3
+				? normalizeDatabaseBackupR2(value.r2)
+				: { strategy: "live-references", objects: [] },
 	};
 	const legacyBodies = sourceTables.message_bodies;
 	if (legacyBodies !== undefined) {
@@ -109,7 +129,11 @@ function validateTableRows(table: string, value: unknown): asserts value is Data
 	for (const row of value) {
 		if (!isRecord(row)) throw new Error(`Backup contains an invalid ${table} record`);
 		for (const columnValue of Object.values(row)) {
-			if (columnValue !== null && typeof columnValue !== "string" && typeof columnValue !== "number") {
+			if (
+				columnValue !== null &&
+				typeof columnValue !== "string" &&
+				typeof columnValue !== "number"
+			) {
 				throw new Error(`Backup contains an invalid ${table} record`);
 			}
 		}

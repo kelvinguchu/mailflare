@@ -17,6 +17,9 @@ export async function getDraftSender(
 	}
 }
 
-export function userOwnsDraft(draft: { userId: string; status: string } | undefined, userId: string): boolean {
+export function userOwnsDraft(
+	draft: { userId: string; status: string } | undefined,
+	userId: string,
+): boolean {
 	return !!draft && draft.userId === userId && draft.status === "draft";
 }

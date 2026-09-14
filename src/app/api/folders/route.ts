@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getDb } from "@/db";
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
 	const user = await requireUser(env, request);
 	const parsed = folderSchema.safeParse(await request.json());
 	if (!parsed.success) {
-		return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+		return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
 	}
 
 	const db = getDb(env);
@@ -60,5 +61,10 @@ export async function POST(request: Request) {
 		color: parsed.data.color,
 	});
 
-	return NextResponse.json({ id, mailboxId: parsed.data.mailboxId, name, color: parsed.data.color });
+	return NextResponse.json({
+		id,
+		mailboxId: parsed.data.mailboxId,
+		name,
+		color: parsed.data.color,
+	});
 }

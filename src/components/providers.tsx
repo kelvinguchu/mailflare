@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { clearMailboxClientState } from "@/components/mailbox-provider-utils";
 import { BrandingProvider } from "@/components/branding-provider";
+import { Toaster } from "@/components/ui/toast";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { NewMessagePopup } from "@/components/new-message-popup";
 import { useMessagePolling } from "@/hooks/use-message-polling";
 import { clearMessageClientState } from "@/hooks/utils";
@@ -42,13 +44,21 @@ export function Providers({ children }: { children: React.ReactNode }) {
 	return (
 		<QueryClientProvider client={client}>
 			<BrandingProvider>
-				{children}
-				{realtime.notification && (
-					<NewMessagePopup
-						notification={realtime.notification}
-						onDismiss={realtime.dismissNotification}
-					/>
-				)}
+				<TooltipProvider>
+					{children}
+					<p className="sr-only" aria-live="polite" aria-atomic="true">
+						{realtime.announcement && (
+							<span key={realtime.announcement.id}>{realtime.announcement.text}</span>
+						)}
+					</p>
+					<Toaster />
+					{realtime.notification && (
+						<NewMessagePopup
+							notification={realtime.notification}
+							onDismiss={realtime.dismissNotification}
+						/>
+					)}
+				</TooltipProvider>
 			</BrandingProvider>
 		</QueryClientProvider>
 	);

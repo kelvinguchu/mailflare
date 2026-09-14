@@ -10,6 +10,7 @@ import { selectDraftWithBody } from "./utils";
 import { readJsonBody } from "@/lib/http/request";
 import { RequestBodyTooLargeError } from "@/lib/http/errors";
 import { getDraftSender, userOwnsDraft } from "../utils";
+import { buildOutboundThreading } from "@/lib/email/threading";
 
 export async function GET(request: Request, { params }: DraftRouteParams) {
 	const { id } = await params;
@@ -49,11 +50,40 @@ export async function PATCH(request: Request, { params }: DraftRouteParams) {
 
 	const text = input.text ?? "";
 	const html = input.html ?? "";
+	let threading: Awaited<ReturnType<typeof buildOutboundThreading>>;
+	try {
+		threading =
+			input.replyToMessageId || !draft.threadId || !draft.providerMessageId
+				? await buildOutboundThreading(db, {
+						messageId: id,
+						mailboxId: sender.mailboxId,
+						fromAddr: sender.fromAddr,
+						replyToMessageId: input.replyToMessageId,
+					})
+				: {
+						providerMessageId: draft.providerMessageId,
+						inReplyTo: null,
+						references: "[]",
+						replyToMessageId: null,
+						threadId: draft.threadId,
+						headers: {},
+					};
+	} catch (error) {
+		return NextResponse.json(
+			{ error: error instanceof Error ? error.message : "Invalid reply message" },
+			{ status: 400 },
+		);
+	}
 	await db
 		.update(messages)
 		.set({
 			mailboxId: sender.mailboxId,
 			fromAddr: sender.fromAddr,
+			providerMessageId: threading.providerMessageId,
+			inReplyTo: threading.inReplyTo,
+			references: threading.references,
+			replyToMessageId: threading.replyToMessageId,
+			threadId: threading.threadId,
 			toAddr: input.to ?? "",
 			subject: input.subject ?? null,
 			snippet: buildSnippet(text || null, html || null),

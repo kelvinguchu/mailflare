@@ -36,7 +36,9 @@ describe("administrator MFA challenge flow", () => {
 		const recovery = await generateRecoveryCodes();
 		expect(recovery.codes).toHaveLength(10);
 		expect(new Set(recovery.codes)).toHaveLength(10);
-		expect(recovery.codes.every((code) => /^[A-Z2-7]{4}(?:-[A-Z2-7]{4}){3}$/.test(code))).toBe(true);
+		expect(recovery.codes.every((code) => /^[A-Z2-7]{4}(?:-[A-Z2-7]{4}){3}$/.test(code))).toBe(
+			true,
+		);
 		expect(recovery.hashes.every((hash) => /^[a-f0-9]{64}$/.test(hash))).toBe(true);
 	});
 
@@ -44,17 +46,19 @@ describe("administrator MFA challenge flow", () => {
 		const env = mfaEnv();
 		const recovery = await generateRecoveryCodes();
 		const encryptedSecret = await encryptTotpSecret(env, "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ");
-		await getDb(env).insert(users).values({
-			id: "usr_mfa_admin",
-			email: "mfa-admin@example.test",
-			passwordHash: "hash",
-			name: "MFA Admin",
-			role: "admin",
-			activationStatus: "active",
-			mfaSecretEncrypted: encryptedSecret,
-			mfaEnabledAt: new Date(),
-			mfaRecoveryCodeHashes: JSON.stringify(recovery.hashes),
-		});
+		await getDb(env)
+			.insert(users)
+			.values({
+				id: "usr_mfa_admin",
+				email: "mfa-admin@example.test",
+				passwordHash: "hash",
+				name: "MFA Admin",
+				role: "admin",
+				activationStatus: "active",
+				mfaSecretEncrypted: encryptedSecret,
+				mfaEnabledAt: new Date(),
+				mfaRecoveryCodeHashes: JSON.stringify(recovery.hashes),
+			});
 
 		const challenge = await createMfaChallenge(env, "usr_mfa_admin");
 		expect(await getUserFromSession(env, challenge)).toBeNull();
@@ -63,7 +67,8 @@ describe("administrator MFA challenge flow", () => {
 		expect((await getUserFromSession(env, completed?.token))?.id).toBe("usr_mfa_admin");
 		expect(await completeMfaChallenge(env, challenge, recovery.codes[0]!)).toBeNull();
 
-		const [user] = await getDb(env).select({ hashes: users.mfaRecoveryCodeHashes })
+		const [user] = await getDb(env)
+			.select({ hashes: users.mfaRecoveryCodeHashes })
 			.from(users)
 			.where(eq(users.id, "usr_mfa_admin"));
 		expect(JSON.parse(user!.hashes)).toHaveLength(9);

@@ -42,7 +42,8 @@ export async function POST(request: Request, { params }: MailboxAccessRouteParam
 	const access = await requireAdmin(request);
 	if (access.error) return access.error;
 	const parsed = mailboxAccessSchema.safeParse(await request.json());
-	if (!parsed.success) return NextResponse.json({ error: "Choose a valid account" }, { status: 400 });
+	if (!parsed.success)
+		return NextResponse.json({ error: "Choose a valid account" }, { status: 400 });
 	const { id } = await params;
 	const db = getDb(access.env);
 	const mailbox = await getSharedMailboxForAdmin(db, id, access.user!.id);
@@ -50,7 +51,13 @@ export async function POST(request: Request, { params }: MailboxAccessRouteParam
 	const [user] = await db
 		.select({ id: users.id })
 		.from(users)
-		.where(and(eq(users.id, parsed.data.userId), eq(users.createdByUserId, access.user!.id), eq(users.disabled, false)))
+		.where(
+			and(
+				eq(users.id, parsed.data.userId),
+				eq(users.createdByUserId, access.user!.id),
+				eq(users.disabled, false),
+			),
+		)
 		.limit(1);
 	if (!user) return NextResponse.json({ error: "Account not found" }, { status: 404 });
 

@@ -3,10 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, LoaderCircle, User } from "lucide-react";
 import { authFetch } from "@/lib/auth/client";
-import {
-	dispatchProfileAvatarChanged,
-	getProfileAvatarUrl,
-} from "@/lib/profile/avatar-client";
+import { dispatchProfileAvatarChanged, getProfileAvatarUrl } from "@/lib/profile/avatar-client";
 import { dispatchMailboxAvatarChanged } from "@/lib/mailboxes/avatar-client";
 import { Input } from "@/components/ui/input";
 import type { ProfileAvatarFormProps, ProfileAvatarSessionResponse } from "./types";
@@ -96,7 +93,7 @@ export function ProfileAvatarForm({
 				type="button"
 				onClick={() => inputRef.current?.click()}
 				disabled={busy}
-				className="group relative h-24 w-24 overflow-hidden rounded-full border border-neutral-200 bg-blue-600 text-white shadow-sm outline-none ring-blue-500 transition focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-wait"
+				className="group relative h-24 w-24 overflow-hidden rounded-full border border-neutral-200 bg-primary text-white shadow-sm outline-none ring-ring transition focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-wait"
 				aria-label={hasAvatar ? `Change ${name} profile picture` : `Upload ${name} profile picture`}
 			>
 				{hasAvatar ? (

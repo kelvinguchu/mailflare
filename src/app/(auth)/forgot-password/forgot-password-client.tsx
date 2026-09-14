@@ -15,7 +15,7 @@ export function ForgotPasswordClient() {
 	const [loading, setLoading] = useState(false);
 	const [turnstileReset, setTurnstileReset] = useState(0);
 
-	async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+	async function onSubmit(event: React.SubmitEvent<HTMLFormElement>) {
 		event.preventDefault();
 		setLoading(true);
 		setError(null);
@@ -33,7 +33,9 @@ export function ForgotPasswordClient() {
 			});
 			const data = (await response.json()) as { error?: string; message?: string };
 			if (!response.ok) throw new Error(data.error ?? "Unable to request a reset link");
-			setMessage(data.message ?? "If the account can be recovered, a reset link will arrive shortly.");
+			setMessage(
+				data.message ?? "If the account can be recovered, a reset link will arrive shortly.",
+			);
 		} catch (caught) {
 			setError(caught instanceof Error ? caught.message : "Unable to request a reset link");
 			setTurnstileReset((value) => value + 1);

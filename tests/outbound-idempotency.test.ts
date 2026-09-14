@@ -14,40 +14,56 @@ function request(overrides?: Partial<Parameters<typeof createOutboundRequestHash
 		subject: "Hello",
 		text: "Message body",
 		mailboxId: "mailbox_1",
-		attachments: [{
-			filename: "report.txt",
-			type: "text/plain",
-			content: new TextEncoder().encode("report").buffer,
-			disposition: "attachment" as const,
-		}],
+		attachments: [
+			{
+				filename: "report.txt",
+				type: "text/plain",
+				content: new TextEncoder().encode("report").buffer,
+				disposition: "attachment" as const,
+			},
+		],
 		...overrides,
 	};
 }
 
 describe("outbound request idempotency", () => {
 	it("keeps the same logical request hash stable", async () => {
-		const first = await createOutboundRequestHash(request({
-			headers: { References: "<message@example.com>", "X-Trace": "abc" },
-		}));
-		const replay = await createOutboundRequestHash(request({
-			headers: { "x-trace": "abc", references: "<message@example.com>" },
-		}));
+		const first = await createOutboundRequestHash(
+			request({
+				headers: { References: "<message@example.com>", "X-Trace": "abc" },
+			}),
+		);
+		const replay = await createOutboundRequestHash(
+			request({
+				headers: { "x-trace": "abc", references: "<message@example.com>" },
+			}),
+		);
 		expect(replay).toBe(first);
 	});
 
 	it("detects reuse of a key with changed content or attachments", async () => {
 		const original = await createOutboundRequestHash(request());
 		const changedBody = await createOutboundRequestHash(request({ text: "Different body" }));
-		const changedAttachment = await createOutboundRequestHash(request({
-			attachments: [{
-				filename: "report.txt",
-				type: "text/plain",
-				content: new TextEncoder().encode("changed").buffer,
-				disposition: "attachment",
-			}],
-		}));
+		const changedAttachment = await createOutboundRequestHash(
+			request({
+				attachments: [
+					{
+						filename: "report.txt",
+						type: "text/plain",
+						content: new TextEncoder().encode("changed").buffer,
+						disposition: "attachment",
+					},
+				],
+			}),
+		);
 		expect(changedBody).not.toBe(original);
 		expect(changedAttachment).not.toBe(original);
+	});
+
+	it("treats a different reply parent as a different request", async () => {
+		const first = await createOutboundRequestHash(request({ replyToMessageId: "msg_parent_1" }));
+		const second = await createOutboundRequestHash(request({ replyToMessageId: "msg_parent_2" }));
+		expect(second).not.toBe(first);
 	});
 
 	it("scopes stored request keys to the authenticated account", async () => {

@@ -26,10 +26,7 @@ export async function authenticateApiKey(
 		const [user] = await db.select().from(users).where(eq(users.id, candidate.userId)).limit(1);
 		if (!user || user.disabled) continue;
 
-		await db
-			.update(apiKeys)
-			.set({ lastUsedAt: new Date() })
-			.where(eq(apiKeys.id, candidate.id));
+		await db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, candidate.id));
 
 		return {
 			userId: user.id,

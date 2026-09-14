@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-	getScheduledBackupRecordId,
-	isBackupDue,
-} from "../src/lib/backups/utils";
+import { getScheduledBackupRecordId, isBackupDue } from "../src/lib/backups/utils";
 
 describe("automatic backup schedule", () => {
 	it("runs a daily schedule on every UTC date", () => {

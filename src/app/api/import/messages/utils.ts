@@ -30,7 +30,9 @@ export async function parseImportForm(request: Request): Promise<{
 	const form = await readFormDataBody(request, MAX_IMPORT_REQUEST_SIZE);
 	const mailboxId = String(form.get("mailboxId") ?? "");
 	const destination = parseImportDestination(form.get("destination"));
-	const files = form.getAll("files").filter((value): value is File => value instanceof File && value.size > 0);
+	const files = form
+		.getAll("files")
+		.filter((value): value is File => value instanceof File && value.size > 0);
 	const messages: ImportMessageInput[] = [];
 
 	for (const file of files) {

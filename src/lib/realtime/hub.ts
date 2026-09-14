@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import type { NewMessageNotification } from "./types";
+import { parseRealtimeNotification } from "./validation";
 
 export class RealtimeHub extends DurableObject<CloudflareEnv> {
 	async fetch(request: Request): Promise<Response> {
@@ -19,7 +19,10 @@ export class RealtimeHub extends DurableObject<CloudflareEnv> {
 		}
 
 		if (url.pathname === "/notify" && request.method === "POST") {
-			const payload = (await request.json()) as NewMessageNotification;
+			const payload = parseRealtimeNotification((await request.json()) as object | null);
+			if (!payload) {
+				return new Response("Invalid notification payload", { status: 400 });
+			}
 			const message = JSON.stringify(payload);
 
 			for (const socket of this.ctx.getWebSockets()) {

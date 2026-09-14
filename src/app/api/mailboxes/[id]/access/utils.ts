@@ -8,7 +8,13 @@ export async function getSharedMailboxForAdmin(db: Db, mailboxId: string, adminU
 	const [mailbox] = await db
 		.select({ id: mailboxes.id })
 		.from(mailboxes)
-		.where(and(eq(mailboxes.id, mailboxId), eq(mailboxes.userId, adminUserId), eq(mailboxes.type, "shared")))
+		.where(
+			and(
+				eq(mailboxes.id, mailboxId),
+				eq(mailboxes.userId, adminUserId),
+				eq(mailboxes.type, "shared"),
+			),
+		)
 		.limit(1);
 	return mailbox ?? null;
 }

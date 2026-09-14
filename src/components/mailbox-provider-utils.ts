@@ -27,21 +27,30 @@ export async function fetchMailboxOptions(force = false): Promise<MailboxOption[
 	mailboxesRequest = authFetch("/api/mailboxes")
 		.then((res) => res.json())
 		.then((data) => {
-			const items = ((data as { mailboxes?: MailboxOption[] }).mailboxes ?? []).map((m) => ({
-				id: m.id,
-				localPart: m.localPart,
-				hostname: m.hostname,
-				displayName: m.displayName,
-				signature: m.signature,
-				autoReplyEnabled: m.autoReplyEnabled,
-				autoReplySubject: m.autoReplySubject,
-				autoReplyBody: m.autoReplyBody,
-				hasAvatar: m.hasAvatar,
-				type: m.type,
-				permission: m.permission,
-				isPrimary: m.isPrimary,
-				senderAddresses: m.senderAddresses,
-			}));
+			const items = ((data as { mailboxes?: MailboxOption[] }).mailboxes ?? []).map((m) => {
+				const canonicalAddress = m.senderAddresses?.find((address) => address.includes("@"));
+				const separator = canonicalAddress?.lastIndexOf("@") ?? -1;
+				return {
+					id: m.id,
+					localPart:
+						m.localPart || (separator > 0 ? (canonicalAddress?.slice(0, separator) ?? "") : ""),
+					hostname:
+						m.hostname || (separator > 0 ? (canonicalAddress?.slice(separator + 1) ?? "") : ""),
+					displayName: m.displayName,
+					signature: m.signature,
+					signatureText: m.signatureText,
+					signatureHtml: m.signatureHtml,
+					signatureVersion: m.signatureVersion,
+					autoReplyEnabled: m.autoReplyEnabled,
+					autoReplySubject: m.autoReplySubject,
+					autoReplyBody: m.autoReplyBody,
+					hasAvatar: m.hasAvatar,
+					type: m.type,
+					permission: m.permission,
+					isPrimary: m.isPrimary,
+					senderAddresses: m.senderAddresses,
+				};
+			});
 			if (requestGeneration === cacheGeneration) {
 				mailboxesCache = items;
 			}

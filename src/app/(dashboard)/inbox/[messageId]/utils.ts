@@ -10,11 +10,15 @@ export async function fetchMessageDetail(messageId: string): Promise<MessageDeta
 	return (await fetchCachedMessageDetail(messageId)) as MessageDetailResponse;
 }
 
-export function getCachedMessageDetailForDisplay(messageId: string): MessageDetailResponse | undefined {
+export function getCachedMessageDetailForDisplay(
+	messageId: string,
+): MessageDetailResponse | undefined {
 	return getCachedMessageDetail(messageId) as MessageDetailResponse | undefined;
 }
 
-export async function fetchMessageMetadata(messageId: string): Promise<Pick<MessageDetailResponse, "attachments" | "unsubscribeUrl">> {
+export async function fetchMessageMetadata(
+	messageId: string,
+): Promise<Pick<MessageDetailResponse, "attachments" | "unsubscribeUrl">> {
 	return (await authFetch(`/api/messages/${messageId}/metadata`)).json();
 }
 
@@ -43,7 +47,7 @@ export function getMessageBodyDisplay(
 
 	return {
 		...parts,
-		htmlBody: parts.quotedContent.length > 0 ? null : htmlBody ?? null,
+		htmlBody: parts.quotedContent.length > 0 ? null : (htmlBody ?? null),
 		hasQuotedContent: parts.quotedContent.length > 0,
 	};
 }
@@ -62,10 +66,7 @@ export function resolveInlineAttachmentUrls(
 	return attachments.reduce((html, attachment) => {
 		if (!attachment.contentId) return html;
 		const contentId = attachment.contentId.replace(/^<|>$/g, "");
-		return html.replaceAll(
-			`cid:${contentId}`,
-			getAttachmentUrl(messageId, attachment.id),
-		);
+		return html.replaceAll(`cid:${contentId}`, getAttachmentUrl(messageId, attachment.id));
 	}, htmlBody);
 }
 

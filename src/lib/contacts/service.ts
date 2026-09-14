@@ -47,7 +47,11 @@ export async function upsertContactFromAddress(env: CloudflareEnv, input: Contac
 	return created ?? null;
 }
 
-export async function getContactDisplayNameMap(env: CloudflareEnv, userId: string, addresses: string[]) {
+export async function getContactDisplayNameMap(
+	env: CloudflareEnv,
+	userId: string,
+	addresses: string[],
+) {
 	const emails = Array.from(new Set(addresses.map(normalizeEmailAddress).filter(Boolean)));
 	if (emails.length === 0) return new Map<string, string>();
 
@@ -134,7 +138,11 @@ export async function blockContact(env: CloudflareEnv, input: BlockContactInput)
 	return { email, blocked: true };
 }
 
-function getNextDisplayName(existingName: string | null, source: string, nextName: string | null): string | null {
+function getNextDisplayName(
+	existingName: string | null,
+	source: string,
+	nextName: string | null,
+): string | null {
 	if (source === "manual") return existingName;
 	if (nextName) return nextName;
 	return existingName;

@@ -25,7 +25,8 @@ export async function POST(request: Request) {
 		);
 	}
 	const parsed = reauthenticateSchema.safeParse(body);
-	if (!parsed.success) return NextResponse.json({ error: "Invalid confirmation request" }, { status: 400 });
+	if (!parsed.success)
+		return NextResponse.json({ error: "Invalid confirmation request" }, { status: 400 });
 	if (!(await allowAccountRecoveryAttempt(env, request, user.id, "verify"))) {
 		return NextResponse.json({ error: "Too many confirmation attempts" }, { status: 429 });
 	}
@@ -35,7 +36,8 @@ export async function POST(request: Request) {
 	let method: "password" | "totp" | "recovery" = "password";
 	if (isMfaEnabled(user)) {
 		const verified = await verifyAndConsumeMfaCode(env, user.id, parsed.data.code);
-		if (!verified) return NextResponse.json({ error: "Invalid verification code" }, { status: 401 });
+		if (!verified)
+			return NextResponse.json({ error: "Invalid verification code" }, { status: 401 });
 		method = verified;
 	}
 	const token = (await cookies()).get(SESSION_COOKIE)?.value;

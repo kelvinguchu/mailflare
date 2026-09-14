@@ -1,7 +1,4 @@
-import type {
-	CloudAttachment,
-	CloudAttachmentExtraction,
-} from "./cloud-attachment-types";
+import type { CloudAttachment, CloudAttachmentExtraction } from "./cloud-attachment-types";
 
 const ZERO_WIDTH_RE = /[\u200B-\u200D\u2060\uFEFF]/g;
 const OUTLOOK_CLOUD_ATTACHMENT_RE =

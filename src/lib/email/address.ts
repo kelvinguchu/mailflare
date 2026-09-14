@@ -44,15 +44,23 @@ export function getEmailDisplayName(value: string): string {
 	return parsed?.local || parts.address;
 }
 
-export function formatPostalAddress(address: Address | undefined, fallback: string | null): string | null {
+export function formatPostalAddress(
+	address: Address | undefined,
+	fallback: string | null,
+): string | null {
 	const mailbox = getFirstPostalMailbox(address);
 	if (!mailbox?.address) return fallback;
 
 	return formatEmailAddress(mailbox.address, mailbox.name);
 }
 
-export function formatPostalAddressList(addresses: Address[] | undefined, fallback: string | null): string | null {
-	const mailbox = addresses?.map(getFirstPostalMailbox).find((item): item is Mailbox => !!item?.address);
+export function formatPostalAddressList(
+	addresses: Address[] | undefined,
+	fallback: string | null,
+): string | null {
+	const mailbox = addresses
+		?.map(getFirstPostalMailbox)
+		.find((item): item is Mailbox => !!item?.address);
 	if (!mailbox?.address) return fallback;
 
 	return formatEmailAddress(mailbox.address, mailbox.name);

@@ -3,6 +3,7 @@ import { integrationEnv } from "./bindings";
 export const backupObjectContents = {
 	"avatars/users/user.png": "user-avatar",
 	"avatars/mailboxes/mailbox.png": "mailbox-avatar",
+	"signatures/mailbox_backup/sigimg_backup/logo.png": "signature-logo",
 	"raw/messages/message.eml": "raw-email",
 	"attachments/message/attachment.txt": "attachment",
 	"branding/app/icon.png": "branding-icon",
@@ -13,127 +14,246 @@ const timestamp = 1_700_000_000;
 export async function seedEveryBackupTable(): Promise<void> {
 	const db = integrationEnv.DB;
 	await db.batch([
-		db.prepare(`INSERT INTO users
+		db
+			.prepare(
+				`INSERT INTO users
 			(id, email, reset_email, reset_email_verified_at, password_hash, name, avatar_key, role,
 			 activation_status, activated_at, mfa_secret_encrypted, mfa_enabled_at,
 			 mfa_recovery_code_hashes, mfa_last_used_counter, disabled, can_manage_mailboxes, created_at)
 			VALUES ('user_backup', 'backup@example.test', 'recovery@example.test', ?, 'hash', 'Backup User',
-			 'avatars/users/user.png', 'admin', 'active', ?, ?, ?, ?, 12345, 0, 1, ?)`)
-			.bind(timestamp, timestamp, "encrypted-mfa-fixture", timestamp, JSON.stringify(["b".repeat(64)]), timestamp),
-		db.prepare(`INSERT INTO account_recovery_tokens
+			 'avatars/users/user.png', 'admin', 'active', ?, ?, ?, ?, 12345, 0, 1, ?)`,
+			)
+			.bind(
+				timestamp,
+				timestamp,
+				"encrypted-mfa-fixture",
+				timestamp,
+				JSON.stringify(["b".repeat(64)]),
+				timestamp,
+			),
+		db
+			.prepare(
+				`INSERT INTO account_recovery_tokens
 			(id, user_id, purpose, token_hash, email, expires_at, created_at)
 			VALUES ('recovery_backup', 'user_backup', 'password_reset', 'recovery-token-hash',
-				'recovery@example.test', ?, ?)`)
+				'recovery@example.test', ?, ?)`,
+			)
 			.bind(timestamp + 1800, timestamp),
-		db.prepare(`INSERT INTO domains
+		db
+			.prepare(
+				`INSERT INTO domains
 			(id, user_id, hostname, zone_id, status, sending_enabled, routing_enabled, created_at)
-			VALUES ('domain_backup', 'user_backup', 'example.test', 'zone', 'active', 1, 1, ?)`)
+			VALUES ('domain_backup', 'user_backup', 'example.test', 'zone', 'active', 1, 1, ?)`,
+			)
 			.bind(timestamp),
-		db.prepare(`INSERT INTO mailboxes
+		db
+			.prepare(
+				`INSERT INTO mailboxes
 			(id, user_id, domain_id, local_part, display_name, avatar_key, type, use_all_domains, disabled,
 			 auto_reply_enabled, auto_reply_subject, auto_reply_body, created_at)
 			VALUES ('mailbox_backup', 'user_backup', 'domain_backup', 'backup', 'Backup Mailbox',
-			 'avatars/mailboxes/mailbox.png', 'shared', 1, 0, 1, 'Away', 'Later', ?)`)
+			 'avatars/mailboxes/mailbox.png', 'shared', 1, 0, 1, 'Away', 'Later', ?)`,
+			)
 			.bind(timestamp),
-		db.prepare(`INSERT INTO auto_reply_deliveries
-			(id, mailbox_id, recipient, sent_at) VALUES ('reply_backup', 'mailbox_backup', 'recipient@example.net', ?)`)
+		db
+			.prepare(
+				`INSERT INTO auto_reply_deliveries
+			(id, mailbox_id, recipient, sent_at) VALUES ('reply_backup', 'mailbox_backup', 'recipient@example.net', ?)`,
+			)
 			.bind(timestamp),
-		db.prepare(`INSERT INTO mailbox_access
+		db
+			.prepare(
+				`INSERT INTO signature_assets
+			(id, mailbox_id, uploaded_by_user_id, filename, content_type, size, width, height,
+			 alt_text, content_id, r2_key, created_at)
+			VALUES ('sigimg_backup', 'mailbox_backup', 'user_backup', 'logo.png', 'image/png', 14,
+			 200, 60, 'Company logo', 'sig.sigimg_backup@ccmail.local',
+			 'signatures/mailbox_backup/sigimg_backup/logo.png', ?)`,
+			)
+			.bind(timestamp),
+		db
+			.prepare(
+				`INSERT INTO mailbox_access
 			(id, mailbox_id, user_id, permission, created_by_user_id, created_at)
-			VALUES ('access_backup', 'mailbox_backup', 'user_backup', 'full_access', 'user_backup', ?)`)
+			VALUES ('access_backup', 'mailbox_backup', 'user_backup', 'full_access', 'user_backup', ?)`,
+			)
 			.bind(timestamp),
-		db.prepare(`INSERT INTO contacts
+		db
+			.prepare(
+				`INSERT INTO contacts
 			(id, user_id, email, display_name, source, blocked, last_seen_at, created_at)
-			VALUES ('contact_backup', 'user_backup', 'contact@example.net', 'Contact', 'manual', 0, ?, ?)`)
+			VALUES ('contact_backup', 'user_backup', 'contact@example.net', 'Contact', 'manual', 0, ?, ?)`,
+			)
 			.bind(timestamp, timestamp),
-		db.prepare(`INSERT INTO folders
+		db
+			.prepare(
+				`INSERT INTO folders
 			(id, user_id, mailbox_id, name, color, created_at)
-			VALUES ('folder_backup', 'user_backup', 'mailbox_backup', 'Archive', '#123456', ?)`)
+			VALUES ('folder_backup', 'user_backup', 'mailbox_backup', 'Archive', '#123456', ?)`,
+			)
 			.bind(timestamp),
-		db.prepare(`INSERT INTO api_keys
+		db
+			.prepare(
+				`INSERT INTO api_keys
 			(id, user_id, name, prefix, key_hash, scopes, created_at, last_used_at)
-			VALUES ('key_backup', 'user_backup', 'Automation', 'cc_test', 'key-hash', '["send"]', ?, ?)`)
+			VALUES ('key_backup', 'user_backup', 'Automation', 'cc_test', 'key-hash', '["send"]', ?, ?)`,
+			)
 			.bind(timestamp, timestamp),
-		db.prepare(`INSERT INTO messages
+		db
+			.prepare(
+				`INSERT INTO messages
 			(id, user_id, mailbox_id, direction, provider_message_id, folder_id, from_addr, to_addr,
 			 subject, snippet, text_body, html_body, raw_r2_key, inbound_delivery_key, status, read,
 			 starred, snoozed_until, thread_id, created_at)
 			VALUES ('message_backup', 'user_backup', 'mailbox_backup', 'inbound', 'provider-id', 'folder_backup',
 			 'sender@example.net', 'backup@example.test', 'Subject', 'Snippet', 'Text', '<p>Text</p>',
-			 'raw/messages/message.eml', ?, 'received', 1, 1, ?, 'thread_backup', ?)`)
+			 'raw/messages/message.eml', ?, 'received', 1, 1, ?, 'thread_backup', ?)`,
+			)
 			.bind("a".repeat(64), timestamp + 3600, timestamp),
-		db.prepare(`INSERT INTO message_attachments
+		db
+			.prepare(
+				`INSERT INTO message_attachments
 			(id, message_id, filename, content_type, size, disposition, content_id, r2_key, created_at)
 			VALUES ('attachment_backup', 'message_backup', 'attachment.txt', 'text/plain', 10,
-			 'attachment', NULL, 'attachments/message/attachment.txt', ?)`)
+			 'attachment', NULL, 'attachments/message/attachment.txt', ?)`,
+			)
 			.bind(timestamp),
-		db.prepare(`INSERT INTO outbound_jobs
+		db
+			.prepare(
+				`INSERT INTO outbound_jobs
 			(id, user_id, message_id, status, payload, idempotency_key, request_hash, attempt_count,
 			 error, scheduled_at, created_at, updated_at)
 			VALUES ('job_backup', 'user_backup', 'message_backup', 'failed', '{}', 'idempotency-backup',
-			 'request-hash', 2, 'E_TEST', ?, ?, ?)`)
+			 'request-hash', 2, 'E_TEST', ?, ?, ?)`,
+			)
 			.bind(timestamp, timestamp, timestamp),
-		db.prepare(`INSERT INTO sender_policies
+		db
+			.prepare(
+				`INSERT INTO sender_policies
 			(id, user_id, pattern_type, pattern, action, created_by_user_id, created_at)
-			VALUES ('policy_backup', 'user_backup', 'domain', 'blocked.example', 'block', 'user_backup', ?)`)
+			VALUES ('policy_backup', 'user_backup', 'domain', 'blocked.example', 'block', 'user_backup', ?)`,
+			)
 			.bind(timestamp),
-		db.prepare(`INSERT INTO dead_letter_events
+		db
+			.prepare(
+				`INSERT INTO dead_letter_events
 			(id, source_queue, dead_letter_queue, queue_message_id, reference_id, payload, diagnostic_code,
 			 attempt_count, status, replay_count, message_created_at, created_at, updated_at)
 			VALUES ('dead_backup', 'inbound', 'inbound-dlq', 'queue-message', 'message_backup', '{}',
-			 'E_TEST', 4, 'unresolved', 0, ?, ?, ?)`)
+			 'E_TEST', 4, 'unresolved', 0, ?, ?, ?)`,
+			)
 			.bind(timestamp, timestamp, timestamp),
-		db.prepare(`INSERT INTO email_templates
+		db
+			.prepare(
+				`INSERT INTO email_templates
 			(id, user_id, name, subject, text_body, created_at, updated_at)
-			VALUES ('template_backup', 'user_backup', 'Template', 'Template subject', 'Template body', ?, ?)`)
+			VALUES ('template_backup', 'user_backup', 'Template', 'Template subject', 'Template body', ?, ?)`,
+			)
 			.bind(timestamp, timestamp),
-		db.prepare(`INSERT INTO calendar_events
+		db
+			.prepare(
+				`INSERT INTO calendar_events
 			(id, user_id, mailbox_id, title, description, location, attendees, starts_at, ends_at, created_at, updated_at)
 			VALUES ('calendar_backup', 'user_backup', 'mailbox_backup', 'Meeting', 'Description', 'Office',
-			 '["person@example.net"]', ?, ?, ?, ?)`)
+			 '["person@example.net"]', ?, ?, ?, ?)`,
+			)
 			.bind(timestamp + 7200, timestamp + 10800, timestamp, timestamp),
-		db.prepare(`INSERT INTO routing_rules
+		db
+			.prepare(
+				`INSERT INTO calendar_tasks
+			(id, user_id, mailbox_id, title, description, due_at, timezone, all_day, status,
+			 priority, completed_at, created_at, updated_at)
+			VALUES ('task_backup', 'user_backup', 'mailbox_backup', 'Follow up', 'Task description', ?,
+			 'Africa/Nairobi', 0, 'open', 'high', NULL, ?, ?)`,
+			)
+			.bind(timestamp + 14_400, timestamp, timestamp),
+		db
+			.prepare(
+				`INSERT INTO calendar_reminders
+			(id, user_id, event_id, task_id, mailbox_id, title, message, channel, recipient,
+			 from_addr, remind_at, timezone, status, attempt_count, created_at, updated_at)
+			VALUES ('reminder_backup', 'user_backup', NULL, 'task_backup', 'mailbox_backup',
+			 'Follow up', 'Complete the task', 'in_app', NULL, NULL, ?, 'Africa/Nairobi',
+			 'delivered', 1, ?, ?)`,
+			)
+			.bind(timestamp + 10_800, timestamp, timestamp),
+		db
+			.prepare(
+				`INSERT INTO calendar_reminder_deliveries
+			(id, reminder_id, user_id, scheduled_for, channel, status, idempotency_key,
+			 attempt_count, created_at, delivered_at)
+			VALUES ('reminder_delivery_backup', 'reminder_backup', 'user_backup', ?, 'in_app',
+			 'delivered', 'reminder-idempotency', 1, ?, ?)`,
+			)
+			.bind(timestamp + 10_800, timestamp, timestamp),
+		db
+			.prepare(
+				`INSERT INTO routing_rules
 			(id, user_id, domain_id, pattern, match_field, match_operator, match_value, mailbox_id,
 			 folder_id, action, priority, created_at)
 			VALUES ('rule_backup', 'user_backup', 'domain_backup', 'sender@example.net', 'email', 'exact',
-			 'sender@example.net', 'mailbox_backup', 'folder_backup', 'store', 10, ?)`)
+			 'sender@example.net', 'mailbox_backup', 'folder_backup', 'store', 10, ?)`,
+			)
 			.bind(timestamp),
-		db.prepare(`INSERT INTO webhooks
+		db
+			.prepare(
+				`INSERT INTO webhooks
 			(id, user_id, url, secret, events, enabled, created_at)
 			VALUES ('webhook_backup', 'user_backup', 'https://example.test/hook', 'secret',
-			 '["message.inbound"]', 1, ?)`)
+			 '["message.inbound"]', 1, ?)`,
+			)
 			.bind(timestamp),
-		db.prepare(`INSERT INTO webhook_deliveries
+		db
+			.prepare(
+				`INSERT INTO webhook_deliveries
 			(id, webhook_id, event_type, payload, status, attempts, created_at)
-			VALUES ('delivery_backup', 'webhook_backup', 'message.inbound', '{}', 'delivered', 1, ?)`)
+			VALUES ('delivery_backup', 'webhook_backup', 'message.inbound', '{}', 'delivered', 1, ?)`,
+			)
 			.bind(timestamp),
-		db.prepare(`INSERT INTO sessions
+		db
+			.prepare(
+				`INSERT INTO sessions
 			(id, user_id, token_hash, expires_at, created_at)
-			VALUES ('session_backup', 'user_backup', 'token-hash', ?, ?)`)
+			VALUES ('session_backup', 'user_backup', 'token-hash', ?, ?)`,
+			)
 			.bind(timestamp + 86400, timestamp),
-		db.prepare(`INSERT INTO audit_logs
+		db
+			.prepare(
+				`INSERT INTO audit_logs
 			(id, actor_user_id, target_user_id, mailbox_id, message_id, action, metadata, created_at)
 			VALUES ('audit_backup', 'user_backup', 'user_backup', 'mailbox_backup', 'message_backup',
-			 'fixture.created', '{}', ?)`)
+			 'fixture.created', '{}', ?)`,
+			)
 			.bind(timestamp),
-		db.prepare(`INSERT INTO backup_settings
+		db
+			.prepare(
+				`INSERT INTO backup_settings
 			(id, enabled, schedule_type, schedule_value, retention_enabled, retention_days, updated_at)
-			VALUES ('settings_backup', 1, 'weekly', 2, 1, 14, ?)`)
+			VALUES ('settings_backup', 1, 'weekly', 2, 1, 14, ?)`,
+			)
 			.bind(timestamp),
-		db.prepare(`INSERT INTO backups
+		db
+			.prepare(
+				`INSERT INTO backups
 			(id, status, trigger, filename, size, created_by_user_id, created_at, started_at, completed_at)
-			VALUES ('backup_history', 'completed', 'manual', 'history.json', 123, 'user_backup', ?, ?, ?)`)
+			VALUES ('backup_history', 'completed', 'manual', 'history.json', 123, 'user_backup', ?, ?, ?)`,
+			)
 			.bind(timestamp, timestamp, timestamp),
-		db.prepare(`INSERT INTO app_settings
+		db
+			.prepare(
+				`INSERT INTO app_settings
 			(id, app_name, company_name, icon_key, updated_at)
-			VALUES ('app_backup', 'CC Mail Test', 'Test Company', 'branding/app/icon.png', ?)`)
+			VALUES ('app_backup', 'CC Mail Test', 'Test Company', 'branding/app/icon.png', ?)`,
+			)
 			.bind(timestamp),
 	]);
 
-	await Promise.all(Object.entries(backupObjectContents).map(([key, content]) =>
-		integrationEnv.BUCKET.put(key, content, {
-			httpMetadata: { contentType: key.endsWith(".png") ? "image/png" : "text/plain" },
-			customMetadata: { fixture: "backup-round-trip" },
-		}),
-	));
+	await Promise.all(
+		Object.entries(backupObjectContents).map(([key, content]) =>
+			integrationEnv.BUCKET.put(key, content, {
+				httpMetadata: { contentType: key.endsWith(".png") ? "image/png" : "text/plain" },
+				customMetadata: { fixture: "backup-round-trip" },
+			}),
+		),
+	);
 }

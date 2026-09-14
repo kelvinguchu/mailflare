@@ -3,16 +3,10 @@ import {
 	DATABASE_BACKUP_VERSION,
 	MAX_DATABASE_RESTORE_BYTES,
 } from "./format";
-import {
-	exportDatabaseDocument,
-	serializeDatabaseBackup,
-} from "./export";
+import { exportDatabaseDocument, serializeDatabaseBackup } from "./export";
 import { snapshotDatabaseObjects } from "./objects";
 import type { DatabaseBackupDocument } from "./types";
-import {
-	BACKUP_PREFIX,
-	createBackupFilename,
-} from "./utils";
+import { BACKUP_PREFIX, createBackupFilename } from "./utils";
 
 export type StoredBackupBundle = {
 	document: DatabaseBackupDocument;
@@ -38,9 +32,10 @@ export async function createBackupBundle(
 		throw new Error("Backup manifest exceeds the 10 MiB restore limit");
 	}
 
-	const filename = options?.purpose === "pre-restore-recovery"
-		? `cc-mail-v${DATABASE_BACKUP_VERSION}-pre-restore-${now.toISOString().replace(/[:.]/g, "-")}.json`
-		: createBackupFilename(now);
+	const filename =
+		options?.purpose === "pre-restore-recovery"
+			? `cc-mail-v${DATABASE_BACKUP_VERSION}-pre-restore-${now.toISOString().replace(/[:.]/g, "-")}.json`
+			: createBackupFilename(now);
 	const r2Key = `${BACKUP_PREFIX}/${backupId}/${filename}`;
 	const objectSize = document.r2.objects.reduce((total, object) => total + object.size, 0);
 	const stored = await env.BUCKET.put(r2Key, content, {

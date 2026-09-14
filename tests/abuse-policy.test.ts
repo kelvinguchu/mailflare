@@ -4,14 +4,18 @@ import { scoreSpamHeaders } from "../src/lib/email/spam-score";
 
 describe("inbound abuse policy", () => {
 	it("quarantines executable extensions even when MIME is generic", () => {
-		expect(classifyAttachment({ filename: "invoice.pdf.exe", type: "application/octet-stream" })).toEqual({
+		expect(
+			classifyAttachment({ filename: "invoice.pdf.exe", type: "application/octet-stream" }),
+		).toEqual({
 			status: "quarantined",
 			reason: "Executable attachment type",
 		});
 	});
 
 	it("keeps ordinary document attachments available", () => {
-		expect(classifyAttachment({ filename: "invoice.pdf", type: "application/pdf" }).status).toBe("safe");
+		expect(classifyAttachment({ filename: "invoice.pdf", type: "application/pdf" }).status).toBe(
+			"safe",
+		);
 	});
 
 	it("scores upstream spam and authentication failures case-insensitively", () => {

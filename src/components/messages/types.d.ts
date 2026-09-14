@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import type { Message, MessageFolder } from "@/hooks/types";
-import type { BulkMessageAction } from "@/app/api/messages/bulk/types";
+import type { BulkMessageAction, BulkMessageScope } from "@/app/api/messages/bulk/types";
 
 export type MessageFolderConfig = {
 	folder: MessageFolder;
@@ -25,6 +25,7 @@ export type MessageListRowProps = {
 	onSelectedChange: (messageId: string, selected: boolean) => void;
 	onMessageAction: (messageId: string, action: RowMessageAction) => Promise<void>;
 	dragMessageIds: string[];
+	highlighted?: boolean;
 };
 
 export type RowMessageAction = "archive" | "trash" | "read" | "unread";
@@ -64,6 +65,7 @@ export type MessageSelectionControl = {
 
 export type BulkMessageSelectionPaneProps = {
 	selectedMessages: SelectedMessage[];
+	scope: BulkMessageScope;
 	onClearSelection: () => void;
 };
 
@@ -75,7 +77,6 @@ export type PageRange = {
 
 export type EmailPageTitleInput = {
 	location: string;
-	total: number;
 	unread: number;
 	emailAddress: string | null;
 };

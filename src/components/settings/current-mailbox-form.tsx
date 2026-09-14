@@ -1,6 +1,6 @@
 "use client";
 
-import type { FormEvent } from "react";
+import type { SubmitEvent } from "react";
 import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
 import { useSelectedMailbox } from "@/components/mailbox-provider";
@@ -25,7 +25,7 @@ export function CurrentMailboxForm() {
 		setStatus(null);
 	}, [selectedMailbox?.id, selectedMailbox?.displayName]);
 
-	async function onSubmit(event: FormEvent<HTMLFormElement>) {
+	async function onSubmit(event: SubmitEvent<HTMLFormElement>) {
 		event.preventDefault();
 		if (!selectedMailbox) return;
 
@@ -80,7 +80,8 @@ export function CurrentMailboxForm() {
 			<CardHeader>
 				<CardTitle>Sender identity</CardTitle>
 				<CardDescription>
-					Set the name recipients see beside {address}. This is separate from your account profile name.
+					Set the name recipients see beside {address}. This is separate from your account profile
+					name.
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="pb-6">
@@ -106,7 +107,9 @@ export function CurrentMailboxForm() {
 						{status && <p className="text-sm text-neutral-500">{status}</p>}
 					</div>
 					{!canManage && (
-						<p className="text-sm text-neutral-500">Only the mailbox owner can change this sender name.</p>
+						<p className="text-sm text-neutral-500">
+							Only the mailbox owner can change this sender name.
+						</p>
 					)}
 				</form>
 			</CardContent>

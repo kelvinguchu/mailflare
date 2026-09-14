@@ -2,10 +2,7 @@ import { getCurrentUser } from "@/lib/auth/cookies";
 import { getEnv } from "@/lib/cloudflare";
 import { getAttachmentForUser } from "@/lib/email/attachments";
 import type { AttachmentRouteParams } from "./types";
-import {
-	getAttachmentContentDisposition,
-	isPreviewableAttachmentType,
-} from "./utils";
+import { getAttachmentContentDisposition, isPreviewableAttachmentType } from "./utils";
 
 export async function GET(request: Request, { params }: AttachmentRouteParams) {
 	const env = getEnv();

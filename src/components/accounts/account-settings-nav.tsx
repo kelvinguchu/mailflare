@@ -29,7 +29,7 @@ export function AccountSettingsNav() {
 								className={cn(
 									"block rounded-full px-4 py-2.5 text-sm font-medium transition-colors",
 									isActiveAccountSettingsPath(pathname, href)
-										? "bg-blue-100 text-blue-900"
+										? "bg-primary/12 text-primary"
 										: "text-neutral-600 hover:bg-white/70 hover:text-neutral-900",
 								)}
 							>

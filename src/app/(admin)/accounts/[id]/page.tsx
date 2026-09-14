@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { useParams } from "next/navigation";
 import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,7 +37,9 @@ export default function AccountDetailsPage() {
 				setAccount(nextAccount);
 				setMailboxes(nextMailboxes);
 			})
-			.catch((error) => setMessage(error instanceof Error ? error.message : "Unable to load account"));
+			.catch((error) =>
+				setMessage(error instanceof Error ? error.message : "Unable to load account"),
+			);
 	}, [id]);
 
 	async function saveDetails() {
@@ -84,9 +87,11 @@ export default function AccountDetailsPage() {
 		try {
 			const delivery = await resendManagedAccountInvitation(account.id, account.resetEmail);
 			setAccount(await fetchManagedAccount(account.id));
-			setMessage(delivery === "delivery_disabled"
-				? "Invitation delivery is disabled in this environment."
-				: "A new invitation was scheduled; every older link is now invalid.");
+			setMessage(
+				delivery === "delivery_disabled"
+					? "Invitation delivery is disabled in this environment."
+					: "A new invitation was scheduled; every older link is now invalid.",
+			);
 		} catch (error) {
 			setMessage(error instanceof Error ? error.message : "Unable to resend invitation");
 		} finally {
@@ -116,9 +121,11 @@ export default function AccountDetailsPage() {
 		try {
 			const revoked = await revokeManagedAccountSessions(account.id);
 			setAccount({ ...account, activeSessionCount: 0 });
-			setMessage(revoked === 0
-				? "No active sessions were found."
-				: `${revoked} ${revoked === 1 ? "session" : "sessions"} revoked.`);
+			setMessage(
+				revoked === 0
+					? "No active sessions were found."
+					: `${revoked} ${revoked === 1 ? "session" : "sessions"} revoked.`,
+			);
 		} catch (error) {
 			setMessage(error instanceof Error ? error.message : "Unable to revoke sessions");
 		} finally {
@@ -126,21 +133,40 @@ export default function AccountDetailsPage() {
 		}
 	}
 
-	if (!account) return <p className="text-sm text-neutral-500">{message ?? "Loading account..."}</p>;
-	const activationLabel = account.activationStatus === "active" ? "Active" : account.activationStatus === "revoked" ? "Invitation revoked" : account.invitationExpired ? "Invitation expired" : account.invitationSentAt ? "Invitation pending" : "Invitation not sent";
+	if (!account)
+		return <p className="text-sm text-neutral-500">{message ?? "Loading account..."}</p>;
+	const activationLabel =
+		account.activationStatus === "active"
+			? "Active"
+			: account.activationStatus === "revoked"
+				? "Invitation revoked"
+				: account.invitationExpired
+					? "Invitation expired"
+					: account.invitationSentAt
+						? "Invitation pending"
+						: "Invitation not sent";
 
 	return (
 		<div className="space-y-6">
 			<div>
 				<h1 className="text-3xl font-medium text-neutral-900">Details</h1>
-				<p className="mt-2 text-sm text-neutral-500">Update this account&apos;s profile and status.</p>
+				<p className="mt-2 text-sm text-neutral-500">
+					Update this account&apos;s profile and status.
+				</p>
 			</div>
 			<section className="space-y-5 rounded-3xl bg-white p-6">
 				<div className="flex items-center gap-4">
-					<span className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-xl font-semibold text-blue-700">
+					<span className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-primary/12 text-xl font-semibold text-primary">
 						{account.name.charAt(0).toUpperCase()}
 						{account.hasAvatar && (
-							<img src={`/api/accounts/${id}/avatar?v=${avatarVersion}`} alt="" className="absolute inset-0 h-full w-full object-cover" />
+							<Image
+								src={`/api/accounts/${id}/avatar?v=${avatarVersion}`}
+								alt=""
+								fill
+								sizes="64px"
+								unoptimized
+								className="object-cover"
+							/>
 						)}
 					</span>
 					<Label className="cursor-pointer">
@@ -148,16 +174,30 @@ export default function AccountDetailsPage() {
 							<Upload className="h-4 w-4" />
 							Change avatar
 						</span>
-						<Input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" onChange={(event) => void uploadAvatar(event.target.files?.[0])} />
+						<Input
+							type="file"
+							accept="image/jpeg,image/png,image/webp,image/gif"
+							className="sr-only"
+							onChange={(event) => void uploadAvatar(event.target.files?.[0])}
+						/>
 					</Label>
 				</div>
 				<div className="space-y-2">
 					<Label htmlFor="account-email">Email</Label>
-					<Input id="account-email" value={account.email} readOnly className="bg-neutral-50 text-neutral-500" />
+					<Input
+						id="account-email"
+						value={account.email}
+						readOnly
+						className="bg-neutral-50 text-neutral-500"
+					/>
 				</div>
 				<div className="space-y-2">
 					<Label htmlFor="account-name">Name</Label>
-					<Input id="account-name" value={account.name} onChange={(event) => setAccount({ ...account, name: event.target.value })} />
+					<Input
+						id="account-name"
+						value={account.name}
+						onChange={(event) => setAccount({ ...account, name: event.target.value })}
+					/>
 				</div>
 				<div className="space-y-2">
 					<Label htmlFor="forwarding-email">Forwarding email (optional)</Label>
@@ -165,7 +205,9 @@ export default function AccountDetailsPage() {
 						id="forwarding-email"
 						type="email"
 						value={account.forwardingEmail ?? ""}
-						onChange={(event) => setAccount({ ...account, forwardingEmail: event.target.value || null })}
+						onChange={(event) =>
+							setAccount({ ...account, forwardingEmail: event.target.value || null })
+						}
 						placeholder="destination@example.com"
 					/>
 					<p className="text-xs leading-5 text-neutral-500">
@@ -175,15 +217,36 @@ export default function AccountDetailsPage() {
 				<div className="grid gap-4 sm:grid-cols-2">
 					<div className="space-y-2">
 						<Label htmlFor="send-rate-limit">Sends per minute</Label>
-						<Input id="send-rate-limit" type="number" min={1} max={10000} value={account.sendRateLimitPerMinute} onChange={(event) => setAccount({ ...account, sendRateLimitPerMinute: Number(event.target.value) })} />
+						<Input
+							id="send-rate-limit"
+							type="number"
+							min={1}
+							max={10000}
+							value={account.sendRateLimitPerMinute}
+							onChange={(event) =>
+								setAccount({ ...account, sendRateLimitPerMinute: Number(event.target.value) })
+							}
+						/>
 					</div>
 					<div className="space-y-2">
 						<Label htmlFor="daily-send-limit">Sends per day</Label>
-						<Input id="daily-send-limit" type="number" min={1} max={1000000} value={account.dailySendLimit} onChange={(event) => setAccount({ ...account, dailySendLimit: Number(event.target.value) })} />
+						<Input
+							id="daily-send-limit"
+							type="number"
+							min={1}
+							max={1000000}
+							value={account.dailySendLimit}
+							onChange={(event) =>
+								setAccount({ ...account, dailySendLimit: Number(event.target.value) })
+							}
+						/>
 					</div>
 				</div>
 				<label className="flex items-center gap-3 text-sm">
-					<Checkbox checked={!account.disabled} onChange={(event) => setAccount({ ...account, disabled: !event.target.checked })} />
+					<Checkbox
+						checked={!account.disabled}
+						onChange={(event) => setAccount({ ...account, disabled: !event.target.checked })}
+					/>
 					Account enabled
 				</label>
 				<Button onClick={() => void saveDetails()} disabled={saving || !account.name.trim()}>
@@ -193,20 +256,59 @@ export default function AccountDetailsPage() {
 			<section className="space-y-4 rounded-3xl bg-white p-6">
 				<div>
 					<h2 className="text-lg font-semibold text-neutral-900">Account activation</h2>
-					<p className="mt-1 text-sm text-neutral-500">Status: <span className="font-medium text-neutral-800">{activationLabel}</span></p>
+					<p className="mt-1 text-sm text-neutral-500">
+						Status: <span className="font-medium text-neutral-800">{activationLabel}</span>
+					</p>
 				</div>
 				{account.activationStatus === "active" ? (
-					<p className="text-sm text-neutral-500">The user chose their password{account.activatedAt ? ` on ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(account.activatedAt))}` : ""}.</p>
+					<p className="text-sm text-neutral-500">
+						The user chose their password
+						{account.activatedAt
+							? ` on ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(account.activatedAt))}`
+							: ""}
+						.
+					</p>
 				) : (
 					<>
 						<div className="space-y-2">
 							<Label htmlFor="invitation-email">Invitation email</Label>
-							<Input id="invitation-email" type="email" value={account.resetEmail ?? ""} onChange={(event) => setAccount({ ...account, resetEmail: event.target.value || null })} />
-							{account.invitationExpiresAt && !account.invitationExpired && <p className="text-xs text-neutral-500">Current link expires {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(account.invitationExpiresAt))}.</p>}
+							<Input
+								id="invitation-email"
+								type="email"
+								value={account.resetEmail ?? ""}
+								onChange={(event) =>
+									setAccount({ ...account, resetEmail: event.target.value || null })
+								}
+							/>
+							{account.invitationExpiresAt && !account.invitationExpired && (
+								<p className="text-xs text-neutral-500">
+									Current link expires{" "}
+									{new Intl.DateTimeFormat(undefined, {
+										dateStyle: "medium",
+										timeStyle: "short",
+									}).format(new Date(account.invitationExpiresAt))}
+									.
+								</p>
+							)}
 						</div>
 						<div className="flex flex-wrap gap-3">
-							<Button type="button" onClick={() => void resendInvitation()} disabled={invitationBusy || !account.resetEmail}>Resend invitation</Button>
-							{account.activationStatus === "pending" && <Button type="button" variant="outline" onClick={() => void revokeInvitation()} disabled={invitationBusy}>Revoke invitation</Button>}
+							<Button
+								type="button"
+								onClick={() => void resendInvitation()}
+								disabled={invitationBusy || !account.resetEmail}
+							>
+								Resend invitation
+							</Button>
+							{account.activationStatus === "pending" && (
+								<Button
+									type="button"
+									variant="outline"
+									onClick={() => void revokeInvitation()}
+									disabled={invitationBusy}
+								>
+									Revoke invitation
+								</Button>
+							)}
 						</div>
 					</>
 				)}
@@ -214,18 +316,30 @@ export default function AccountDetailsPage() {
 			<section className="space-y-4 rounded-3xl bg-white p-6">
 				<div>
 					<h2 className="text-lg font-semibold text-neutral-900">Sessions</h2>
-					<p className="mt-1 text-sm text-neutral-500">{account.activeSessionCount} active {account.activeSessionCount === 1 ? "session" : "sessions"}</p>
+					<p className="mt-1 text-sm text-neutral-500">
+						{account.activeSessionCount} active{" "}
+						{account.activeSessionCount === 1 ? "session" : "sessions"}
+					</p>
 				</div>
-				<Button type="button" variant="outline" onClick={() => void revokeSessions()} disabled={sessionsBusy || account.activeSessionCount === 0}>
+				<Button
+					type="button"
+					variant="outline"
+					onClick={() => void revokeSessions()}
+					disabled={sessionsBusy || account.activeSessionCount === 0}
+				>
 					{sessionsBusy ? "Revoking..." : "Revoke all sessions"}
 				</Button>
 			</section>
 			<section className="space-y-5 rounded-3xl bg-white p-6">
 				<div>
 					<h2 className="text-lg font-semibold text-neutral-900">Sender identities</h2>
-					<p className="mt-1 text-sm text-neutral-500">Only administrators can change the names recipients see.</p>
+					<p className="mt-1 text-sm text-neutral-500">
+						Only administrators can change the names recipients see.
+					</p>
 				</div>
-				{mailboxes.length === 0 && <p className="text-sm text-neutral-500">No mailboxes are assigned to this account.</p>}
+				{mailboxes.length === 0 && (
+					<p className="text-sm text-neutral-500">No mailboxes are assigned to this account.</p>
+				)}
 				{mailboxes.map((mailbox) => {
 					const address = `${mailbox.localPart}@${mailbox.hostname}`;
 					return (
@@ -235,12 +349,26 @@ export default function AccountDetailsPage() {
 								<Input
 									id={`sender-name-${mailbox.id}`}
 									value={mailbox.displayName ?? ""}
-									onChange={(event) => setMailboxes((items) => items.map((item) => item.id === mailbox.id ? { ...item, displayName: event.target.value } : item))}
+									onChange={(event) =>
+										setMailboxes((items) =>
+											items.map((item) =>
+												item.id === mailbox.id
+													? { ...item, displayName: event.target.value }
+													: item,
+											),
+										)
+									}
 									maxLength={100}
 								/>
-								<p className="text-xs text-neutral-500">Preview: {mailbox.displayName?.trim() || mailbox.localPart} &lt;{address}&gt;</p>
+								<p className="text-xs text-neutral-500">
+									Preview: {mailbox.displayName?.trim() || mailbox.localPart} &lt;{address}&gt;
+								</p>
 							</div>
-							<Button type="button" onClick={() => void saveSenderName(mailbox)} disabled={savingMailboxId === mailbox.id}>
+							<Button
+								type="button"
+								onClick={() => void saveSenderName(mailbox)}
+								disabled={savingMailboxId === mailbox.id}
+							>
 								{savingMailboxId === mailbox.id ? "Saving..." : "Save sender name"}
 							</Button>
 						</div>

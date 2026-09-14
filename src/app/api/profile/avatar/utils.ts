@@ -7,7 +7,9 @@ export function avatarKeyFor(userId: string): string {
 	return `avatars/${userId}`;
 }
 
-export function isUploadedAvatarFile(value: FormDataEntryValue | null): value is UploadedAvatarFile {
+export function isUploadedAvatarFile(
+	value: FormDataEntryValue | null,
+): value is UploadedAvatarFile {
 	return (
 		value !== null &&
 		typeof value !== "string" &&

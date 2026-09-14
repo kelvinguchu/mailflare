@@ -16,7 +16,10 @@ export async function POST(request: Request) {
 		input = parseImapFolderListRequest(body);
 	} catch (error) {
 		const status = error instanceof RequestBodyTooLargeError ? 413 : 400;
-		return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid IMAP folder request" }, { status });
+		return NextResponse.json(
+			{ error: error instanceof Error ? error.message : "Invalid IMAP folder request" },
+			{ status },
+		);
 	}
 
 	try {

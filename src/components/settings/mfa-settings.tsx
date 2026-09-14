@@ -18,7 +18,9 @@ export function MfaSettings() {
 	const [loading, setLoading] = useState(false);
 
 	useEffect(() => {
-		void loadStatus().then(setStatus).catch((reason) => setError(errorMessage(reason)));
+		void loadStatus()
+			.then(setStatus)
+			.catch((reason) => setError(errorMessage(reason)));
 	}, []);
 
 	async function beginSetup(form: FormData) {
@@ -40,21 +42,29 @@ export function MfaSettings() {
 			setRecoveryCodes(response.recoveryCodes);
 			setSetup(null);
 			setStatus(await loadStatus());
-			setMessage("Multi-factor authentication is enabled. Save every recovery code now; they will not be shown again.");
+			setMessage(
+				"Multi-factor authentication is enabled. Save every recovery code now; they will not be shown again.",
+			);
 		});
 	}
 
 	async function protectedAction(form: FormData, method: "PATCH" | "DELETE") {
 		await run(async () => {
-			const response = await requestJson<{ recoveryCodes?: string[] }>("/api/settings/mfa", method, {
-				currentPassword: form.get("currentPassword"),
-				code: form.get("code"),
-			});
+			const response = await requestJson<{ recoveryCodes?: string[] }>(
+				"/api/settings/mfa",
+				method,
+				{
+					currentPassword: form.get("currentPassword"),
+					code: form.get("code"),
+				},
+			);
 			setRecoveryCodes(response.recoveryCodes ?? []);
 			setStatus(await loadStatus());
-			setMessage(method === "PATCH"
-				? "New recovery codes created. Save them now; the previous codes no longer work."
-				: "Multi-factor authentication is disabled.");
+			setMessage(
+				method === "PATCH"
+					? "New recovery codes created. Save them now; the previous codes no longer work."
+					: "Multi-factor authentication is disabled.",
+			);
 		});
 	}
 
@@ -85,27 +95,54 @@ export function MfaSettings() {
 			</div>
 
 			{!status.enabled && !setup && (
-				<SecurityForm title="Enable multi-factor authentication" submitLabel="Create authenticator key" loading={loading} onSubmit={beginSetup} passwordOnly />
+				<SecurityForm
+					title="Enable multi-factor authentication"
+					submitLabel="Create authenticator key"
+					loading={loading}
+					onSubmit={beginSetup}
+					passwordOnly
+				/>
 			)}
 
 			{setup && (
 				<div className="space-y-4 rounded-2xl border border-neutral-200 p-4">
 					<div>
 						<p className="text-sm font-medium text-neutral-900">Authenticator setup key</p>
-						<code className="mt-2 block break-all rounded-xl bg-neutral-100 p-3 text-sm">{setup.secret}</code>
+						<code className="mt-2 block break-all rounded-xl bg-neutral-100 p-3 text-sm">
+							{setup.secret}
+						</code>
 						<p className="mt-2 break-all text-xs text-neutral-500">{setup.otpauthUri}</p>
 					</div>
-					<form onSubmit={(event) => { event.preventDefault(); void confirmSetup(new FormData(event.currentTarget)); }} className="space-y-3">
+					<form
+						onSubmit={(event) => {
+							event.preventDefault();
+							void confirmSetup(new FormData(event.currentTarget));
+						}}
+						className="space-y-3"
+					>
 						<CodeField />
-						<Button type="submit" disabled={loading}>Verify and enable</Button>
+						<Button type="submit" disabled={loading}>
+							Verify and enable
+						</Button>
 					</form>
 				</div>
 			)}
 
 			{status.enabled && (
 				<>
-					<SecurityForm title="Replace recovery codes" submitLabel="Generate new codes" loading={loading} onSubmit={(form) => protectedAction(form, "PATCH")} />
-					<SecurityForm title="Disable multi-factor authentication" submitLabel="Disable MFA" loading={loading} onSubmit={(form) => protectedAction(form, "DELETE")} destructive />
+					<SecurityForm
+						title="Replace recovery codes"
+						submitLabel="Generate new codes"
+						loading={loading}
+						onSubmit={(form) => protectedAction(form, "PATCH")}
+					/>
+					<SecurityForm
+						title="Disable multi-factor authentication"
+						submitLabel="Disable MFA"
+						loading={loading}
+						onSubmit={(form) => protectedAction(form, "DELETE")}
+						destructive
+					/>
 				</>
 			)}
 
@@ -113,9 +150,18 @@ export function MfaSettings() {
 				<div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
 					<p className="text-sm font-medium text-amber-950">One-time recovery codes</p>
 					<div className="mt-3 grid gap-2 font-mono text-sm sm:grid-cols-2">
-						{recoveryCodes.map((code) => <code key={code}>{code}</code>)}
+						{recoveryCodes.map((code) => (
+							<code key={code}>{code}</code>
+						))}
 					</div>
-					<Button type="button" variant="outline" className="mt-4" onClick={() => void navigator.clipboard.writeText(recoveryCodes.join("\n"))}>Copy codes</Button>
+					<Button
+						type="button"
+						variant="outline"
+						className="mt-4"
+						onClick={() => void navigator.clipboard.writeText(recoveryCodes.join("\n"))}
+					>
+						Copy codes
+					</Button>
 				</div>
 			)}
 			{message && <p className="text-sm font-medium text-emerald-700">{message}</p>}
@@ -140,14 +186,28 @@ function SecurityForm({
 	destructive?: boolean;
 }) {
 	return (
-		<form onSubmit={(event) => { event.preventDefault(); void onSubmit(new FormData(event.currentTarget)); }} className="space-y-3 rounded-2xl border border-neutral-200 p-4">
+		<form
+			onSubmit={(event) => {
+				event.preventDefault();
+				void onSubmit(new FormData(event.currentTarget));
+			}}
+			className="space-y-3 rounded-2xl border border-neutral-200 p-4"
+		>
 			<p className="text-sm font-medium text-neutral-900">{title}</p>
 			<div className="space-y-2">
 				<Label htmlFor={`${submitLabel}-password`}>Current password</Label>
-				<Input id={`${submitLabel}-password`} name="currentPassword" type="password" autoComplete="current-password" required />
+				<Input
+					id={`${submitLabel}-password`}
+					name="currentPassword"
+					type="password"
+					autoComplete="current-password"
+					required
+				/>
 			</div>
 			{!passwordOnly && <CodeField id={`${submitLabel}-code`} />}
-			<Button type="submit" variant={destructive ? "destructive" : "default"} disabled={loading}>{submitLabel}</Button>
+			<Button type="submit" variant={destructive ? "destructive" : "default"} disabled={loading}>
+				{submitLabel}
+			</Button>
 		</form>
 	);
 }
@@ -163,18 +223,22 @@ function CodeField({ id = "mfa-code" }: { id?: string }) {
 
 async function loadStatus(): Promise<MfaStatus> {
 	const response = await authFetch("/api/settings/mfa", { cache: "no-store" });
-	const data = await response.json() as MfaStatus & { error?: string };
+	const data = (await response.json()) as MfaStatus & { error?: string };
 	if (!response.ok) throw new Error(data.error ?? "Failed to load multi-factor settings");
 	return data;
 }
 
-async function requestJson<T = { ok: boolean }>(url: string, method: string, body: Record<string, unknown>): Promise<T> {
+async function requestJson<T = { ok: boolean }>(
+	url: string,
+	method: string,
+	body: Record<string, unknown>,
+): Promise<T> {
 	const response = await authFetch(url, {
 		method,
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify(body),
 	});
-	const data = await response.json() as T & { error?: string };
+	const data = (await response.json()) as T & { error?: string };
 	if (!response.ok) throw new Error(data.error ?? "Security request failed");
 	return data;
 }

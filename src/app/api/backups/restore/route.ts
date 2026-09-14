@@ -21,7 +21,8 @@ export async function POST(request: Request) {
 		}
 		const form = await request.formData();
 		const file = form.get("backup");
-		if (!(file instanceof File)) return NextResponse.json({ error: "Choose a backup file" }, { status: 400 });
+		if (!(file instanceof File))
+			return NextResponse.json({ error: "Choose a backup file" }, { status: 400 });
 		if (file.size > MAX_DATABASE_RESTORE_BYTES) {
 			return NextResponse.json({ error: restoreTooLargeError().message }, { status: 413 });
 		}

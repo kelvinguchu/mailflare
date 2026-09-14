@@ -25,27 +25,39 @@ export function createEmptyFolderCounts(): MessageCounts["folders"] {
 	};
 }
 
-export function buildMessageCounts(rows: MessageCountRow[]): MessageCounts {
+export function buildMessageCounts(rows: MessageCountRow[], threadUnread = false): MessageCounts {
 	const folders = createEmptyFolderCounts();
 	const customFolders: MessageCounts["customFolders"] = {};
-	const mailboxMap = new Map<string, { mailboxId: string; total: number; unread: number; inbox: number }>();
+	const unreadKeys = new Set<string>();
+	const mailboxMap = new Map<
+		string,
+		{ mailboxId: string; total: number; unread: number; inbox: number }
+	>();
 
 	for (const row of rows) {
 		const folder = getMessageFolder(row);
 		const unread = row.direction === "inbound" && !row.read;
+		const threadKey = `${row.mailboxId ?? "unassigned"}:${row.threadId ?? row.id}`;
+		const incrementUnread = (scope: string): boolean => {
+			if (!threadUnread) return true;
+			const key = `${scope}:${threadKey}`;
+			if (unreadKeys.has(key)) return false;
+			unreadKeys.add(key);
+			return true;
+		};
 		if (row.starred) {
 			folders.starred.total += 1;
-			if (unread) folders.starred.unread += 1;
+			if (unread && incrementUnread("starred")) folders.starred.unread += 1;
 		}
 		if (folder) {
 			folders[folder].total += 1;
-			if (unread) folders[folder].unread += 1;
+			if (unread && incrementUnread(`folder:${folder}`)) folders[folder].unread += 1;
 		}
 
 		if (row.folderId) {
 			const folderCount = customFolders[row.folderId] ?? { total: 0, unread: 0 };
 			folderCount.total += 1;
-			if (unread) folderCount.unread += 1;
+			if (unread && incrementUnread(`custom:${row.folderId}`)) folderCount.unread += 1;
 			customFolders[row.folderId] = folderCount;
 		}
 
@@ -58,7 +70,7 @@ export function buildMessageCounts(rows: MessageCountRow[]): MessageCounts {
 			inbox: 0,
 		};
 		mailboxCount.total += 1;
-		if (unread) mailboxCount.unread += 1;
+		if (unread && incrementUnread(`mailbox:${row.mailboxId}`)) mailboxCount.unread += 1;
 		if (folder === "inbox") mailboxCount.inbox += 1;
 		mailboxMap.set(row.mailboxId, mailboxCount);
 	}

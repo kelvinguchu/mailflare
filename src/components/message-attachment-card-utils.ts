@@ -104,7 +104,11 @@ export function getAttachmentVisual(
 			thumbnail: null,
 		};
 	}
-	if (previewKind === "text" || type.includes("word") || /\.(doc|docx|odt|rtf|txt)$/.test(filename)) {
+	if (
+		previewKind === "text" ||
+		type.includes("word") ||
+		/\.(doc|docx|odt|rtf|txt)$/.test(filename)
+	) {
 		return {
 			icon: FileType,
 			iconClassName: "bg-sky-50 text-sky-700",

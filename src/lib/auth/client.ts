@@ -30,7 +30,10 @@ export function notifyAuthSessionChanged(authenticated: boolean): void {
 	);
 }
 
-export async function authFetch(input: RequestInfo | URL, init: AuthFetchOptions = {}): Promise<Response> {
+export async function authFetch(
+	input: RequestInfo | URL,
+	init: AuthFetchOptions = {},
+): Promise<Response> {
 	const { redirectOnUnauthorized = true, headers, ...requestInit } = init;
 	clearLegacySessionStorage();
 	const response = await fetch(input, {
@@ -41,7 +44,7 @@ export async function authFetch(input: RequestInfo | URL, init: AuthFetchOptions
 
 	if (response.status === 401 && redirectOnUnauthorized && typeof window !== "undefined") {
 		notifyAuthSessionChanged(false);
-		window.location.assign("/login");
+		window.location.replace("/login");
 	}
 
 	return response;

@@ -6,7 +6,10 @@ export const accountSettingsNavItems: AccountSettingsNavItem[] = [
 	{ segment: "mailboxes", label: "Mailboxes" },
 ];
 
-export function getAccountSettingsHref(accountId: string, segment: AccountSettingsNavItem["segment"]): string {
+export function getAccountSettingsHref(
+	accountId: string,
+	segment: AccountSettingsNavItem["segment"],
+): string {
 	return `/accounts/${accountId}${segment ? `/${segment}` : ""}`;
 }
 

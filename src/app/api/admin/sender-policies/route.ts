@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { and, eq, isNull } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getDb } from "@/db";
@@ -22,21 +23,31 @@ export async function POST(request: Request) {
 	const recentAuthError = await requireRecentAuthentication(access.env, access.user!.id);
 	if (recentAuthError) return recentAuthError;
 	const parsed = senderPolicySchema.safeParse(await request.json());
-	if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+	if (!parsed.success)
+		return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
 	const pattern = normalizePattern(parsed.data.patternType, parsed.data.pattern);
 	if (!pattern) return NextResponse.json({ error: "Invalid sender pattern" }, { status: 400 });
 	const db = getDb(access.env);
 	const scope = parsed.data.userId
 		? eq(senderPolicies.userId, parsed.data.userId)
 		: isNull(senderPolicies.userId);
-	const [existing] = await db.select({ id: senderPolicies.id }).from(senderPolicies).where(and(
-		scope,
-		eq(senderPolicies.patternType, parsed.data.patternType),
-		eq(senderPolicies.pattern, pattern),
-	)).limit(1);
+	const [existing] = await db
+		.select({ id: senderPolicies.id })
+		.from(senderPolicies)
+		.where(
+			and(
+				scope,
+				eq(senderPolicies.patternType, parsed.data.patternType),
+				eq(senderPolicies.pattern, pattern),
+			),
+		)
+		.limit(1);
 	const id = existing?.id ?? newId("policy");
 	if (existing) {
-		await db.update(senderPolicies).set({ action: parsed.data.action, createdByUserId: access.user!.id }).where(eq(senderPolicies.id, id));
+		await db
+			.update(senderPolicies)
+			.set({ action: parsed.data.action, createdByUserId: access.user!.id })
+			.where(eq(senderPolicies.id, id));
 	} else {
 		await db.insert(senderPolicies).values({
 			id,
@@ -63,7 +74,11 @@ export async function DELETE(request: Request) {
 	if (recentAuthError) return recentAuthError;
 	const id = new URL(request.url).searchParams.get("id") ?? "";
 	if (!id) return NextResponse.json({ error: "Policy ID is required" }, { status: 400 });
-	const [policy] = await getDb(access.env).select().from(senderPolicies).where(eq(senderPolicies.id, id)).limit(1);
+	const [policy] = await getDb(access.env)
+		.select()
+		.from(senderPolicies)
+		.where(eq(senderPolicies.id, id))
+		.limit(1);
 	if (!policy) return NextResponse.json({ error: "Not found" }, { status: 404 });
 	await getDb(access.env).delete(senderPolicies).where(eq(senderPolicies.id, id));
 	await createAuditLog(access.env, {

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { ZodError } from "zod";
+import { z, ZodError } from "zod";
 import { getDb } from "@/db";
 import { users } from "@/db/schema";
 import { requireUser } from "@/lib/auth/cookies";
@@ -16,7 +16,7 @@ export async function PATCH(request: Request) {
 		input = await parseUpdateForwardingEmailRequest(request);
 	} catch (error) {
 		if (error instanceof ZodError) {
-			return NextResponse.json({ error: error.flatten() }, { status: 400 });
+			return NextResponse.json({ error: z.flattenError(error) }, { status: 400 });
 		}
 		return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 	}

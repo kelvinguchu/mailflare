@@ -1,10 +1,5 @@
-import {
-	BACKUP_PREFIX,
-} from "./utils";
-import {
-	DATABASE_BACKUP_R2_STRATEGY,
-	MAX_BACKUP_OBJECTS,
-} from "./format";
+import { BACKUP_PREFIX } from "./utils";
+import { DATABASE_BACKUP_R2_STRATEGY, MAX_BACKUP_OBJECTS } from "./format";
 import type {
 	DatabaseBackupDocument,
 	DatabaseBackupObject,
@@ -18,19 +13,17 @@ import type {
 const R2_REFERENCE_COLUMNS = {
 	users: ["avatar_key"],
 	mailboxes: ["avatar_key"],
+	signature_assets: ["r2_key"],
 	messages: ["raw_r2_key"],
 	message_attachments: ["r2_key"],
 	app_settings: ["icon_key"],
 } satisfies Partial<Record<DatabaseBackupTable, readonly string[]>>;
 
-export function getReferencedR2Keys(
-	document: Pick<DatabaseBackupDocument, "tables">,
-): string[] {
+export function getReferencedR2Keys(document: Pick<DatabaseBackupDocument, "tables">): string[] {
 	const keys = new Set<string>();
-	for (const [table, columns] of Object.entries(R2_REFERENCE_COLUMNS) as Array<[
-		DatabaseBackupTable,
-		readonly string[],
-	]>) {
+	for (const [table, columns] of Object.entries(R2_REFERENCE_COLUMNS) as Array<
+		[DatabaseBackupTable, readonly string[]]
+	>) {
 		for (const row of document.tables[table]) {
 			for (const column of columns) {
 				const value = row[column];
@@ -104,7 +97,11 @@ export async function snapshotDatabaseObjects(
 }
 
 export function normalizeDatabaseBackupR2(value: unknown): DatabaseBackupR2Snapshot {
-	if (!isRecord(value) || value.strategy !== DATABASE_BACKUP_R2_STRATEGY || !Array.isArray(value.objects)) {
+	if (
+		!isRecord(value) ||
+		value.strategy !== DATABASE_BACKUP_R2_STRATEGY ||
+		!Array.isArray(value.objects)
+	) {
 		throw invalidR2ManifestError();
 	}
 	if (value.objects.length > MAX_BACKUP_OBJECTS) throw invalidR2ManifestError();
@@ -114,7 +111,9 @@ export function normalizeDatabaseBackupR2(value: unknown): DatabaseBackupR2Snaps
 	};
 }
 
-export function validateDatabaseBackupObjectCoverage(document: NormalizedDatabaseBackupDocument): void {
+export function validateDatabaseBackupObjectCoverage(
+	document: NormalizedDatabaseBackupDocument,
+): void {
 	if (document.r2.strategy === "live-references") return;
 	const referenced = getReferencedR2Keys(document);
 	const manifestKeys = document.r2.objects.map((object) => object.sourceKey);
@@ -218,19 +217,28 @@ function assertSnapshotMatchesManifest(object: DatabaseBackupObject, stored: R2O
 
 async function createSnapshotKey(backupId: string, sourceKey: string): Promise<string> {
 	const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(sourceKey));
-	const hash = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+	const hash = [...new Uint8Array(digest)]
+		.map((byte) => byte.toString(16).padStart(2, "0"))
+		.join("");
 	return `${BACKUP_PREFIX}/${backupId}/objects/${hash}`;
 }
 
 function normalizeBackupObject(value: unknown): DatabaseBackupObject {
 	if (!isRecord(value)) throw invalidR2ManifestError();
 	if (
-		typeof value.sourceKey !== "string" || value.sourceKey.length === 0 ||
-		typeof value.snapshotKey !== "string" || !value.snapshotKey.startsWith(`${BACKUP_PREFIX}/`) ||
-		typeof value.size !== "number" || !Number.isSafeInteger(value.size) || value.size < 0 ||
-		typeof value.etag !== "string" || value.etag.length === 0 ||
+		typeof value.sourceKey !== "string" ||
+		value.sourceKey.length === 0 ||
+		typeof value.snapshotKey !== "string" ||
+		!value.snapshotKey.startsWith(`${BACKUP_PREFIX}/`) ||
+		typeof value.size !== "number" ||
+		!Number.isSafeInteger(value.size) ||
+		value.size < 0 ||
+		typeof value.etag !== "string" ||
+		value.etag.length === 0 ||
 		(value.storageClass !== "Standard" && value.storageClass !== "InfrequentAccess") ||
-		!isRecord(value.checksums) || !isRecord(value.httpMetadata) || !isRecord(value.customMetadata)
+		!isRecord(value.checksums) ||
+		!isRecord(value.httpMetadata) ||
+		!isRecord(value.customMetadata)
 	) {
 		throw invalidR2ManifestError();
 	}
@@ -239,7 +247,13 @@ function normalizeBackupObject(value: unknown): DatabaseBackupObject {
 		snapshotKey: value.snapshotKey,
 		size: value.size,
 		etag: value.etag,
-		checksums: normalizeStringRecord(value.checksums, ["md5", "sha1", "sha256", "sha384", "sha512"]),
+		checksums: normalizeStringRecord(value.checksums, [
+			"md5",
+			"sha1",
+			"sha256",
+			"sha384",
+			"sha512",
+		]),
 		httpMetadata: normalizeStringRecord(value.httpMetadata, [
 			"contentType",
 			"contentLanguage",

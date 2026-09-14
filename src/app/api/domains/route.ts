@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { NextRequest, NextResponse } from "next/server";
 import { getEnv } from "@/lib/cloudflare";
 import { requireUser } from "@/lib/auth/cookies";
@@ -8,7 +9,8 @@ import { summariseDns, type DnsStatusSummary } from "@/lib/dns-status";
 export async function GET(request: NextRequest) {
 	const env = getEnv();
 	const user = await requireUser(env, request);
-	const domainOwnerId = user.canManageMailboxes && user.createdByUserId ? user.createdByUserId : user.id;
+	const domainOwnerId =
+		user.canManageMailboxes && user.createdByUserId ? user.createdByUserId : user.id;
 	const domains = await listUserDomains(env, domainOwnerId);
 
 	const includeDns = request.nextUrl.searchParams.get("includeDns") === "true";
@@ -20,7 +22,13 @@ export async function GET(request: NextRequest) {
 				const view = await getDomainDns(env, domain);
 				return {
 					id: domain.id,
-					summary: summariseDns(view.routing.records, view.routing.missing, view.sending, view.zoneRecords, domain.hostname),
+					summary: summariseDns(
+						view.routing.records,
+						view.routing.missing,
+						view.sending,
+						view.zoneRecords,
+						domain.hostname,
+					),
 				};
 			}),
 		);
@@ -39,7 +47,7 @@ export async function POST(request: Request) {
 	const user = await requireUser(env, request);
 	const parsed = addDomainSchema.safeParse(await request.json());
 	if (!parsed.success) {
-		return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+		return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
 	}
 
 	try {

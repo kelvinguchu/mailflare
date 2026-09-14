@@ -21,7 +21,9 @@ export async function getSetupStatus(): Promise<SetupStatus> {
 	return data;
 }
 
-export async function submitPrimaryDomain(form: FormData): Promise<{ ok: boolean; data: DomainSetupResult }> {
+export async function submitPrimaryDomain(
+	form: FormData,
+): Promise<{ ok: boolean; data: DomainSetupResult }> {
 	const res = await fetch("/api/setup/domain", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },

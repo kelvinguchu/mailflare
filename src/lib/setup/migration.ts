@@ -35,7 +35,48 @@ const MIGRATION_NAMES = [
 	"0033_add_session_management_indexes.sql",
 	"0034_add_administrator_mfa.sql",
 	"0035_add_delivery_and_abuse_controls.sql",
+	"0036_add_message_search.sql",
+	"0037_add_calendar_tasks_reminders.sql",
+	"0038_add_undo_send.sql",
+	"0039_add_conversation_threads.sql",
+	"0040_add_task_assignments.sql",
+	"0041_add_rich_mailbox_signatures.sql",
 ];
+
+const SEARCH_SCHEMA_STATEMENTS = [
+	`CREATE VIRTUAL TABLE message_search USING fts5(
+		message_id UNINDEXED,
+		search_text,
+		subject,
+		tokenize = 'trigram'
+	)`,
+	`CREATE TRIGGER message_search_after_insert
+	AFTER INSERT ON messages
+	BEGIN
+		INSERT INTO message_search (message_id, search_text, subject)
+		VALUES (
+			new.id,
+			new.from_addr || ' ' || new.to_addr || ' ' || coalesce(new.subject, '') || ' ' || coalesce(new.snippet, ''),
+			coalesce(new.subject, '')
+		);
+	END`,
+	`CREATE TRIGGER message_search_after_delete
+	AFTER DELETE ON messages
+	BEGIN
+		DELETE FROM message_search WHERE message_id = old.id;
+	END`,
+	`CREATE TRIGGER message_search_after_update
+	AFTER UPDATE OF id, from_addr, to_addr, subject, snippet ON messages
+	BEGIN
+		DELETE FROM message_search WHERE message_id = old.id;
+		INSERT INTO message_search (message_id, search_text, subject)
+		VALUES (
+			new.id,
+			new.from_addr || ' ' || new.to_addr || ' ' || coalesce(new.subject, '') || ' ' || coalesce(new.snippet, ''),
+			coalesce(new.subject, '')
+		);
+	END`,
+] as const;
 
 const INITIAL_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS users (id text PRIMARY KEY NOT NULL, email text NOT NULL UNIQUE, reset_email text, reset_email_verified_at integer, forwarding_email text, password_hash text NOT NULL, name text NOT NULL, avatar_key text, role text DEFAULT 'user' NOT NULL, activation_status text DEFAULT 'active' NOT NULL, activated_at integer, invitation_sent_at integer, invitation_expires_at integer, mfa_secret_encrypted text, mfa_enabled_at integer, mfa_recovery_code_hashes text DEFAULT '[]' NOT NULL, mfa_last_used_counter integer, disabled integer DEFAULT false NOT NULL, send_rate_limit_per_minute integer DEFAULT 20 NOT NULL, daily_send_limit integer DEFAULT 500 NOT NULL, can_manage_mailboxes integer DEFAULT false NOT NULL, created_by_user_id text REFERENCES users(id) ON DELETE set null, created_at integer NOT NULL);
@@ -43,8 +84,10 @@ CREATE INDEX IF NOT EXISTS users_created_by_idx ON users(created_by_user_id);
 CREATE TABLE IF NOT EXISTS domains (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, hostname text NOT NULL, zone_id text NOT NULL, status text DEFAULT 'pending' NOT NULL, routing_status text, sending_subdomain_tag text, sending_enabled integer DEFAULT false NOT NULL, routing_enabled integer DEFAULT false NOT NULL, send_rate_limit_per_minute integer DEFAULT 60 NOT NULL, daily_send_limit integer DEFAULT 2000 NOT NULL, created_at integer NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS domains_hostname_idx ON domains(hostname);
 CREATE INDEX IF NOT EXISTS domains_user_idx ON domains(user_id);
-CREATE TABLE IF NOT EXISTS mailboxes (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, domain_id text NOT NULL REFERENCES domains(id) ON DELETE cascade, local_part text NOT NULL, display_name text, signature text, auto_reply_enabled integer DEFAULT false NOT NULL, auto_reply_subject text DEFAULT 'Out of office' NOT NULL, auto_reply_body text DEFAULT '' NOT NULL, avatar_key text, type text DEFAULT 'personal' NOT NULL, use_all_domains integer DEFAULT true NOT NULL, disabled integer DEFAULT false NOT NULL, created_at integer NOT NULL);
+CREATE TABLE IF NOT EXISTS mailboxes (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, domain_id text NOT NULL REFERENCES domains(id) ON DELETE cascade, local_part text NOT NULL, display_name text, signature text, signature_text text, signature_html text, signature_version integer DEFAULT 1 NOT NULL, auto_reply_enabled integer DEFAULT false NOT NULL, auto_reply_subject text DEFAULT 'Out of office' NOT NULL, auto_reply_body text DEFAULT '' NOT NULL, avatar_key text, type text DEFAULT 'personal' NOT NULL, use_all_domains integer DEFAULT true NOT NULL, disabled integer DEFAULT false NOT NULL, created_at integer NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS mailboxes_address_idx ON mailboxes(domain_id, local_part);
+CREATE TABLE IF NOT EXISTS signature_assets (id text PRIMARY KEY NOT NULL, mailbox_id text NOT NULL REFERENCES mailboxes(id) ON DELETE cascade, uploaded_by_user_id text REFERENCES users(id) ON DELETE set null, filename text NOT NULL, content_type text NOT NULL, size integer NOT NULL, width integer NOT NULL, height integer NOT NULL, alt_text text DEFAULT '' NOT NULL, content_id text NOT NULL UNIQUE, r2_key text NOT NULL UNIQUE, created_at integer NOT NULL);
+CREATE INDEX IF NOT EXISTS signature_assets_mailbox_idx ON signature_assets(mailbox_id);
 CREATE TABLE IF NOT EXISTS auto_reply_deliveries (id text PRIMARY KEY NOT NULL, mailbox_id text NOT NULL REFERENCES mailboxes(id) ON DELETE cascade, recipient text NOT NULL, sent_at integer NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS auto_reply_deliveries_mailbox_recipient_idx ON auto_reply_deliveries(mailbox_id, recipient);
 CREATE INDEX IF NOT EXISTS auto_reply_deliveries_sent_idx ON auto_reply_deliveries(sent_at);
@@ -60,17 +103,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS folders_mailbox_name_idx ON folders(mailbox_id
 CREATE INDEX IF NOT EXISTS folders_user_idx ON folders(user_id);
 CREATE INDEX IF NOT EXISTS folders_mailbox_idx ON folders(mailbox_id);
 CREATE TABLE IF NOT EXISTS api_keys (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, name text NOT NULL, prefix text NOT NULL, key_hash text NOT NULL, scopes text NOT NULL, created_at integer NOT NULL, last_used_at integer);
-CREATE TABLE IF NOT EXISTS messages (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, direction text NOT NULL, provider_message_id text, folder_id text REFERENCES folders(id) ON DELETE set null, from_addr text NOT NULL, to_addr text NOT NULL, subject text, snippet text, text_body text, html_body text, raw_r2_key text, inbound_delivery_key text, status text DEFAULT 'received' NOT NULL, delivery_status text, delivery_detail text, delivery_updated_at integer, security_status text DEFAULT 'clean' NOT NULL, security_reason text, spam_score integer DEFAULT 0 NOT NULL, read integer DEFAULT false NOT NULL, starred integer DEFAULT false NOT NULL, snoozed_until integer, thread_id text, created_at integer NOT NULL);
+CREATE TABLE IF NOT EXISTS messages (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, direction text NOT NULL, provider_message_id text, in_reply_to text, "references" text, reply_to_message_id text REFERENCES messages(id) ON DELETE set null, folder_id text REFERENCES folders(id) ON DELETE set null, from_addr text NOT NULL, to_addr text NOT NULL, subject text, snippet text, text_body text, html_body text, raw_r2_key text, inbound_delivery_key text, status text DEFAULT 'received' NOT NULL, delivery_status text, delivery_detail text, delivery_updated_at integer, security_status text DEFAULT 'clean' NOT NULL, security_reason text, spam_score integer DEFAULT 0 NOT NULL, read integer DEFAULT false NOT NULL, starred integer DEFAULT false NOT NULL, snoozed_until integer, thread_id text, created_at integer NOT NULL);
 CREATE INDEX IF NOT EXISTS messages_user_created_idx ON messages(user_id, created_at);
 CREATE INDEX IF NOT EXISTS messages_mailbox_idx ON messages(mailbox_id);
+CREATE INDEX IF NOT EXISTS messages_mailbox_thread_created_idx ON messages(mailbox_id, thread_id, created_at);
+CREATE INDEX IF NOT EXISTS messages_mailbox_provider_message_idx ON messages(mailbox_id, provider_message_id);
 CREATE INDEX IF NOT EXISTS messages_folder_idx ON messages(folder_id);
 CREATE UNIQUE INDEX IF NOT EXISTS messages_inbound_delivery_key_idx ON messages(inbound_delivery_key);
 CREATE TABLE IF NOT EXISTS message_attachments (id text PRIMARY KEY NOT NULL, message_id text NOT NULL REFERENCES messages(id) ON DELETE cascade, filename text NOT NULL, content_type text NOT NULL, size integer NOT NULL, disposition text DEFAULT 'attachment' NOT NULL, content_id text, security_status text DEFAULT 'safe' NOT NULL, security_reason text, r2_key text NOT NULL UNIQUE, created_at integer NOT NULL);
 CREATE INDEX IF NOT EXISTS message_attachments_message_idx ON message_attachments(message_id);
-CREATE TABLE IF NOT EXISTS outbound_jobs (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, message_id text REFERENCES messages(id) ON DELETE set null, domain_id text REFERENCES domains(id) ON DELETE set null, status text DEFAULT 'queued' NOT NULL, payload text NOT NULL, idempotency_key text, request_hash text, delivery_started_at integer, attempt_count integer DEFAULT 0 NOT NULL, error text, scheduled_at integer, created_at integer NOT NULL, updated_at integer NOT NULL);
+CREATE TABLE IF NOT EXISTS outbound_jobs (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, message_id text REFERENCES messages(id) ON DELETE set null, domain_id text REFERENCES domains(id) ON DELETE set null, status text DEFAULT 'queued' NOT NULL, payload text NOT NULL, idempotency_key text, request_hash text, delivery_started_at integer, attempt_count integer DEFAULT 0 NOT NULL, error text, scheduled_at integer, send_not_before integer, canceled_at integer, created_at integer NOT NULL, updated_at integer NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS outbound_jobs_user_idempotency_key_idx ON outbound_jobs(user_id, idempotency_key);
 CREATE INDEX IF NOT EXISTS outbound_jobs_user_created_idx ON outbound_jobs(user_id, created_at);
 CREATE INDEX IF NOT EXISTS outbound_jobs_domain_created_idx ON outbound_jobs(domain_id, created_at);
+CREATE INDEX IF NOT EXISTS outbound_jobs_status_send_not_before_idx ON outbound_jobs(status, send_not_before);
 CREATE TABLE IF NOT EXISTS sender_policies (id text PRIMARY KEY NOT NULL, user_id text REFERENCES users(id) ON DELETE cascade, pattern_type text NOT NULL, pattern text NOT NULL, action text NOT NULL, created_by_user_id text REFERENCES users(id) ON DELETE set null, created_at integer NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS sender_policies_scope_pattern_idx ON sender_policies(user_id, pattern_type, pattern);
 CREATE INDEX IF NOT EXISTS sender_policies_lookup_idx ON sender_policies(user_id, pattern_type, pattern);
@@ -80,8 +126,21 @@ CREATE INDEX IF NOT EXISTS dead_letter_events_status_created_idx ON dead_letter_
 CREATE INDEX IF NOT EXISTS dead_letter_events_source_created_idx ON dead_letter_events(source_queue, created_at);
 CREATE TABLE IF NOT EXISTS email_templates (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, name text NOT NULL, subject text DEFAULT '' NOT NULL, text_body text DEFAULT '' NOT NULL, created_at integer NOT NULL, updated_at integer NOT NULL);
 CREATE INDEX IF NOT EXISTS email_templates_user_idx ON email_templates(user_id);
-CREATE TABLE IF NOT EXISTS calendar_events (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, title text NOT NULL, description text DEFAULT '' NOT NULL, location text DEFAULT '' NOT NULL, attendees text DEFAULT '[]' NOT NULL, starts_at integer NOT NULL, ends_at integer NOT NULL, created_at integer NOT NULL, updated_at integer NOT NULL);
+CREATE TABLE IF NOT EXISTS calendar_events (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, title text NOT NULL, description text DEFAULT '' NOT NULL, location text DEFAULT '' NOT NULL, attendees text DEFAULT '[]' NOT NULL, organizer text, starts_at integer NOT NULL, ends_at integer NOT NULL, timezone text DEFAULT 'UTC' NOT NULL, all_day integer DEFAULT 0 NOT NULL, sequence integer DEFAULT 0 NOT NULL, idempotency_key text, request_hash text, created_at integer NOT NULL, updated_at integer NOT NULL);
 CREATE INDEX IF NOT EXISTS calendar_events_user_starts_idx ON calendar_events(user_id, starts_at);
+CREATE UNIQUE INDEX IF NOT EXISTS calendar_events_user_idempotency_idx ON calendar_events(user_id, idempotency_key);
+ CREATE TABLE IF NOT EXISTS calendar_tasks (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, assignee_user_id text REFERENCES users(id) ON DELETE set null, completed_by_user_id text REFERENCES users(id) ON DELETE set null, assigned_at integer, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, title text NOT NULL, description text DEFAULT '' NOT NULL, due_at integer, timezone text DEFAULT 'UTC' NOT NULL, all_day integer DEFAULT 0 NOT NULL, status text DEFAULT 'open' NOT NULL CHECK (status IN ('open', 'completed')), priority text DEFAULT 'none' NOT NULL CHECK (priority IN ('none', 'low', 'medium', 'high')), completed_at integer, created_at integer NOT NULL, updated_at integer NOT NULL);
+CREATE INDEX IF NOT EXISTS calendar_tasks_user_status_due_idx ON calendar_tasks(user_id, status, due_at);
+ CREATE INDEX IF NOT EXISTS calendar_tasks_user_due_idx ON calendar_tasks(user_id, due_at);
+ CREATE INDEX IF NOT EXISTS calendar_tasks_assignee_status_due_idx ON calendar_tasks(assignee_user_id, status, due_at);
+CREATE TABLE IF NOT EXISTS calendar_reminders (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, event_id text REFERENCES calendar_events(id) ON DELETE cascade, task_id text REFERENCES calendar_tasks(id) ON DELETE cascade, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, title text NOT NULL, message text DEFAULT '' NOT NULL, channel text DEFAULT 'in_app' NOT NULL CHECK (channel IN ('in_app', 'email')), recipient text, from_addr text, remind_at integer NOT NULL, timezone text DEFAULT 'UTC' NOT NULL, status text DEFAULT 'scheduled' NOT NULL CHECK (status IN ('scheduled', 'processing', 'delivered', 'dismissed', 'cancelled', 'failed')), snoozed_until integer, claimed_at integer, delivered_at integer, dismissed_at integer, attempt_count integer DEFAULT 0 NOT NULL, last_error text, created_at integer NOT NULL, updated_at integer NOT NULL, CHECK ((event_id IS NOT NULL AND task_id IS NULL) OR (event_id IS NULL AND task_id IS NOT NULL)), CHECK (channel = 'in_app' OR (mailbox_id IS NOT NULL AND recipient IS NOT NULL AND from_addr IS NOT NULL)));
+CREATE INDEX IF NOT EXISTS calendar_reminders_due_idx ON calendar_reminders(status, remind_at);
+CREATE INDEX IF NOT EXISTS calendar_reminders_user_status_idx ON calendar_reminders(user_id, status, remind_at);
+CREATE INDEX IF NOT EXISTS calendar_reminders_event_idx ON calendar_reminders(event_id);
+CREATE INDEX IF NOT EXISTS calendar_reminders_task_idx ON calendar_reminders(task_id);
+CREATE TABLE IF NOT EXISTS calendar_reminder_deliveries (id text PRIMARY KEY NOT NULL, reminder_id text NOT NULL REFERENCES calendar_reminders(id) ON DELETE cascade, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, scheduled_for integer NOT NULL, channel text NOT NULL CHECK (channel IN ('in_app', 'email')), status text NOT NULL CHECK (status IN ('delivered', 'queued', 'failed')), idempotency_key text NOT NULL, outbound_job_id text REFERENCES outbound_jobs(id) ON DELETE set null, message_id text REFERENCES messages(id) ON DELETE set null, attempt_count integer DEFAULT 1 NOT NULL, error text, created_at integer NOT NULL, delivered_at integer);
+CREATE UNIQUE INDEX IF NOT EXISTS calendar_reminder_deliveries_schedule_idx ON calendar_reminder_deliveries(reminder_id, scheduled_for);
+CREATE INDEX IF NOT EXISTS calendar_reminder_deliveries_user_created_idx ON calendar_reminder_deliveries(user_id, created_at);
 CREATE TABLE IF NOT EXISTS routing_rules (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, domain_id text NOT NULL REFERENCES domains(id) ON DELETE cascade, pattern text NOT NULL, match_field text DEFAULT 'email' NOT NULL, match_operator text DEFAULT 'contains' NOT NULL, match_value text DEFAULT '' NOT NULL, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, folder_id text REFERENCES folders(id) ON DELETE set null, action text DEFAULT 'store' NOT NULL, forward_to text, priority integer DEFAULT 0 NOT NULL, created_at integer NOT NULL);
 CREATE TABLE IF NOT EXISTS webhooks (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, url text NOT NULL, secret text NOT NULL, events text NOT NULL, enabled integer DEFAULT true NOT NULL, created_at integer NOT NULL);
 CREATE TABLE IF NOT EXISTS webhook_deliveries (id text PRIMARY KEY NOT NULL, webhook_id text NOT NULL REFERENCES webhooks(id) ON DELETE cascade, event_type text NOT NULL, payload text NOT NULL, status text DEFAULT 'pending' NOT NULL, attempts integer DEFAULT 0 NOT NULL, last_attempt_at integer, next_attempt_at integer, delivered_at integer, last_status_code integer, last_error text, created_at integer NOT NULL);
@@ -112,7 +171,9 @@ CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, 
 
 export async function migrateCleanDatabase(db: D1Database): Promise<boolean> {
 	const existing = await db
-		.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' AND name NOT IN ('d1_migrations', 'd1_kv')")
+		.prepare(
+			"SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' AND name NOT IN ('d1_migrations', 'd1_kv')",
+		)
 		.all<{ name: string }>();
 	if (existing.results.length > 0) {
 		const tableNames = new Set(existing.results.map((table) => table.name));
@@ -122,14 +183,14 @@ export async function migrateCleanDatabase(db: D1Database): Promise<boolean> {
 		);
 	}
 
-	const schemaStatements = INITIAL_SCHEMA_SQL
-		.split(";")
+	const schemaStatements = INITIAL_SCHEMA_SQL.split(";")
 		.map((statement) => statement.trim())
 		.filter(Boolean)
 		.map((statement) => db.prepare(statement));
 	const migrationStatements = MIGRATION_NAMES.map((name) =>
 		db.prepare("INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)").bind(name),
 	);
-	await db.batch([...schemaStatements, ...migrationStatements]);
+	const searchSchemaStatements = SEARCH_SCHEMA_STATEMENTS.map((statement) => db.prepare(statement));
+	await db.batch([...schemaStatements, ...searchSchemaStatements, ...migrationStatements]);
 	return true;
 }

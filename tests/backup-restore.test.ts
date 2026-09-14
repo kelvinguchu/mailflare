@@ -10,7 +10,10 @@ import { normalizeDatabaseBackupDocument } from "../src/lib/backups/export";
 
 function validColumns(): Record<DatabaseBackupTable, TableColumn[]> {
 	return Object.fromEntries(
-		BACKUP_TABLES.map((table) => [table, [{ name: "id", type: "TEXT", notnull: 0, dflt_value: null, pk: 1 }]]),
+		BACKUP_TABLES.map((table) => [
+			table,
+			[{ name: "id", type: "TEXT", notnull: 0, dflt_value: null, pk: 1 }],
+		]),
 	) as Record<DatabaseBackupTable, TableColumn[]>;
 }
 
@@ -62,10 +65,7 @@ describe("database restore transaction", () => {
 		const columns = validColumns();
 		columns.users.push({ name: "name", type: "TEXT", notnull: 1, dflt_value: "''", pk: 0 });
 		expect(() =>
-			validateDatabaseBackupColumns(
-				documentWithUser({ name: "CaliberCode" }),
-				columns,
-			),
+			validateDatabaseBackupColumns(documentWithUser({ name: "CaliberCode" }), columns),
 		).toThrow("missing required column users.id");
 	});
 });

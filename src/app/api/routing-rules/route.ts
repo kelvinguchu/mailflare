@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { getEnv } from "@/lib/cloudflare";
@@ -23,10 +24,7 @@ export async function GET(request: Request) {
 		return NextResponse.json({ error: "Mailbox not found" }, { status: 404 });
 	}
 
-	const rows = await db
-		.select()
-		.from(routingRules)
-		.where(eq(routingRules.mailboxId, mailboxId));
+	const rows = await db.select().from(routingRules).where(eq(routingRules.mailboxId, mailboxId));
 	return NextResponse.json({ rules: rows });
 }
 
@@ -35,7 +33,7 @@ export async function POST(request: Request) {
 	const user = await requireUser(env, request);
 	const parsed = routingRuleSchema.safeParse(await request.json());
 	if (!parsed.success) {
-		return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+		return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
 	}
 
 	const db = getDb(env);
@@ -45,7 +43,8 @@ export async function POST(request: Request) {
 	}
 	const mailbox = access.mailbox;
 
-	const destination = parsed.data.destination ?? (parsed.data.folderId ? `folder:${parsed.data.folderId}` : "");
+	const destination =
+		parsed.data.destination ?? (parsed.data.folderId ? `folder:${parsed.data.folderId}` : "");
 	const systemAction = destination === "spam" || destination === "trash" ? destination : null;
 	const folderId = destination.startsWith("folder:") ? destination.slice("folder:".length) : null;
 

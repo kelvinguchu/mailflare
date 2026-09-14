@@ -22,13 +22,14 @@
 		"paths": {
 			"@/*": ["./src/*"]
 		},
-		"types": [
-			"./cloudflare-env.d.ts",
-			"./env.d.ts",
-			"node",
-			"@cloudflare/workers-types"
-		]
+		"types": ["./cloudflare-env.d.ts", "./env.d.ts", "node", "@cloudflare/workers-types"]
 	},
-	"include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", ".next/dev/types/**/*.ts"],
+	"include": [
+		"next-env.d.ts",
+		"**/*.ts",
+		"**/*.tsx",
+		".next/types/**/*.ts",
+		".next/dev/types/**/*.ts"
+	],
 	"exclude": ["node_modules"]
 }

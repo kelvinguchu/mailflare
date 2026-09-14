@@ -113,7 +113,9 @@ export function OnboardingClient() {
 									onChange={(e) => setLocalPart(e.target.value)}
 									className="min-w-0"
 								/>
-								<span className="max-w-36 truncate text-sm font-medium text-neutral-500">@{hostname}</span>
+								<span className="max-w-36 truncate text-sm font-medium text-neutral-500">
+									@{hostname}
+								</span>
 							</div>
 						</div>
 						<Button

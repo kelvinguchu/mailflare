@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { ZodError } from "zod";
+import { z, ZodError } from "zod";
 import { getCurrentUser } from "@/lib/auth/cookies";
 import { verifyPassword } from "@/lib/auth/password";
 import { changePasswordAndRevokeRecoveryTokens } from "@/lib/auth/recovery";
@@ -19,7 +19,7 @@ export async function PATCH(request: Request) {
 		parsed = await parseChangePasswordRequest(request);
 	} catch (err) {
 		if (err instanceof ZodError) {
-			return NextResponse.json({ error: err.flatten() }, { status: 400 });
+			return NextResponse.json({ error: z.flattenError(err) }, { status: 400 });
 		}
 		return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 	}
@@ -29,7 +29,10 @@ export async function PATCH(request: Request) {
 	}
 
 	if (verifyPassword(parsed.newPassword, user.passwordHash)) {
-		return NextResponse.json({ error: "New password must be different from the current password" }, { status: 400 });
+		return NextResponse.json(
+			{ error: "New password must be different from the current password" },
+			{ status: 400 },
+		);
 	}
 
 	const jar = await cookies();

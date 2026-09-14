@@ -11,7 +11,10 @@ const permissionRank: Record<MailboxPermission, number> = {
 	full_access: 4,
 };
 
-export function hasMailboxPermission(permission: MailboxPermission, required: MailboxPermission): boolean {
+export function hasMailboxPermission(
+	permission: MailboxPermission,
+	required: MailboxPermission,
+): boolean {
 	return permissionRank[permission] >= permissionRank[required];
 }
 
@@ -37,19 +40,25 @@ export async function getMailboxAccessLevel(
 	return null;
 }
 
-export async function listAccessibleMailboxes(db: AppDatabase, user: Pick<SessionUser, "id" | "email" | "role">) {
-	const ownedRows = await db
+export async function listAccessibleMailboxes(
+	db: AppDatabase,
+	user: Pick<SessionUser, "id" | "email" | "role">,
+) {
+	const ownedQuery = db
 		.select({
 			id: mailboxes.id,
 			userId: mailboxes.userId,
 			domainId: mailboxes.domainId,
-		localPart: mailboxes.localPart,
-		displayName: mailboxes.displayName,
-		signature: mailboxes.signature,
-		autoReplyEnabled: mailboxes.autoReplyEnabled,
-		autoReplySubject: mailboxes.autoReplySubject,
-		autoReplyBody: mailboxes.autoReplyBody,
-		useAllDomains: mailboxes.useAllDomains,
+			localPart: mailboxes.localPart,
+			displayName: mailboxes.displayName,
+			signature: mailboxes.signature,
+			signatureText: mailboxes.signatureText,
+			signatureHtml: mailboxes.signatureHtml,
+			signatureVersion: mailboxes.signatureVersion,
+			autoReplyEnabled: mailboxes.autoReplyEnabled,
+			autoReplySubject: mailboxes.autoReplySubject,
+			autoReplyBody: mailboxes.autoReplyBody,
+			useAllDomains: mailboxes.useAllDomains,
 			mailboxAvatarKey: mailboxes.avatarKey,
 			ownerAvatarKey: users.avatarKey,
 			type: mailboxes.type,
@@ -61,29 +70,22 @@ export async function listAccessibleMailboxes(db: AppDatabase, user: Pick<Sessio
 		.innerJoin(domains, eq(mailboxes.domainId, domains.id))
 		.innerJoin(users, eq(mailboxes.userId, users.id))
 		.where(and(eq(mailboxes.userId, user.id), eq(mailboxes.disabled, false)));
-	const owned = ownedRows
-		.map((row) => {
-			const { mailboxAvatarKey, ownerAvatarKey, ...mailbox } = row;
-			return {
-				...mailbox,
-				hasAvatar: row.type === "personal" ? !!ownerAvatarKey : !!mailboxAvatarKey,
-				permission: "full_access" as MailboxPermission,
-				isPrimary: `${row.localPart}@${row.hostname}` === user.email,
-			};
-		});
 
-	const sharedRows = await db
+	const sharedQuery = db
 		.select({
 			id: mailboxes.id,
 			userId: mailboxes.userId,
 			domainId: mailboxes.domainId,
-		localPart: mailboxes.localPart,
-		displayName: mailboxes.displayName,
-		signature: mailboxes.signature,
-		autoReplyEnabled: mailboxes.autoReplyEnabled,
-		autoReplySubject: mailboxes.autoReplySubject,
-		autoReplyBody: mailboxes.autoReplyBody,
-		useAllDomains: mailboxes.useAllDomains,
+			localPart: mailboxes.localPart,
+			displayName: mailboxes.displayName,
+			signature: mailboxes.signature,
+			signatureText: mailboxes.signatureText,
+			signatureHtml: mailboxes.signatureHtml,
+			signatureVersion: mailboxes.signatureVersion,
+			autoReplyEnabled: mailboxes.autoReplyEnabled,
+			autoReplySubject: mailboxes.autoReplySubject,
+			autoReplyBody: mailboxes.autoReplyBody,
+			useAllDomains: mailboxes.useAllDomains,
 			avatarKey: mailboxes.avatarKey,
 			type: mailboxes.type,
 			disabled: mailboxes.disabled,
@@ -101,6 +103,17 @@ export async function listAccessibleMailboxes(db: AppDatabase, user: Pick<Sessio
 				eq(mailboxes.disabled, false),
 			),
 		);
+
+	const [ownedRows, sharedRows] = await db.batch([ownedQuery, sharedQuery]);
+	const owned = ownedRows.map((row) => {
+		const { mailboxAvatarKey, ownerAvatarKey, ...mailbox } = row;
+		return {
+			...mailbox,
+			hasAvatar: row.type === "personal" ? !!ownerAvatarKey : !!mailboxAvatarKey,
+			permission: "full_access" as MailboxPermission,
+			isPrimary: `${row.localPart}@${row.hostname}` === user.email,
+		};
+	});
 	const shared = sharedRows.map((row) => {
 		const { avatarKey, ...mailbox } = row;
 		return {
@@ -113,7 +126,10 @@ export async function listAccessibleMailboxes(db: AppDatabase, user: Pick<Sessio
 	return [...owned, ...shared];
 }
 
-export async function listAccessibleMailboxIds(db: AppDatabase, user: Pick<SessionUser, "id" | "email" | "role">) {
+export async function listAccessibleMailboxIds(
+	db: AppDatabase,
+	user: Pick<SessionUser, "id" | "email" | "role">,
+) {
 	const rows = await listAccessibleMailboxes(db, user);
 	return rows.map((row) => row.id);
 }

@@ -7,10 +7,4 @@ export interface MessageAttachmentViewerProps {
 	open: boolean;
 }
 
-export type AttachmentPreviewKind =
-	| "audio"
-	| "image"
-	| "pdf"
-	| "text"
-	| "unsupported"
-	| "video";
+export type AttachmentPreviewKind = "audio" | "image" | "pdf" | "text" | "unsupported" | "video";

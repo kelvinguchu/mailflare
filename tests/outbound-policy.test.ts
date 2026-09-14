@@ -11,13 +11,12 @@ import {
 import { isOutboundQueueMessage } from "../worker-utils";
 
 describe("outbound delivery failure policy", () => {
-	it.each([
-		"E_RATE_LIMIT_EXCEEDED",
-		"E_DELIVERY_FAILED",
-		"E_INTERNAL_SERVER_ERROR",
-	])("retries the transient Email Service error %s", (code) => {
-		expect(classifyOutboundFailure({ code })).toBe("retryable");
-	});
+	it.each(["E_RATE_LIMIT_EXCEEDED", "E_DELIVERY_FAILED", "E_INTERNAL_SERVER_ERROR"])(
+		"retries the transient Email Service error %s",
+		(code) => {
+			expect(classifyOutboundFailure({ code })).toBe("retryable");
+		},
+	);
 
 	it("treats Email Service validation errors as permanent", () => {
 		expect(classifyOutboundFailure({ code: "E_INVALID_RECIPIENT" })).toBe("permanent");

@@ -13,7 +13,7 @@ export function ForwardingEmailForm({ initialForwardingEmail }: ForwardingEmailF
 	const [status, setStatus] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
 
-	async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+	async function onSubmit(event: React.SubmitEvent<HTMLFormElement>) {
 		event.preventDefault();
 		setSaving(true);
 		setStatus(null);

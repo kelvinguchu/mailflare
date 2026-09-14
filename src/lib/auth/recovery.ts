@@ -1,11 +1,6 @@
 import { and, eq, gt, isNotNull, isNull, lt, ne, sql } from "drizzle-orm";
 import { getDb } from "@/db";
-import {
-	accountRecoveryTokens,
-	auditLogs,
-	sessions,
-	users,
-} from "@/db/schema";
+import { accountRecoveryTokens, auditLogs, sessions, users } from "@/db/schema";
 import { newId } from "@/lib/ids";
 import { createAuditLog } from "@/lib/mailboxes/audit";
 import { hashPassword } from "./password";
@@ -32,8 +27,7 @@ export type RecoveryEmailVerificationPreparation =
 	| { status: "pending"; email: PendingAuthEmail };
 
 export type AccountActivationPreparation =
-	| { status: "delivery_disabled" }
-	| { status: "pending"; email: PendingAuthEmail };
+	{ status: "delivery_disabled" } | { status: "pending"; email: PendingAuthEmail };
 
 export function isAuthEmailDeliveryEnabled(env: CloudflareEnv): boolean {
 	return env.AUTH_EMAIL_DELIVERY_MODE === "enabled";
@@ -107,16 +101,23 @@ export async function prepareAccountActivation(
 	}
 	if (!isAuthEmailDeliveryEnabled(env)) {
 		await db.batch([
-			db.delete(accountRecoveryTokens).where(and(
-				eq(accountRecoveryTokens.userId, userId),
-				eq(accountRecoveryTokens.purpose, "account_activation"),
-			)),
-			db.update(users).set({
-				activationStatus: "pending",
-				invitationSentAt: null,
-				invitationExpiresAt: null,
-				resetEmailVerifiedAt: null,
-			}).where(eq(users.id, userId)),
+			db
+				.delete(accountRecoveryTokens)
+				.where(
+					and(
+						eq(accountRecoveryTokens.userId, userId),
+						eq(accountRecoveryTokens.purpose, "account_activation"),
+					),
+				),
+			db
+				.update(users)
+				.set({
+					activationStatus: "pending",
+					invitationSentAt: null,
+					invitationExpiresAt: null,
+					resetEmailVerifiedAt: null,
+				})
+				.where(eq(users.id, userId)),
 		]);
 		return { status: "delivery_disabled" };
 	}
@@ -127,12 +128,16 @@ export async function prepareAccountActivation(
 		email: user.resetEmail,
 		ttlMs: ACCOUNT_ACTIVATION_TTL_MS,
 	});
-	const updated = await db.update(users).set({
-		activationStatus: "pending",
-		invitationSentAt: new Date(),
-		invitationExpiresAt: new Date(Date.now() + ACCOUNT_ACTIVATION_TTL_MS),
-		resetEmailVerifiedAt: null,
-	}).where(and(eq(users.id, userId), ne(users.activationStatus, "active"))).returning({ id: users.id });
+	const updated = await db
+		.update(users)
+		.set({
+			activationStatus: "pending",
+			invitationSentAt: new Date(),
+			invitationExpiresAt: new Date(Date.now() + ACCOUNT_ACTIVATION_TTL_MS),
+			resetEmailVerifiedAt: null,
+		})
+		.where(and(eq(users.id, userId), ne(users.activationStatus, "active")))
+		.returning({ id: users.id });
 	if (updated.length === 0) {
 		await db.delete(accountRecoveryTokens).where(eq(accountRecoveryTokens.id, pending.tokenId));
 		throw new Error("Account is already active");
@@ -145,14 +150,18 @@ export async function prepareAccountActivation(
 	return { status: "pending", email: pending };
 }
 
-export async function deliverAuthEmail(env: CloudflareEnv, pending: PendingAuthEmail): Promise<void> {
+export async function deliverAuthEmail(
+	env: CloudflareEnv,
+	pending: PendingAuthEmail,
+): Promise<void> {
 	try {
 		const origin = getPublicAppOrigin(env);
-		const route = pending.purpose === "password_reset"
-			? "/reset-password"
-			: pending.purpose === "account_activation"
-				? "/activate-account"
-				: "/verify-recovery-email";
+		const route =
+			pending.purpose === "password_reset"
+				? "/reset-password"
+				: pending.purpose === "account_activation"
+					? "/activate-account"
+					: "/verify-recovery-email";
 		const link = new URL(route, origin);
 		link.searchParams.set("token", pending.token);
 		const content = {
@@ -183,22 +192,24 @@ export async function deliverAuthEmail(env: CloudflareEnv, pending: PendingAuthE
 		try {
 			const revoked = await revokeRecoveryToken(env, pending.tokenId);
 			if (revoked && pending.purpose === "account_activation") {
-				await getDb(env).update(users).set({
-					invitationSentAt: null,
-					invitationExpiresAt: null,
-				}).where(and(
-					eq(users.id, pending.userId),
-					eq(users.activationStatus, "pending"),
-				));
+				await getDb(env)
+					.update(users)
+					.set({
+						invitationSentAt: null,
+						invitationExpiresAt: null,
+					})
+					.where(and(eq(users.id, pending.userId), eq(users.activationStatus, "pending")));
 			}
 		} catch {
 			console.error(JSON.stringify({ event: "auth_email_token_revocation_failed" }));
 		}
-		console.error(JSON.stringify({
-			event: "auth_email_delivery_failed",
-			purpose: pending.purpose,
-			errorCode: getErrorCode(error),
-		}));
+		console.error(
+			JSON.stringify({
+				event: "auth_email_delivery_failed",
+				purpose: pending.purpose,
+				errorCode: getErrorCode(error),
+			}),
+		);
 		await recordRecoveryAudit(env, {
 			targetUserId: pending.userId,
 			action: "auth.email_delivery_failed",
@@ -208,11 +219,12 @@ export async function deliverAuthEmail(env: CloudflareEnv, pending: PendingAuthE
 	}
 	await recordRecoveryAudit(env, {
 		targetUserId: pending.userId,
-		action: pending.purpose === "password_reset"
-			? "auth.password_reset_email_sent"
-			: pending.purpose === "account_activation"
-				? "auth.account_invitation_sent"
-				: "auth.recovery_email_verification_sent",
+		action:
+			pending.purpose === "password_reset"
+				? "auth.password_reset_email_sent"
+				: pending.purpose === "account_activation"
+					? "auth.account_invitation_sent"
+					: "auth.recovery_email_verification_sent",
 	});
 }
 
@@ -225,19 +237,25 @@ export async function completeAccountActivation(
 	if (!claimed) return null;
 	const db = getDb(env);
 	const now = new Date();
-	const activated = await db.update(users).set({
-		passwordHash: hashPassword(newPassword),
-		activationStatus: "active",
-		activatedAt: now,
-		invitationSentAt: null,
-		invitationExpiresAt: null,
-		resetEmailVerifiedAt: now,
-	}).where(and(
-		eq(users.id, claimed.userId),
-		eq(users.resetEmail, claimed.email),
-		eq(users.activationStatus, "pending"),
-		eq(users.disabled, false),
-	)).returning({ id: users.id });
+	const activated = await db
+		.update(users)
+		.set({
+			passwordHash: hashPassword(newPassword),
+			activationStatus: "active",
+			activatedAt: now,
+			invitationSentAt: null,
+			invitationExpiresAt: null,
+			resetEmailVerifiedAt: now,
+		})
+		.where(
+			and(
+				eq(users.id, claimed.userId),
+				eq(users.resetEmail, claimed.email),
+				eq(users.activationStatus, "pending"),
+				eq(users.disabled, false),
+			),
+		)
+		.returning({ id: users.id });
 	const user = activated[0];
 	if (!user) return null;
 
@@ -255,22 +273,31 @@ export async function completeAccountActivation(
 	return user.id;
 }
 
-export async function revokeAccountInvitation(env: CloudflareEnv, userId: string, actorUserId: string): Promise<boolean> {
+export async function revokeAccountInvitation(
+	env: CloudflareEnv,
+	userId: string,
+	actorUserId: string,
+): Promise<boolean> {
 	const db = getDb(env);
-	const updated = await db.update(users).set({
-		activationStatus: "revoked",
-		invitationSentAt: null,
-		invitationExpiresAt: null,
-	}).where(and(
-		eq(users.id, userId),
-		eq(users.activationStatus, "pending"),
-	)).returning({ id: users.id });
+	const updated = await db
+		.update(users)
+		.set({
+			activationStatus: "revoked",
+			invitationSentAt: null,
+			invitationExpiresAt: null,
+		})
+		.where(and(eq(users.id, userId), eq(users.activationStatus, "pending")))
+		.returning({ id: users.id });
 	if (updated.length === 0) return false;
 	await db.batch([
-		db.delete(accountRecoveryTokens).where(and(
-			eq(accountRecoveryTokens.userId, userId),
-			eq(accountRecoveryTokens.purpose, "account_activation"),
-		)),
+		db
+			.delete(accountRecoveryTokens)
+			.where(
+				and(
+					eq(accountRecoveryTokens.userId, userId),
+					eq(accountRecoveryTokens.purpose, "account_activation"),
+				),
+			),
 		db.delete(sessions).where(eq(sessions.userId, userId)),
 		db.insert(auditLogs).values({
 			id: newId("aud"),
@@ -313,18 +340,23 @@ export async function completePasswordReset(
 	const [user] = await getDb(env)
 		.select({ id: users.id })
 		.from(users)
-		.where(and(
-			eq(users.id, claimed.userId),
-			eq(users.resetEmail, claimed.email),
-			isNotNull(users.resetEmailVerifiedAt),
-			eq(users.disabled, false),
-		))
+		.where(
+			and(
+				eq(users.id, claimed.userId),
+				eq(users.resetEmail, claimed.email),
+				isNotNull(users.resetEmailVerifiedAt),
+				eq(users.disabled, false),
+			),
+		)
 		.limit(1);
 	if (!user) return false;
 
 	const db = getDb(env);
 	await db.batch([
-		db.update(users).set({ passwordHash: hashPassword(newPassword) }).where(eq(users.id, user.id)),
+		db
+			.update(users)
+			.set({ passwordHash: hashPassword(newPassword) })
+			.where(eq(users.id, user.id)),
 		db.delete(sessions).where(eq(sessions.userId, user.id)),
 		db.delete(accountRecoveryTokens).where(eq(accountRecoveryTokens.userId, user.id)),
 		db.insert(auditLogs).values({
@@ -350,12 +382,14 @@ export async function changePasswordAndRevokeRecoveryTokens(
 		? await hashSessionToken(currentSessionToken)
 		: null;
 	const results = await db.batch([
-		db.update(users).set({ passwordHash: hashPassword(newPassword) }).where(eq(users.id, userId)),
+		db
+			.update(users)
+			.set({ passwordHash: hashPassword(newPassword) })
+			.where(eq(users.id, userId)),
 		currentSessionHash
-			? db.delete(sessions).where(and(
-				eq(sessions.userId, userId),
-				ne(sessions.tokenHash, currentSessionHash),
-			))
+			? db
+					.delete(sessions)
+					.where(and(eq(sessions.userId, userId), ne(sessions.tokenHash, currentSessionHash)))
 			: db.delete(sessions).where(eq(sessions.userId, userId)),
 		db.delete(accountRecoveryTokens).where(eq(accountRecoveryTokens.userId, userId)),
 		db.insert(auditLogs).values({
@@ -400,10 +434,14 @@ async function replaceRecoveryToken(
 	const tokenHash = await hashRecoveryToken(token);
 	const db = getDb(env);
 	await db.batch([
-		db.delete(accountRecoveryTokens).where(and(
-			eq(accountRecoveryTokens.userId, input.userId),
-			eq(accountRecoveryTokens.purpose, input.purpose),
-		)),
+		db
+			.delete(accountRecoveryTokens)
+			.where(
+				and(
+					eq(accountRecoveryTokens.userId, input.userId),
+					eq(accountRecoveryTokens.purpose, input.purpose),
+				),
+			),
 		db.insert(accountRecoveryTokens).values({
 			id: tokenId,
 			userId: input.userId,
@@ -425,12 +463,14 @@ async function claimRecoveryToken(
 	const claimed = await getDb(env)
 		.update(accountRecoveryTokens)
 		.set({ usedAt: new Date() })
-		.where(and(
-			eq(accountRecoveryTokens.tokenHash, tokenHash),
-			eq(accountRecoveryTokens.purpose, purpose),
-			isNull(accountRecoveryTokens.usedAt),
-			gt(accountRecoveryTokens.expiresAt, new Date()),
-		))
+		.where(
+			and(
+				eq(accountRecoveryTokens.tokenHash, tokenHash),
+				eq(accountRecoveryTokens.purpose, purpose),
+				isNull(accountRecoveryTokens.usedAt),
+				gt(accountRecoveryTokens.expiresAt, new Date()),
+			),
+		)
 		.returning({
 			userId: accountRecoveryTokens.userId,
 			email: accountRecoveryTokens.email,
@@ -477,9 +517,11 @@ async function recordRecoveryAudit(
 	try {
 		await createAuditLog(env, input);
 	} catch {
-		console.error(JSON.stringify({
-			event: "auth_recovery_audit_failed",
-			action: input.action,
-		}));
+		console.error(
+			JSON.stringify({
+				event: "auth_recovery_audit_failed",
+				action: input.action,
+			}),
+		);
 	}
 }

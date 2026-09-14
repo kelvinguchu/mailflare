@@ -44,13 +44,16 @@ export async function resolveInboundAddress(
 	const [exactMailbox] = await db
 		.select()
 		.from(mailboxes)
-		.where(and(
-			eq(mailboxes.domainId, domain.id),
-			eq(mailboxes.localPart, parsed.local),
-			eq(mailboxes.disabled, false),
-		))
+		.where(
+			and(
+				eq(mailboxes.domainId, domain.id),
+				eq(mailboxes.localPart, parsed.local),
+				eq(mailboxes.disabled, false),
+			),
+		)
 		.limit(1);
-	const mailbox = exactMailbox ?? await resolveMailboxDomainAlias(db, domain.hostname, parsed.local);
+	const mailbox =
+		exactMailbox ?? (await resolveMailboxDomainAlias(db, domain.hostname, parsed.local));
 
 	if (!mailbox) return null;
 
@@ -72,7 +75,13 @@ async function resolveMailboxDomainAlias(db: AppDatabase, hostname: string, loca
 	const candidates = await db
 		.select()
 		.from(mailboxes)
-		.where(and(eq(mailboxes.localPart, localPart), eq(mailboxes.useAllDomains, true), eq(mailboxes.disabled, false)));
+		.where(
+			and(
+				eq(mailboxes.localPart, localPart),
+				eq(mailboxes.useAllDomains, true),
+				eq(mailboxes.disabled, false),
+			),
+		);
 
 	for (const mailbox of candidates) {
 		const addresses = await getMailboxDomainAddresses(db, mailbox);
@@ -142,7 +151,10 @@ function matchesInboxRule(
 	});
 }
 
-function normalizeRuleComparisonValue(field: string | undefined, value: string | null | undefined): string {
+function normalizeRuleComparisonValue(
+	field: string | undefined,
+	value: string | null | undefined,
+): string {
 	if (!value) return "";
 	if (field !== "email") return value.toLowerCase();
 	return getEmailAddress(value).trim().toLowerCase();

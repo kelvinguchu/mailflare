@@ -5,7 +5,10 @@ export function quoteImapString(value: string): string {
 export function parseSearchUids(line: string): string[] {
 	const match = line.match(/^\* SEARCH(?:\s+(.+))?$/i);
 	if (!match?.[1]) return [];
-	return match[1].trim().split(/\s+/).filter((value) => /^\d+$/.test(value));
+	return match[1]
+		.trim()
+		.split(/\s+/)
+		.filter((value) => /^\d+$/.test(value));
 }
 
 export function getLiteralLength(line: string): number | null {

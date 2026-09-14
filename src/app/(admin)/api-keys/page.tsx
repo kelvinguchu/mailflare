@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
 	Dialog,
+	DialogBody,
 	DialogContent,
 	DialogDescription,
 	DialogHeader,
@@ -49,7 +50,7 @@ export default function ApiKeysPage() {
 		},
 		onSuccess: () => {
 			setCreateOpen(false);
-			qc.invalidateQueries({ queryKey: ["api-keys"] });
+			void qc.invalidateQueries({ queryKey: ["api-keys"] });
 		},
 	});
 
@@ -69,25 +70,31 @@ export default function ApiKeysPage() {
 							<DialogTitle>Create API key</DialogTitle>
 							<DialogDescription>Create a key with send and read permissions.</DialogDescription>
 						</DialogHeader>
-						<div className="space-y-4">
-							<div className="space-y-2">
-								<Label>Name</Label>
-								<Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Production app" />
+						<DialogBody>
+							<div className="space-y-4">
+								<div className="space-y-2">
+									<Label>Name</Label>
+									<Input
+										value={name}
+										onChange={(e) => setName(e.target.value)}
+										placeholder="Production app"
+									/>
+								</div>
+								{create.isError && (
+									<p className="text-sm text-red-600">{(create.error as Error).message}</p>
+								)}
+								<Button onClick={() => create.mutate()} disabled={!name || create.isPending}>
+									{create.isPending ? "Creating..." : "Create key"}
+								</Button>
 							</div>
-							{create.isError && (
-								<p className="text-sm text-red-600">{(create.error as Error).message}</p>
-							)}
-							<Button onClick={() => create.mutate()} disabled={!name || create.isPending}>
-								{create.isPending ? "Creating..." : "Create key"}
-							</Button>
-						</div>
+						</DialogBody>
 					</DialogContent>
 				</Dialog>
 			</div>
 			{newKey && (
-				<Card className="border-blue-600/10 bg-blue-400/10">
+				<Card className="border-primary/10 bg-primary/10">
 					<CardContent className="pt-6">
-						<p className="text-sm font-medium text-blue-600">Copy your key now:</p>
+						<p className="text-sm font-medium text-primary">Copy your key now:</p>
 						<code className="block mt-2 text-xs break-all font-bold">{newKey}</code>
 					</CardContent>
 				</Card>
@@ -96,9 +103,7 @@ export default function ApiKeysPage() {
 				<div className="flex items-center justify-between">
 					<span className="text-sm text-neutral-500">{(data?.apiKeys ?? []).length} total</span>
 				</div>
-				{isLoading && (
-					<CardGridSkeleton />
-				)}
+				{isLoading && <CardGridSkeleton />}
 				{!isLoading && (data?.apiKeys ?? []).length === 0 && (
 					<p className="rounded-lg border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-500">
 						No API keys yet
@@ -114,8 +119,12 @@ export default function ApiKeysPage() {
 								<KeyRound className="h-5 w-5" />
 							</span>
 							<span className="min-w-0 flex-1 space-y-2">
-								<span className="block truncate text-sm font-semibold text-neutral-900">{key.name}</span>
-								<span className="block truncate no-font-mono text-sm text-neutral-500">{key.prefix}...</span>
+								<span className="block truncate text-sm font-semibold text-neutral-900">
+									{key.name}
+								</span>
+								<span className="block truncate no-font-mono text-sm text-neutral-500">
+									{key.prefix}...
+								</span>
 								<span className="flex flex-wrap gap-1">
 									{parseApiKeyScopes(key.scopes).map((scope) => (
 										<Badge key={scope} variant="outline">

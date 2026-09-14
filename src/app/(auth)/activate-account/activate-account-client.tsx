@@ -8,14 +8,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export function ActivateAccountClient({ token }: { token: string }) {
-	const [error, setError] = useState<string | null>(token ? null : "This activation link is invalid.");
+	const [error, setError] = useState<string | null>(
+		token ? null : "This activation link is invalid.",
+	);
 	const [loading, setLoading] = useState(false);
 
 	useEffect(() => {
 		if (token) window.history.replaceState({}, "", "/activate-account");
 	}, [token]);
 
-	async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+	async function onSubmit(event: React.SubmitEvent<HTMLFormElement>) {
 		event.preventDefault();
 		const form = new FormData(event.currentTarget);
 		const newPassword = String(form.get("newPassword") ?? "");
@@ -52,11 +54,27 @@ export function ActivateAccountClient({ token }: { token: string }) {
 			<form onSubmit={onSubmit} className="space-y-5">
 				<div className="space-y-2">
 					<Label htmlFor="newPassword">New password</Label>
-					<Input id="newPassword" name="newPassword" type="password" autoComplete="new-password" minLength={8} maxLength={128} required />
+					<Input
+						id="newPassword"
+						name="newPassword"
+						type="password"
+						autoComplete="new-password"
+						minLength={8}
+						maxLength={128}
+						required
+					/>
 				</div>
 				<div className="space-y-2">
 					<Label htmlFor="confirmPassword">Confirm new password</Label>
-					<Input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" minLength={8} maxLength={128} required />
+					<Input
+						id="confirmPassword"
+						name="confirmPassword"
+						type="password"
+						autoComplete="new-password"
+						minLength={8}
+						maxLength={128}
+						required
+					/>
 				</div>
 				{error && (
 					<p className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">

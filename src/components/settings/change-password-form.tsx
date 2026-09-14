@@ -13,7 +13,7 @@ export function ChangePasswordForm() {
 	const [status, setStatus] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 
-	async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+	async function onSubmit(event: React.SubmitEvent<HTMLFormElement>) {
 		event.preventDefault();
 		setStatus(null);
 
@@ -28,9 +28,11 @@ export function ChangePasswordForm() {
 			setCurrentPassword("");
 			setNewPassword("");
 			setConfirmPassword("");
-			setStatus(revokedSessions > 0
-				? `Password changed and ${revokedSessions} other ${revokedSessions === 1 ? "session" : "sessions"} signed out`
-				: "Password changed");
+			setStatus(
+				revokedSessions > 0
+					? `Password changed and ${revokedSessions} other ${revokedSessions === 1 ? "session" : "sessions"} signed out`
+					: "Password changed",
+			);
 		} catch (err) {
 			setStatus(err instanceof Error ? err.message : "Failed to change password");
 		} finally {

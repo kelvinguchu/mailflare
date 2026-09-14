@@ -3,9 +3,7 @@ export function getSecurityHeaders(
 		? "development"
 		: "production",
 ) {
-	const developmentScriptSource = environment === "development"
-		? " 'unsafe-eval'"
-		: "";
+	const developmentScriptSource = environment === "development" ? " 'unsafe-eval'" : "";
 	const csp = [
 		"default-src 'self'",
 		`script-src 'self' 'unsafe-inline'${developmentScriptSource} https://challenges.cloudflare.com`,

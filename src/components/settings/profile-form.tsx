@@ -21,12 +21,10 @@ export function ProfileForm({
 	const [status, setStatus] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [verificationLoading, setVerificationLoading] = useState(false);
-	const hasChanges =
-		name.trim() !== savedName ||
-		resetEmail.trim() !== savedResetEmail;
+	const hasChanges = name.trim() !== savedName || resetEmail.trim() !== savedResetEmail;
 	const canVerify = !!savedResetEmail && !resetEmailVerified && !hasChanges;
 
-	async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+	async function onSubmit(event: React.SubmitEvent<HTMLFormElement>) {
 		event.preventDefault();
 		setLoading(true);
 		setStatus(null);
@@ -87,7 +85,14 @@ export function ProfileForm({
 		<form onSubmit={onSubmit} className="space-y-4">
 			<div className="space-y-2">
 				<Label htmlFor="accountEmail">Current email</Label>
-				<Input id="accountEmail" value={email} type="email" readOnly aria-readonly="true" className="bg-neutral-50" />
+				<Input
+					id="accountEmail"
+					value={email}
+					type="email"
+					readOnly
+					aria-readonly="true"
+					className="bg-neutral-50"
+				/>
 			</div>
 			<div className="space-y-2">
 				<Label htmlFor="name">Name</Label>
@@ -97,7 +102,9 @@ export function ProfileForm({
 				<div className="flex items-center justify-between gap-3">
 					<Label htmlFor="resetEmail">Recovery email</Label>
 					{savedResetEmail && !hasChanges && (
-						<span className={`text-xs font-medium ${resetEmailVerified ? "text-emerald-700" : "text-amber-700"}`}>
+						<span
+							className={`text-xs font-medium ${resetEmailVerified ? "text-emerald-700" : "text-amber-700"}`}
+						>
 							{resetEmailVerified ? "Verified" : "Not verified"}
 						</span>
 					)}

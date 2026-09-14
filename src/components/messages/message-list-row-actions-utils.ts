@@ -55,5 +55,7 @@ export async function toggleMessageStar(messageId: string) {
 }
 
 export function dispatchMessageCountsDelta(detail: MessageCountsDelta) {
-	window.dispatchEvent(new CustomEvent<MessageCountsDelta>("mailflare:message-counts-delta", { detail }));
+	window.dispatchEvent(
+		new CustomEvent<MessageCountsDelta>("mailflare:message-counts-delta", { detail }),
+	);
 }

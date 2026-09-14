@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
@@ -30,9 +31,10 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 			activatedAt: account.activatedAt,
 			invitationSentAt: account.invitationSentAt,
 			invitationExpiresAt: account.invitationExpiresAt,
-			invitationExpired: account.activationStatus === "pending"
-				&& !!account.invitationExpiresAt
-				&& account.invitationExpiresAt.getTime() <= Date.now(),
+			invitationExpired:
+				account.activationStatus === "pending" &&
+				!!account.invitationExpiresAt &&
+				account.invitationExpiresAt.getTime() <= Date.now(),
 			disabled: account.disabled,
 			canManageMailboxes: account.canManageMailboxes,
 			sendRateLimitPerMinute: account.sendRateLimitPerMinute,
@@ -56,16 +58,22 @@ export async function PATCH(request: Request, { params }: AccountRouteParams) {
 		return NextResponse.json({ error: "Account not found" }, { status: 404 });
 	}
 	const parsed = updateManagedAccountSchema.safeParse(await request.json());
-	if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+	if (!parsed.success)
+		return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
 	await updateAccountCredentials(db, id, { name: parsed.data.name, password: null });
-	await db.update(users).set({
-		role: parsed.data.role,
-		disabled: parsed.data.disabled,
-		canManageMailboxes: parsed.data.canManageMailboxes,
-		sendRateLimitPerMinute: parsed.data.sendRateLimitPerMinute,
-		dailySendLimit: parsed.data.dailySendLimit,
-		...(parsed.data.forwardingEmail !== undefined ? { forwardingEmail: parsed.data.forwardingEmail } : {}),
-	}).where(eq(users.id, id));
+	await db
+		.update(users)
+		.set({
+			role: parsed.data.role,
+			disabled: parsed.data.disabled,
+			canManageMailboxes: parsed.data.canManageMailboxes,
+			sendRateLimitPerMinute: parsed.data.sendRateLimitPerMinute,
+			dailySendLimit: parsed.data.dailySendLimit,
+			...(parsed.data.forwardingEmail !== undefined
+				? { forwardingEmail: parsed.data.forwardingEmail }
+				: {}),
+		})
+		.where(eq(users.id, id));
 	if (
 		account.sendRateLimitPerMinute !== parsed.data.sendRateLimitPerMinute ||
 		account.dailySendLimit !== parsed.data.dailySendLimit

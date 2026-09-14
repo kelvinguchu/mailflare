@@ -32,18 +32,24 @@ export async function createBackupRecord(
 	createdByUserId?: string,
 ) {
 	const id = newId("bak");
-	await getDb(env).insert(backups).values({
-		id,
-		trigger,
-		createdByUserId: createdByUserId ?? null,
-	});
+	await getDb(env)
+		.insert(backups)
+		.values({
+			id,
+			trigger,
+			createdByUserId: createdByUserId ?? null,
+		});
 	return id;
 }
 
-export async function createScheduledBackupIfDue(env: CloudflareEnv, now: Date): Promise<string | null> {
+export async function createScheduledBackupIfDue(
+	env: CloudflareEnv,
+	now: Date,
+): Promise<string | null> {
 	const settings = await getBackupSettings(env);
 	if (!settings?.enabled) return null;
-	if (!isBackupDue(settings.scheduleType as BackupScheduleType, settings.scheduleValue, now)) return null;
+	if (!isBackupDue(settings.scheduleType as BackupScheduleType, settings.scheduleValue, now))
+		return null;
 
 	const { start, end } = getUtcDayBounds(now);
 	const existing = await getDb(env)

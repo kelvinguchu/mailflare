@@ -3,12 +3,15 @@ import { formatPostalAddress, formatPostalAddressList } from "@/lib/email/addres
 import { normalizeAttachmentContent } from "@/lib/email/attachments";
 import { getLatestEmailContent, htmlToReadableText } from "@/lib/email/reply-content-utils";
 import type { AttachmentContent } from "@/lib/email/attachment-types";
+import { normalizeProviderMessageId, parseMessageReferences } from "@/lib/email/threading";
 
 export type ParsedEmail = {
 	subject: string | null;
 	text: string | null;
 	html: string | null;
 	messageId: string | null;
+	inReplyTo: string | null;
+	references: string[];
 	fromAddr: string | null;
 	toAddr: string | null;
 	date: Date | null;
@@ -22,7 +25,9 @@ export async function parseRawMime(raw: ArrayBuffer): Promise<ParsedEmail> {
 		subject: email.subject ?? null,
 		text: email.text ?? null,
 		html: email.html ?? null,
-		messageId: email.messageId ?? null,
+		messageId: normalizeProviderMessageId(email.messageId),
+		inReplyTo: parseMessageReferences(email.inReplyTo).at(-1) ?? null,
+		references: parseMessageReferences(email.references),
 		fromAddr: formatPostalAddress(email.from, null),
 		toAddr: formatPostalAddressList(email.to, null),
 		date: date && !Number.isNaN(date.getTime()) ? date : null,

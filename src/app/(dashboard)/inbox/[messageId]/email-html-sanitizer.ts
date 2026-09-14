@@ -158,9 +158,7 @@ function classifyImageUrl(value: string): ImageSourceKind {
 	if (!/^(?:https?:)?\/\//i.test(value)) return "unsafe";
 	try {
 		const url = new URL(value, window.location.origin);
-		return url.protocol === "http:" || url.protocol === "https:"
-			? "remote"
-			: "unsafe";
+		return url.protocol === "http:" || url.protocol === "https:" ? "remote" : "unsafe";
 	} catch {
 		return "unsafe";
 	}
@@ -174,10 +172,9 @@ function sanitizeStyle(element: HTMLElement): void {
 		if (
 			/[\\\u0000-\u001f\u007f]/.test(value) ||
 			/url\s*\(|expression\s*\(|javascript:|@import|behavior\s*:|-moz-binding/i.test(value)
-		) continue;
-		const safeValue = property === "font-family"
-			? `${value}, ${APP_FONT_FALLBACK}`
-			: value;
+		)
+			continue;
+		const safeValue = property === "font-family" ? `${value}, ${APP_FONT_FALLBACK}` : value;
 		safeDeclarations.push(`${property}: ${safeValue}`);
 	}
 	if (safeDeclarations.length) {

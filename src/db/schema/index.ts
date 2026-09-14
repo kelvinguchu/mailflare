@@ -10,7 +10,9 @@ export const users = sqliteTable("users", {
 	passwordHash: text("password_hash").notNull(),
 	name: text("name").notNull(),
 	avatarKey: text("avatar_key"),
-	role: text("role", { enum: ["admin", "user"] }).notNull().default("user"),
+	role: text("role", { enum: ["admin", "user"] })
+		.notNull()
+		.default("user"),
 	activationStatus: text("activation_status", { enum: ["active", "pending", "revoked"] })
 		.notNull()
 		.default("active"),
@@ -25,7 +27,9 @@ export const users = sqliteTable("users", {
 	sendRateLimitPerMinute: integer("send_rate_limit_per_minute").notNull().default(20),
 	dailySendLimit: integer("daily_send_limit").notNull().default(500),
 	canManageMailboxes: integer("can_manage_mailboxes", { mode: "boolean" }).notNull().default(false),
-	createdByUserId: text("created_by_user_id").references((): AnySQLiteColumn => users.id, { onDelete: "set null" }),
+	createdByUserId: text("created_by_user_id").references((): AnySQLiteColumn => users.id, {
+		onDelete: "set null",
+	}),
 	createdAt: integer("created_at", { mode: "timestamp" })
 		.notNull()
 		.$defaultFn(() => new Date()),
@@ -72,11 +76,16 @@ export const mailboxes = sqliteTable(
 		localPart: text("local_part").notNull(),
 		displayName: text("display_name"),
 		signature: text("signature"),
+		signatureText: text("signature_text"),
+		signatureHtml: text("signature_html"),
+		signatureVersion: integer("signature_version").notNull().default(1),
 		autoReplyEnabled: integer("auto_reply_enabled", { mode: "boolean" }).notNull().default(false),
 		autoReplySubject: text("auto_reply_subject").notNull().default("Out of office"),
 		autoReplyBody: text("auto_reply_body").notNull().default(""),
 		avatarKey: text("avatar_key"),
-		type: text("type", { enum: ["personal", "shared"] }).notNull().default("personal"),
+		type: text("type", { enum: ["personal", "shared"] })
+			.notNull()
+			.default("personal"),
 		useAllDomains: integer("use_all_domains", { mode: "boolean" }).notNull().default(true),
 		disabled: integer("disabled", { mode: "boolean" }).notNull().default(false),
 		createdAt: integer("created_at", { mode: "timestamp" })
@@ -84,6 +93,31 @@ export const mailboxes = sqliteTable(
 			.$defaultFn(() => new Date()),
 	},
 	(t) => [uniqueIndex("mailboxes_address_idx").on(t.domainId, t.localPart)],
+);
+
+export const signatureAssets = sqliteTable(
+	"signature_assets",
+	{
+		id: text("id").primaryKey(),
+		mailboxId: text("mailbox_id")
+			.notNull()
+			.references(() => mailboxes.id, { onDelete: "cascade" }),
+		uploadedByUserId: text("uploaded_by_user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		filename: text("filename").notNull(),
+		contentType: text("content_type").notNull(),
+		size: integer("size").notNull(),
+		width: integer("width").notNull(),
+		height: integer("height").notNull(),
+		altText: text("alt_text").notNull().default(""),
+		contentId: text("content_id").notNull().unique(),
+		r2Key: text("r2_key").notNull().unique(),
+		createdAt: integer("created_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
+	},
+	(t) => [index("signature_assets_mailbox_idx").on(t.mailboxId)],
 );
 
 export const autoReplyDeliveries = sqliteTable(
@@ -112,10 +146,14 @@ export const mailboxAccess = sqliteTable(
 		userId: text("user_id")
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
-		permission: text("permission", { enum: ["read_only", "send_as", "send_on_behalf", "full_access"] })
+		permission: text("permission", {
+			enum: ["read_only", "send_as", "send_on_behalf", "full_access"],
+		})
 			.notNull()
 			.default("read_only"),
-		createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+		createdByUserId: text("created_by_user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
 		createdAt: integer("created_at", { mode: "timestamp" })
 			.notNull()
 			.$defaultFn(() => new Date()),
@@ -199,6 +237,11 @@ export const messages = sqliteTable(
 		mailboxId: text("mailbox_id").references(() => mailboxes.id, { onDelete: "set null" }),
 		direction: text("direction", { enum: ["inbound", "outbound"] }).notNull(),
 		providerMessageId: text("provider_message_id"),
+		inReplyTo: text("in_reply_to"),
+		references: text("references"),
+		replyToMessageId: text("reply_to_message_id").references((): AnySQLiteColumn => messages.id, {
+			onDelete: "set null",
+		}),
 		folderId: text("folder_id").references(() => folders.id, { onDelete: "set null" }),
 		fromAddr: text("from_addr").notNull(),
 		toAddr: text("to_addr").notNull(),
@@ -210,7 +253,16 @@ export const messages = sqliteTable(
 		inboundDeliveryKey: text("inbound_delivery_key"),
 		status: text("status").notNull().default("received"),
 		deliveryStatus: text("delivery_status", {
-			enum: ["queued", "accepted", "delivered", "failed", "suppressed", "unknown"],
+			enum: [
+				"scheduled",
+				"queued",
+				"canceled",
+				"accepted",
+				"delivered",
+				"failed",
+				"suppressed",
+				"unknown",
+			],
 		}),
 		deliveryDetail: text("delivery_detail"),
 		deliveryUpdatedAt: integer("delivery_updated_at", { mode: "timestamp" }),
@@ -230,6 +282,8 @@ export const messages = sqliteTable(
 	(t) => [
 		index("messages_user_created_idx").on(t.userId, t.createdAt),
 		index("messages_mailbox_idx").on(t.mailboxId),
+		index("messages_mailbox_thread_created_idx").on(t.mailboxId, t.threadId, t.createdAt),
+		index("messages_mailbox_provider_message_idx").on(t.mailboxId, t.providerMessageId),
 		index("messages_folder_idx").on(t.folderId),
 		uniqueIndex("messages_inbound_delivery_key_idx").on(t.inboundDeliveryKey),
 	],
@@ -270,7 +324,9 @@ export const outboundJobs = sqliteTable(
 			.references(() => users.id, { onDelete: "cascade" }),
 		messageId: text("message_id").references(() => messages.id, { onDelete: "set null" }),
 		domainId: text("domain_id").references(() => domains.id, { onDelete: "set null" }),
-		status: text("status", { enum: ["queued", "sending", "sent", "failed"] })
+		status: text("status", {
+			enum: ["scheduled", "queued", "sending", "sent", "canceled", "failed"],
+		})
 			.notNull()
 			.default("queued"),
 		payload: text("payload").notNull(),
@@ -280,6 +336,8 @@ export const outboundJobs = sqliteTable(
 		attemptCount: integer("attempt_count").notNull().default(0),
 		error: text("error"),
 		scheduledAt: integer("scheduled_at", { mode: "timestamp" }),
+		sendNotBefore: integer("send_not_before", { mode: "timestamp" }),
+		canceledAt: integer("canceled_at", { mode: "timestamp" }),
 		createdAt: integer("created_at", { mode: "timestamp" })
 			.notNull()
 			.$defaultFn(() => new Date()),
@@ -291,6 +349,7 @@ export const outboundJobs = sqliteTable(
 		uniqueIndex("outbound_jobs_user_idempotency_key_idx").on(t.userId, t.idempotencyKey),
 		index("outbound_jobs_user_created_idx").on(t.userId, t.createdAt),
 		index("outbound_jobs_domain_created_idx").on(t.domainId, t.createdAt),
+		index("outbound_jobs_status_send_not_before_idx").on(t.status, t.sendNotBefore),
 	],
 );
 
@@ -302,8 +361,12 @@ export const senderPolicies = sqliteTable(
 		patternType: text("pattern_type", { enum: ["address", "domain"] }).notNull(),
 		pattern: text("pattern").notNull(),
 		action: text("action", { enum: ["allow", "block"] }).notNull(),
-		createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
-		createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+		createdByUserId: text("created_by_user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		createdAt: integer("created_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
 	},
 	(t) => [
 		uniqueIndex("sender_policies_scope_pattern_idx").on(t.userId, t.patternType, t.pattern),
@@ -349,12 +412,18 @@ export const emailTemplates = sqliteTable(
 	"email_templates",
 	{
 		id: text("id").primaryKey(),
-		userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
 		name: text("name").notNull(),
 		subject: text("subject").notNull().default(""),
 		textBody: text("text_body").notNull().default(""),
-		createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
-		updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+		createdAt: integer("created_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
+		updatedAt: integer("updated_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
 	},
 	(t) => [index("email_templates_user_idx").on(t.userId)],
 );
@@ -363,18 +432,150 @@ export const calendarEvents = sqliteTable(
 	"calendar_events",
 	{
 		id: text("id").primaryKey(),
-		userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
 		mailboxId: text("mailbox_id").references(() => mailboxes.id, { onDelete: "set null" }),
 		title: text("title").notNull(),
 		description: text("description").notNull().default(""),
 		location: text("location").notNull().default(""),
 		attendees: text("attendees").notNull().default("[]"),
+		organizer: text("organizer"),
 		startsAt: integer("starts_at", { mode: "timestamp" }).notNull(),
 		endsAt: integer("ends_at", { mode: "timestamp" }).notNull(),
-		createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
-		updatedAt: integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+		timezone: text("timezone").notNull().default("UTC"),
+		allDay: integer("all_day", { mode: "boolean" }).notNull().default(false),
+		sequence: integer("sequence").notNull().default(0),
+		idempotencyKey: text("idempotency_key"),
+		requestHash: text("request_hash"),
+		createdAt: integer("created_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
+		updatedAt: integer("updated_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
 	},
-	(t) => [index("calendar_events_user_starts_idx").on(t.userId, t.startsAt)],
+	(t) => [
+		index("calendar_events_user_starts_idx").on(t.userId, t.startsAt),
+		uniqueIndex("calendar_events_user_idempotency_idx").on(t.userId, t.idempotencyKey),
+	],
+);
+
+export const calendarTasks = sqliteTable(
+	"calendar_tasks",
+	{
+		id: text("id").primaryKey(),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		assigneeUserId: text("assignee_user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		completedByUserId: text("completed_by_user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		assignedAt: integer("assigned_at", { mode: "timestamp" }),
+		mailboxId: text("mailbox_id").references(() => mailboxes.id, { onDelete: "set null" }),
+		title: text("title").notNull(),
+		description: text("description").notNull().default(""),
+		dueAt: integer("due_at", { mode: "timestamp" }),
+		timezone: text("timezone").notNull().default("UTC"),
+		allDay: integer("all_day", { mode: "boolean" }).notNull().default(false),
+		status: text("status", { enum: ["open", "completed"] })
+			.notNull()
+			.default("open"),
+		priority: text("priority", { enum: ["none", "low", "medium", "high"] })
+			.notNull()
+			.default("none"),
+		completedAt: integer("completed_at", { mode: "timestamp" }),
+		createdAt: integer("created_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
+		updatedAt: integer("updated_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
+	},
+	(t) => [
+		index("calendar_tasks_user_status_due_idx").on(t.userId, t.status, t.dueAt),
+		index("calendar_tasks_user_due_idx").on(t.userId, t.dueAt),
+		index("calendar_tasks_assignee_status_due_idx").on(t.assigneeUserId, t.status, t.dueAt),
+	],
+);
+
+export const calendarReminders = sqliteTable(
+	"calendar_reminders",
+	{
+		id: text("id").primaryKey(),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		eventId: text("event_id").references(() => calendarEvents.id, { onDelete: "cascade" }),
+		taskId: text("task_id").references(() => calendarTasks.id, { onDelete: "cascade" }),
+		mailboxId: text("mailbox_id").references(() => mailboxes.id, { onDelete: "set null" }),
+		title: text("title").notNull(),
+		message: text("message").notNull().default(""),
+		channel: text("channel", { enum: ["in_app", "email"] })
+			.notNull()
+			.default("in_app"),
+		recipient: text("recipient"),
+		fromAddr: text("from_addr"),
+		remindAt: integer("remind_at", { mode: "timestamp" }).notNull(),
+		timezone: text("timezone").notNull().default("UTC"),
+		status: text("status", {
+			enum: ["scheduled", "processing", "delivered", "dismissed", "cancelled", "failed"],
+		})
+			.notNull()
+			.default("scheduled"),
+		snoozedUntil: integer("snoozed_until", { mode: "timestamp" }),
+		claimedAt: integer("claimed_at", { mode: "timestamp" }),
+		deliveredAt: integer("delivered_at", { mode: "timestamp" }),
+		dismissedAt: integer("dismissed_at", { mode: "timestamp" }),
+		attemptCount: integer("attempt_count").notNull().default(0),
+		lastError: text("last_error"),
+		createdAt: integer("created_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
+		updatedAt: integer("updated_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
+	},
+	(t) => [
+		index("calendar_reminders_due_idx").on(t.status, t.remindAt),
+		index("calendar_reminders_user_status_idx").on(t.userId, t.status, t.remindAt),
+		index("calendar_reminders_event_idx").on(t.eventId),
+		index("calendar_reminders_task_idx").on(t.taskId),
+	],
+);
+
+export const calendarReminderDeliveries = sqliteTable(
+	"calendar_reminder_deliveries",
+	{
+		id: text("id").primaryKey(),
+		reminderId: text("reminder_id")
+			.notNull()
+			.references(() => calendarReminders.id, { onDelete: "cascade" }),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		scheduledFor: integer("scheduled_for", { mode: "timestamp" }).notNull(),
+		channel: text("channel", { enum: ["in_app", "email"] }).notNull(),
+		status: text("status", { enum: ["delivered", "queued", "failed"] }).notNull(),
+		idempotencyKey: text("idempotency_key").notNull(),
+		outboundJobId: text("outbound_job_id").references(() => outboundJobs.id, {
+			onDelete: "set null",
+		}),
+		messageId: text("message_id").references(() => messages.id, { onDelete: "set null" }),
+		attemptCount: integer("attempt_count").notNull().default(1),
+		error: text("error"),
+		createdAt: integer("created_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
+		deliveredAt: integer("delivered_at", { mode: "timestamp" }),
+	},
+	(t) => [
+		uniqueIndex("calendar_reminder_deliveries_schedule_idx").on(t.reminderId, t.scheduledFor),
+		index("calendar_reminder_deliveries_user_created_idx").on(t.userId, t.createdAt),
+	],
 );
 
 export const routingRules = sqliteTable("routing_rules", {
@@ -386,12 +587,18 @@ export const routingRules = sqliteTable("routing_rules", {
 		.notNull()
 		.references(() => domains.id, { onDelete: "cascade" }),
 	pattern: text("pattern").notNull(),
-	matchField: text("match_field", { enum: ["email", "content", "title"] }).notNull().default("email"),
-	matchOperator: text("match_operator", { enum: ["contains", "exact"] }).notNull().default("contains"),
+	matchField: text("match_field", { enum: ["email", "content", "title"] })
+		.notNull()
+		.default("email"),
+	matchOperator: text("match_operator", { enum: ["contains", "exact"] })
+		.notNull()
+		.default("contains"),
 	matchValue: text("match_value").notNull().default(""),
 	mailboxId: text("mailbox_id").references(() => mailboxes.id, { onDelete: "set null" }),
 	folderId: text("folder_id").references(() => folders.id, { onDelete: "set null" }),
-	action: text("action", { enum: ["store", "forward", "reject", "spam", "trash"] }).notNull().default("store"),
+	action: text("action", { enum: ["store", "forward", "reject", "spam", "trash"] })
+		.notNull()
+		.default("store"),
 	forwardTo: text("forward_to"),
 	priority: integer("priority").notNull().default(0),
 	createdAt: integer("created_at", { mode: "timestamp" })
@@ -545,23 +752,23 @@ export const backups = sqliteTable(
 		filename: text("filename"),
 		size: integer("size"),
 		error: text("error"),
-		createdByUserId: text("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+		createdByUserId: text("created_by_user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
 		createdAt: integer("created_at", { mode: "timestamp" })
 			.notNull()
 			.$defaultFn(() => new Date()),
 		startedAt: integer("started_at", { mode: "timestamp" }),
 		completedAt: integer("completed_at", { mode: "timestamp" }),
 	},
-	(t) => [
-		index("backups_created_idx").on(t.createdAt),
-		index("backups_status_idx").on(t.status),
-	],
+	(t) => [index("backups_created_idx").on(t.createdAt), index("backups_status_idx").on(t.status)],
 );
 
 export const schema = {
 	users,
 	domains,
 	mailboxes,
+	signatureAssets,
 	autoReplyDeliveries,
 	mailboxAccess,
 	contacts,
@@ -574,6 +781,9 @@ export const schema = {
 	deadLetterEvents,
 	emailTemplates,
 	calendarEvents,
+	calendarTasks,
+	calendarReminders,
+	calendarReminderDeliveries,
 	routingRules,
 	webhooks,
 	webhookDeliveries,

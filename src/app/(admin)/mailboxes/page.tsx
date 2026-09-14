@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -8,6 +9,7 @@ import { Plus, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
+	DialogBody,
 	DialogContent,
 	DialogDescription,
 	DialogHeader,
@@ -16,7 +18,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
 import { CardGridSkeleton } from "@/components/page-skeletons";
 import { clearMailboxesCache } from "@/components/mailbox-provider-utils";
 import { authFetch } from "@/lib/auth/client";
@@ -97,17 +105,18 @@ export default function MailboxesPage() {
 		onSuccess: (mailboxId) => {
 			clearMailboxesCache();
 			setCreateOpen(false);
-			qc.invalidateQueries({ queryKey: ["mailboxes"] });
+			void qc.invalidateQueries({ queryKey: ["mailboxes"] });
 			if (mailboxType === "shared" && mailboxId) router.push(`/mailboxes/${mailboxId}`);
 			setMailboxType("personal");
 		},
 	});
 
-	const domainMap = new Map(
-		(domains.data?.domains ?? []).map((d) => [d.id, d.hostname]),
-	);
+	const domainMap = new Map((domains.data?.domains ?? []).map((d) => [d.id, d.hostname]));
 	const mailboxOwners = [...(accounts.data?.accounts ?? [])];
-	if (account.data?.user?.id && !mailboxOwners.some((owner) => owner.id === account.data?.user?.id)) {
+	if (
+		account.data?.user?.id &&
+		!mailboxOwners.some((owner) => owner.id === account.data?.user?.id)
+	) {
 		mailboxOwners.unshift({
 			id: account.data.user.id,
 			email: account.data.user.email ?? "",
@@ -130,93 +139,127 @@ export default function MailboxesPage() {
 					<DialogContent>
 						<DialogHeader>
 							<DialogTitle>Create mailbox</DialogTitle>
-							<DialogDescription>Add an address and provision its routing rule automatically.</DialogDescription>
+							<DialogDescription>Adds an address and its routing rule.</DialogDescription>
 						</DialogHeader>
-						<div className="space-y-4">
-							{mailboxes.data?.canCreateShared && (
+						<DialogBody>
+							<div className="space-y-4">
+								{mailboxes.data?.canCreateShared && (
+									<div className="space-y-2">
+										<Label htmlFor="mailbox-type">Type</Label>
+										<Select
+											value={mailboxType}
+											onValueChange={(value) => setMailboxType(value as "personal" | "shared")}
+										>
+											<SelectTrigger id="mailbox-type" className="w-full">
+												<SelectValue>
+													{(value) => (value === "shared" ? "Shared inbox" : "Personal inbox")}
+												</SelectValue>
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="personal">Personal inbox</SelectItem>
+												<SelectItem value="shared">Shared inbox</SelectItem>
+											</SelectContent>
+										</Select>
+									</div>
+								)}
+								{mailboxType === "personal" ? (
+									<div className="space-y-2">
+										<Label htmlFor="mailbox-owner">Account</Label>
+										<Select
+											value={ownerUserId}
+											onValueChange={(value) => {
+												const owner = mailboxOwners.find((item) => item.id === value);
+												setOwnerUserId(value as string);
+												if (owner) setDisplayName(owner.name);
+											}}
+										>
+											<SelectTrigger id="mailbox-owner" className="w-full">
+												<SelectValue>
+													{(value) => {
+														const owner = mailboxOwners.find((item) => item.id === value);
+														return owner ? `${owner.name} (${owner.email})` : "Select an owner";
+													}}
+												</SelectValue>
+											</SelectTrigger>
+											<SelectContent>
+												{mailboxOwners.map((owner) => (
+													<SelectItem key={owner.id} value={owner.id}>
+														{owner.name} ({owner.email})
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</div>
+								) : (
+									<p className="rounded-2xl bg-primary/8 px-4 py-3 text-sm text-primary">
+										After creating the shared inbox, choose which accounts can access it.
+									</p>
+								)}
 								<div className="space-y-2">
-									<Label htmlFor="mailbox-type">Type</Label>
-									<NativeSelect
-										id="mailbox-type"
-										value={mailboxType}
-										onChange={(event) => setMailboxType(event.target.value as "personal" | "shared")}
-										className="flex h-10 w-full rounded-md border border-neutral-200 bg-white px-3 text-sm shadow-sm shadow-neutral-200/50 focus-visible:border-blue-600 focus-visible:outline-none"
-									>
-										<option value="personal">Personal inbox</option>
-										<option value="shared">Shared inbox</option>
-									</NativeSelect>
-								</div>
-							)}
-							{mailboxType === "personal" ? (
-							<div className="space-y-2">
-								<Label htmlFor="mailbox-owner">Account</Label>
-								<NativeSelect
-									id="mailbox-owner"
-									value={ownerUserId}
-									onChange={(event) => {
-										const owner = mailboxOwners.find((item) => item.id === event.target.value);
-										setOwnerUserId(event.target.value);
-										if (owner) setDisplayName(owner.name);
-									}}
-									className="flex h-10 w-full rounded-md border border-neutral-200 bg-white px-3 text-sm shadow-sm shadow-neutral-200/50 focus-visible:border-blue-600 focus-visible:outline-none"
-								>
-									{mailboxOwners.map((owner) => (
-										<option key={owner.id} value={owner.id}>
-											{owner.name} ({owner.email})
-										</option>
-									))}
-								</NativeSelect>
-							</div>
-							) : (
-								<p className="rounded-2xl bg-blue-50 px-4 py-3 text-sm text-blue-800">
-									After creating the shared inbox, choose which accounts can access it.
-								</p>
-							)}
-							<div className="space-y-2">
-								<Label htmlFor="mailbox-name">Name</Label>
-								<Input
-									id="mailbox-name"
-									value={displayName}
-									onChange={(event) => setDisplayName(event.target.value)}
-									placeholder="Mailbox name"
-								/>
-							</div>
-							<div className="space-y-2">
-								<Label htmlFor="mailbox-username">Email address</Label>
-								<div className="flex h-10 overflow-hidden rounded-md border border-neutral-200 bg-white shadow-sm shadow-neutral-200/50 focus-within:border-blue-600">
+									<Label htmlFor="mailbox-name">Name</Label>
 									<Input
-										id="mailbox-username"
-										value={localPart}
-										onChange={(event) => setLocalPart(event.target.value)}
-										placeholder="support"
-										className="min-w-0 flex-1 rounded-none border-0 shadow-none focus-visible:border-0"
+										id="mailbox-name"
+										value={displayName}
+										onChange={(event) => setDisplayName(event.target.value)}
+										placeholder="Mailbox name"
 									/>
-									<span className="flex items-center text-sm text-neutral-400">@</span>
-									<NativeSelect
-										aria-label="Domain"
-										className="min-w-0 max-w-[55%] bg-transparent px-3 text-sm text-neutral-700 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-										value={domainId}
-										onChange={(event) => setDomainId(event.target.value)}
-									>
-										<option value="">Select domain</option>
-										{(domains.data?.domains ?? []).map((domain) => (
-											<option key={domain.id} value={domain.id}>
-												{domain.hostname}
-											</option>
-										))}
-									</NativeSelect>
 								</div>
+								<div className="space-y-2">
+									<Label htmlFor="mailbox-username">Email address</Label>
+									<div className="flex h-10 overflow-hidden rounded-md border border-neutral-200 bg-white shadow-sm shadow-neutral-200/50 focus-within:border-primary">
+										<Input
+											id="mailbox-username"
+											value={localPart}
+											onChange={(event) => setLocalPart(event.target.value)}
+											placeholder="support"
+											className="min-w-0 flex-1 rounded-none border-0 shadow-none focus-visible:border-0"
+										/>
+										<span className="flex items-center text-sm text-neutral-400">@</span>
+										<Select
+											value={domainId}
+											onValueChange={(value) => setDomainId(value as string)}
+										>
+											<SelectTrigger
+												aria-label="Domain"
+												size="sm"
+												className="h-7 max-w-56 rounded-sm border-0 bg-transparent px-1.5 font-normal shadow-none hover:bg-muted hover:text-foreground focus-visible:ring-0"
+											>
+												<SelectValue>
+													{(value) => {
+														const match = (domains.data?.domains ?? []).find(
+															(domain) => domain.id === value,
+														);
+														return match ? `@${match.hostname}` : "Select domain";
+													}}
+												</SelectValue>
+											</SelectTrigger>
+											<SelectContent>
+												{(domains.data?.domains ?? []).map((domain) => (
+													<SelectItem key={domain.id} value={domain.id}>
+														@{domain.hostname}
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</div>
+								</div>
+								{create.isError && (
+									<p className="text-sm text-red-600">{(create.error as Error).message}</p>
+								)}
+								<Button
+									onClick={() => create.mutate()}
+									disabled={
+										(mailboxType === "personal" && !ownerUserId) ||
+										!displayName.trim() ||
+										!domainId ||
+										!localPart ||
+										create.isPending
+									}
+								>
+									{create.isPending ? "Creating..." : "Create mailbox"}
+								</Button>
 							</div>
-							{create.isError && (
-								<p className="text-sm text-red-600">{(create.error as Error).message}</p>
-							)}
-							<Button
-								onClick={() => create.mutate()}
-								disabled={(mailboxType === "personal" && !ownerUserId) || !displayName.trim() || !domainId || !localPart || create.isPending}
-							>
-								{create.isPending ? "Creating..." : "Create mailbox"}
-							</Button>
-						</div>
+						</DialogBody>
 					</DialogContent>
 				</Dialog>
 			</div>
@@ -226,9 +269,7 @@ export default function MailboxesPage() {
 						{(mailboxes.data?.mailboxes ?? []).length} total
 					</span>
 				</div> */}
-				{mailboxes.isLoading && (
-					<CardGridSkeleton />
-				)}
+				{mailboxes.isLoading && <CardGridSkeleton />}
 				{!mailboxes.isLoading && (mailboxes.data?.mailboxes ?? []).length === 0 && (
 					<p className="rounded-2xl bg-white px-5 py-4 text-sm text-neutral-500">
 						No mailboxes yet
@@ -245,15 +286,18 @@ export default function MailboxesPage() {
 							<Link
 								key={mailbox.id}
 								href={`/mailboxes/${mailbox.id}`}
-								className="group flex items-start gap-4 rounded-3xl bg-white p-5 transition-colors hover:bg-blue-50/10"
+								className="group flex items-start gap-4 rounded-3xl bg-white p-5 transition-colors hover:bg-primary/5"
 							>
-								<span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
+								<span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/12 text-sm font-semibold text-primary">
 									{getMailboxName(mailboxWithHostname).trim().charAt(0).toUpperCase() || "?"}
 									{mailbox.hasAvatar && (
-										<img
+										<Image
 											src={`/api/mailboxes/${mailbox.id}/avatar`}
 											alt={`${getMailboxName(mailboxWithHostname)} profile`}
-											className="absolute inset-0 h-full w-full object-cover"
+											fill
+											sizes="40px"
+											unoptimized
+											className="object-cover"
 											onError={(event) => event.currentTarget.remove()}
 										/>
 									)}
@@ -264,7 +308,7 @@ export default function MailboxesPage() {
 											{getMailboxName(mailboxWithHostname)}
 										</span>
 										{mailbox.type === "shared" && (
-											<span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+											<span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/8 px-2 py-0.5 text-xs font-medium text-primary">
 												<UsersRound className="h-3 w-3" />
 												Shared
 											</span>

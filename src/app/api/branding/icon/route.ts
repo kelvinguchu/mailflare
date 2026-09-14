@@ -16,7 +16,7 @@ async function getDefaultIcon(env: CloudflareEnv): Promise<Response> {
 	});
 }
 
-export async function GET(request: Request) {
+export async function GET() {
 	const env = await getEnvAsync();
 	try {
 		const [settings] = await getDb(env)

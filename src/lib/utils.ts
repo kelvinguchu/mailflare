@@ -1,9 +1,6 @@
-import { type ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
-
-export function cn(...inputs: ClassValue[]) {
-	return twMerge(clsx(inputs));
-}
+// `cn` now comes from the `cn` package installed by the shadcn preset; the
+// helpers below predate it and are used across the mail and routing code.
+export { cn } from "cn";
 
 export function slugify(value: string): string {
 	return value

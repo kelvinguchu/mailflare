@@ -13,11 +13,15 @@ export type MessageActionsProps = {
 	subject?: string | null;
 	bodyText?: string | null;
 	ownAddress?: string | null;
+	/** Replaces the popup reply, e.g. with a conversation's inline reply. */
+	onReply?: () => void;
 };
 
 export type SingleMessageAction = BulkMessageAction | "reply";
 
 export type ReplyDraftInput = {
+	/** The message being replied to, so the reply joins its conversation. */
+	messageId: string;
 	mailboxId: string | null;
 	senderAddress: string;
 	ownAddress?: string | null;

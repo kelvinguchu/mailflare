@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useBranding } from "@/components/branding-provider";
 import type { AuthShellProps } from "./types";
 
@@ -75,10 +76,12 @@ export function AuthShell({
 					{logoFailed ? (
 						<Icon className="h-8 w-8 text-[#16304e]" />
 					) : (
-						<img
+						<Image
 							src="/ccmail_logo_full.png"
 							onError={() => setLogoFailed(true)}
 							alt={branding.appName}
+							width={160}
+							height={36}
 							className="h-9 w-auto max-w-40 object-contain object-left"
 						/>
 					)}

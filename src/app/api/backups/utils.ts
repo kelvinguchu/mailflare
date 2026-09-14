@@ -6,7 +6,8 @@ export function parseBackupSettingsInput(value: unknown): BackupSettingsInput | 
 	if (!value || typeof value !== "object") return null;
 	const input = value as Record<string, unknown>;
 	if (typeof input.enabled !== "boolean") return null;
-	if (typeof input.scheduleType !== "string" || !SCHEDULE_TYPES.has(input.scheduleType)) return null;
+	if (typeof input.scheduleType !== "string" || !SCHEDULE_TYPES.has(input.scheduleType))
+		return null;
 	if (typeof input.retentionEnabled !== "boolean") return null;
 
 	const retentionDays = Number(input.retentionDays);

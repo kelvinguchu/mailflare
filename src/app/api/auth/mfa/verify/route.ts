@@ -20,7 +20,8 @@ export async function POST(request: Request) {
 		);
 	}
 	const parsed = mfaVerifySchema.safeParse(body);
-	if (!parsed.success) return NextResponse.json({ error: "Invalid verification request" }, { status: 400 });
+	if (!parsed.success)
+		return NextResponse.json({ error: "Invalid verification request" }, { status: 400 });
 	if (!(await allowLoginAttempt(env, request))) {
 		return NextResponse.json(
 			{ error: "Too many verification attempts. Try again shortly." },
@@ -28,7 +29,8 @@ export async function POST(request: Request) {
 		);
 	}
 	const completed = await completeMfaChallenge(env, parsed.data.challengeToken, parsed.data.code);
-	if (!completed) return NextResponse.json({ error: "Invalid or expired verification code" }, { status: 401 });
+	if (!completed)
+		return NextResponse.json({ error: "Invalid or expired verification code" }, { status: 401 });
 	await recordAuthActivity(env, { action: "auth.login", userId: completed.userId, request });
 	return createAuthenticatedResponse(completed.token, "/inbox");
 }

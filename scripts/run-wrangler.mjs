@@ -11,14 +11,10 @@ const wranglerPath = fileURLToPath(
 	new URL("../node_modules/wrangler/bin/wrangler.js", import.meta.url),
 );
 const wranglerArgs = action === "deploy" ? ["deploy"] : ["versions", "upload"];
-const result = spawnSync(
-	process.execPath,
-	[wranglerPath, ...wranglerArgs, "--env", environment],
-	{
-		stdio: "inherit",
-		env: { ...process.env, OPEN_NEXT_DEPLOY: "true" },
-	},
-);
+const result = spawnSync(process.execPath, [wranglerPath, ...wranglerArgs, "--env", environment], {
+	stdio: "inherit",
+	env: { ...process.env, OPEN_NEXT_DEPLOY: "true" },
+});
 
 if (result.error) throw result.error;
 process.exit(result.status ?? 1);

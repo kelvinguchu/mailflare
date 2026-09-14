@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { getEnv } from "@/lib/cloudflare";
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
 	}
 	const parsed = loginSchema.safeParse(body);
 	if (!parsed.success) {
-		return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+		return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
 	}
 	if (!(await allowLoginAttempt(env, request))) {
 		return NextResponse.json(
@@ -33,13 +34,19 @@ export async function POST(request: Request) {
 			{ status: 429, headers: { "Retry-After": "60" } },
 		);
 	}
-	if (!(await verifyTurnstileToken(env, request, (body as Record<string, unknown>).turnstileToken))) {
+	if (
+		!(await verifyTurnstileToken(env, request, (body as Record<string, unknown>).turnstileToken))
+	) {
 		return NextResponse.json({ error: "Verification failed. Please try again." }, { status: 400 });
 	}
 
 	const db = getDb(env);
 	const [user] = await db.select().from(users).where(eq(users.email, parsed.data.email)).limit(1);
-	if (!user || !verifyPassword(parsed.data.password, user.passwordHash) || user.activationStatus !== "active") {
+	if (
+		!user ||
+		!verifyPassword(parsed.data.password, user.passwordHash) ||
+		user.activationStatus !== "active"
+	) {
 		return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
 	}
 	if (user.disabled) {

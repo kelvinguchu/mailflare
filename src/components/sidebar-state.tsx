@@ -30,7 +30,10 @@ export function SidebarProvider({ children, expandedWidth = 240 }: SidebarProvid
 
 	return (
 		<SidebarContext.Provider value={{ minimal, toggle }}>
-			<div className="h-full" style={{ "--sidebar-width": `${minimal ? 72 : expandedWidth}px` } as React.CSSProperties}>
+			<div
+				className="h-full"
+				style={{ "--sidebar-width": `${minimal ? 72 : expandedWidth}px` } as React.CSSProperties}
+			>
 				{children}
 			</div>
 		</SidebarContext.Provider>

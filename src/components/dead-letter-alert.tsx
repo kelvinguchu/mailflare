@@ -27,7 +27,8 @@ export function DeadLetterAlert() {
 		>
 			<AlertTriangle className="h-5 w-5 shrink-0 text-red-700" />
 			<span className="font-medium">
-				{count.data} mail {count.data === 1 ? "delivery has" : "deliveries have"} exhausted automatic retries
+				{count.data} mail {count.data === 1 ? "delivery has" : "deliveries have"} exhausted
+				automatic retries
 			</span>
 			<ArrowRight className="ml-auto h-4 w-4" />
 		</Link>

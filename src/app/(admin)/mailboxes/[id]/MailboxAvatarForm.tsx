@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { useQueryClient } from "@tanstack/react-query";
 import { Camera, LoaderCircle, User } from "lucide-react";
 import { dispatchMailboxAvatarChanged } from "@/lib/mailboxes/avatar-client";
@@ -70,14 +71,17 @@ export default function MailboxAvatarForm({
 				type="button"
 				onClick={() => inputRef.current?.click()}
 				disabled={busy}
-				className="group relative h-24 w-24 overflow-hidden rounded-full border border-neutral-200 bg-blue-600 text-white shadow-sm outline-none ring-blue-500 transition focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-wait"
+				className="group relative h-24 w-24 overflow-hidden rounded-full border border-neutral-200 bg-primary text-white shadow-sm outline-none ring-ring transition focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-wait"
 				aria-label={hasAvatar ? `Change ${name} profile picture` : `Upload ${name} profile picture`}
 			>
 				{hasAvatar ? (
-					<img
+					<Image
 						src={avatarUrl}
 						alt={`${name} profile picture`}
-						className="h-full w-full object-cover"
+						fill
+						sizes="96px"
+						unoptimized
+						className="object-cover"
 						onError={() => setHasAvatar(false)}
 					/>
 				) : (

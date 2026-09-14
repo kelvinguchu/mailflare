@@ -26,7 +26,9 @@ function loadTurnstileScript(): Promise<void> {
 	if (existing) {
 		return existing.dataset.loaded === "true"
 			? Promise.resolve()
-			: new Promise((resolve) => existing.addEventListener("load", () => resolve(), { once: true }));
+			: new Promise((resolve) =>
+					existing.addEventListener("load", () => resolve(), { once: true }),
+				);
 	}
 
 	return new Promise((resolve, reject) => {

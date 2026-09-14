@@ -21,7 +21,9 @@ export function splitRepliedEmailContent(
 		return splitOriginalMessage(lines, originalMessageIndex, options);
 	}
 
-	const underscoreSeparatorIndex = lines.findIndex((line) => UNDERSCORE_SEPARATOR_RE.test(line.trim()));
+	const underscoreSeparatorIndex = lines.findIndex((line) =>
+		UNDERSCORE_SEPARATOR_RE.test(line.trim()),
+	);
 	if (underscoreSeparatorIndex >= 0) {
 		return splitSeparatorQuotedContent(lines, underscoreSeparatorIndex, options);
 	}
@@ -46,12 +48,7 @@ export function splitRepliedEmailContent(
 		const quotedLines = stripSingleQuotePrefix(lines.slice(quoteIndex));
 		return {
 			latestContent: trimEmptyLines(lines.slice(0, quoteIndex)).join("\n").trim(),
-			quotedContent: buildQuotedContent(
-				quotedLines,
-				"Unknown time",
-				"received",
-				options,
-			),
+			quotedContent: buildQuotedContent(quotedLines, "Unknown time", "received", options),
 		};
 	}
 
@@ -72,7 +69,7 @@ export function htmlToReadableText(html: string | null | undefined): string {
 		.replace(/&amp;/g, "&")
 		.replace(/&lt;/g, "<")
 		.replace(/&gt;/g, ">")
-		.replace(/&quot;/g, "\"")
+		.replace(/&quot;/g, '"')
 		.replace(/&#39;/g, "'");
 }
 
@@ -130,10 +127,12 @@ function splitSeparatorQuotedContent(
 function getWroteDateLine(line: string): string {
 	const match = line.match(WROTE_RE);
 	const rawDateLine = match?.[1]?.trim() ?? "";
-	return rawDateLine
-		.replace(/,\s*["']?[^,<"]+["']?\s*<[^>]+>\s*$/i, "")
-		.replace(/\b([0-9]{1,2}:[0-9]{2}\s?(?:AM|PM))(?:,?\s+.*)?$/i, "$1")
-		.trim() || "Unknown time";
+	return (
+		rawDateLine
+			.replace(/,\s*["']?[^,<"]+["']?\s*<[^>]+>\s*$/i, "")
+			.replace(/\b([0-9]{1,2}:[0-9]{2}\s?(?:AM|PM))(?:,?\s+.*)?$/i, "$1")
+			.trim() || "Unknown time"
+	);
 }
 
 function getWroteAddress(line: string): string | undefined {
@@ -159,10 +158,7 @@ function trimEmptyLines(lines: string[]): string[] {
 }
 
 function hasQuotedContent(quotedContent: QuotedEmailContent): boolean {
-	return (
-		quotedContent.content.trim().length > 0 ||
-		quotedContent.quotedContent.length > 0
-	);
+	return quotedContent.content.trim().length > 0 || quotedContent.quotedContent.length > 0;
 }
 
 function buildQuotedContent(
@@ -190,9 +186,7 @@ function getPreviousMessageDirection(
 	ownAddress: string | undefined,
 ): PreviousMessageDirection {
 	if (!from || !ownAddress) return "received";
-	const fromAddress = normalizeEmailAddress(
-		from.match(/<([^>]+)>/)?.[1] ?? from,
-	);
+	const fromAddress = normalizeEmailAddress(from.match(/<([^>]+)>/)?.[1] ?? from);
 	return fromAddress === normalizeEmailAddress(ownAddress) ? "sent" : "received";
 }
 

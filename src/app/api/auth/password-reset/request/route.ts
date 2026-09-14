@@ -28,15 +28,12 @@ export async function POST(request: Request) {
 		return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
 	}
 
-	if (!(await verifyTurnstileToken(env, request, (body as Record<string, unknown>).turnstileToken))) {
+	if (
+		!(await verifyTurnstileToken(env, request, (body as Record<string, unknown>).turnstileToken))
+	) {
 		return NextResponse.json({ error: "Verification failed. Please try again." }, { status: 400 });
 	}
-	const allowed = await allowAccountRecoveryAttempt(
-		env,
-		request,
-		parsed.data.email,
-		"request",
-	);
+	const allowed = await allowAccountRecoveryAttempt(env, request, parsed.data.email, "request");
 	if (!allowed) return NextResponse.json(GENERIC_RESPONSE, { status: 202 });
 
 	try {

@@ -1,9 +1,29 @@
 import type { AttachmentContent } from "./attachment-types";
 
 const EXECUTABLE_EXTENSIONS = new Set([
-	"apk", "app", "bat", "cmd", "com", "cpl", "dll", "dmg", "exe", "hta",
-	"img", "iso", "jar", "js", "jse", "lnk", "msi", "msp", "ps1", "scr",
-	"vbe", "vbs", "wsf",
+	"apk",
+	"app",
+	"bat",
+	"cmd",
+	"com",
+	"cpl",
+	"dll",
+	"dmg",
+	"exe",
+	"hta",
+	"img",
+	"iso",
+	"jar",
+	"js",
+	"jse",
+	"lnk",
+	"msi",
+	"msp",
+	"ps1",
+	"scr",
+	"vbe",
+	"vbs",
+	"wsf",
 ]);
 
 const EXECUTABLE_TYPES = new Set([
@@ -19,7 +39,9 @@ const EXECUTABLE_TYPES = new Set([
 
 export type AttachmentSecurity = { status: "safe" | "quarantined"; reason: string | null };
 
-export function classifyAttachment(attachment: Pick<AttachmentContent, "filename" | "type">): AttachmentSecurity {
+export function classifyAttachment(
+	attachment: Pick<AttachmentContent, "filename" | "type">,
+): AttachmentSecurity {
 	const extension = attachment.filename.toLowerCase().split(".").pop() ?? "";
 	const contentType = attachment.type.toLowerCase().split(";", 1)[0]?.trim() ?? "";
 	if (EXECUTABLE_EXTENSIONS.has(extension) || EXECUTABLE_TYPES.has(contentType)) {

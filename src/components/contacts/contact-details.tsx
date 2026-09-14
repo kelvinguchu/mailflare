@@ -5,6 +5,7 @@ import dayjs from "dayjs";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
+	DialogBody,
 	DialogContent,
 	DialogDescription,
 	DialogHeader,
@@ -13,11 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ContactDetailsRecord, ContactDetailsTriggerProps } from "./contact-details-types";
-import {
-	fetchContactDetails,
-	getContactInitial,
-	updateContactName,
-} from "./contact-details-utils";
+import { fetchContactDetails, getContactInitial, updateContactName } from "./contact-details-utils";
 
 export function ContactDetailsTrigger({
 	mailboxId,
@@ -49,7 +46,8 @@ export function ContactDetailsTrigger({
 				setDisplayName(nextContact.displayName ?? shownName);
 			})
 			.catch((loadError) => {
-				if (!cancelled) setError(loadError instanceof Error ? loadError.message : "Unable to load contact");
+				if (!cancelled)
+					setError(loadError instanceof Error ? loadError.message : "Unable to load contact");
 			})
 			.finally(() => {
 				if (!cancelled) setLoading(false);
@@ -69,9 +67,11 @@ export function ContactDetailsTrigger({
 			setContact(updated);
 			setShownName(nextName);
 			setOpen(false);
-			window.dispatchEvent(new CustomEvent("mailflare:contact-changed", {
-				detail: { email: updated.email, displayName: nextName },
-			}));
+			window.dispatchEvent(
+				new CustomEvent("mailflare:contact-changed", {
+					detail: { email: updated.email, displayName: nextName },
+				}),
+			);
 		} catch (saveError) {
 			setError(saveError instanceof Error ? saveError.message : "Unable to update contact");
 		} finally {
@@ -86,7 +86,7 @@ export function ContactDetailsTrigger({
 			<button
 				type="button"
 				onClick={() => setOpen(true)}
-				className={`${className ?? ""} rounded-sm text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200`}
+				className={`${className ?? ""} rounded-sm text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25`}
 			>
 				{shownName}
 			</button>
@@ -96,49 +96,53 @@ export function ContactDetailsTrigger({
 						<DialogTitle>Contact details</DialogTitle>
 						<DialogDescription>Update how this contact appears in your mailbox.</DialogDescription>
 					</DialogHeader>
-					<div className="space-y-5">
-						<div className="flex items-center gap-4">
-							<div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-blue-100 text-lg font-semibold text-blue-700">
-								{getContactInitial(shownName, address)}
+					<DialogBody>
+						<div className="space-y-5">
+							<div className="flex items-center gap-4">
+								<div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/12 text-lg font-semibold text-primary">
+									{getContactInitial(shownName, address)}
+								</div>
+								<div className="min-w-0">
+									<p className="truncate font-medium text-neutral-900">{shownName}</p>
+									<p className="truncate text-sm text-neutral-500">{contact?.email ?? address}</p>
+								</div>
 							</div>
-							<div className="min-w-0">
-								<p className="truncate font-medium text-neutral-900">{shownName}</p>
-								<p className="truncate text-sm text-neutral-500">{contact?.email ?? address}</p>
+							<div className="space-y-2">
+								<Label htmlFor="contact-display-name">Name</Label>
+								<Input
+									id="contact-display-name"
+									value={displayName}
+									onChange={(event) => setDisplayName(event.target.value)}
+									disabled={loading || saving}
+								/>
 							</div>
+							<div className="grid gap-3 rounded-lg bg-neutral-50 p-3 text-sm sm:grid-cols-2">
+								<div>
+									<p className="text-xs font-medium uppercase text-neutral-400">Source</p>
+									<p className="mt-1 capitalize text-neutral-700">{contact?.source ?? "Email"}</p>
+								</div>
+								<div>
+									<p className="text-xs font-medium uppercase text-neutral-400">Last seen</p>
+									<p className="mt-1 text-neutral-700">
+										{contact?.lastSeenAt
+											? dayjs(contact.lastSeenAt).format("MMM DD, YYYY")
+											: "Unknown"}
+									</p>
+								</div>
+								{contact?.blocked && (
+									<p className="text-sm font-medium text-red-600">Blocked contact</p>
+								)}
+							</div>
+							{error && <p className="text-sm text-red-600">{error}</p>}
+							<Button
+								type="button"
+								onClick={saveContact}
+								disabled={loading || saving || !displayName.trim()}
+							>
+								{saving ? "Saving..." : "Save contact"}
+							</Button>
 						</div>
-						<div className="space-y-2">
-							<Label htmlFor="contact-display-name">Name</Label>
-							<Input
-								id="contact-display-name"
-								value={displayName}
-								onChange={(event) => setDisplayName(event.target.value)}
-								disabled={loading || saving}
-							/>
-						</div>
-						<div className="grid gap-3 rounded-lg bg-neutral-50 p-3 text-sm sm:grid-cols-2">
-							<div>
-								<p className="text-xs font-medium uppercase text-neutral-400">Source</p>
-								<p className="mt-1 capitalize text-neutral-700">{contact?.source ?? "Email"}</p>
-							</div>
-							<div>
-								<p className="text-xs font-medium uppercase text-neutral-400">Last seen</p>
-								<p className="mt-1 text-neutral-700">
-									{contact?.lastSeenAt ? dayjs(contact.lastSeenAt).format("MMM DD, YYYY") : "Unknown"}
-								</p>
-							</div>
-							{contact?.blocked && (
-								<p className="text-sm font-medium text-red-600">Blocked contact</p>
-							)}
-						</div>
-						{error && <p className="text-sm text-red-600">{error}</p>}
-						<Button
-							type="button"
-							onClick={saveContact}
-							disabled={loading || saving || !displayName.trim()}
-						>
-							{saving ? "Saving..." : "Save contact"}
-						</Button>
-					</div>
+					</DialogBody>
 				</DialogContent>
 			</Dialog>
 		</>

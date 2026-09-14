@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 
 export function VerifyRecoveryEmailClient({ token }: { token: string }) {
 	const [verified, setVerified] = useState(false);
-	const [error, setError] = useState<string | null>(token ? null : "This verification link is invalid.");
+	const [error, setError] = useState<string | null>(
+		token ? null : "This verification link is invalid.",
+	);
 	const [loading, setLoading] = useState(false);
 
 	useEffect(() => {
@@ -53,7 +55,12 @@ export function VerifyRecoveryEmailClient({ token }: { token: string }) {
 								{error}
 							</p>
 						)}
-						<Button type="button" className="h-11 w-full" disabled={loading || !token} onClick={verify}>
+						<Button
+							type="button"
+							className="h-11 w-full"
+							disabled={loading || !token}
+							onClick={verify}
+						>
 							{loading ? "Verifying..." : "Verify recovery email"}
 						</Button>
 					</>

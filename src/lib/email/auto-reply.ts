@@ -16,7 +16,12 @@ export async function sendMailboxAutoReply(
 ): Promise<void> {
 	const recipient = normalizeEmailAddress(input.fromAddress);
 	const deliveredAddress = normalizeEmailAddress(input.deliveredAddress);
-	if (!recipient.includes("@") || recipient === deliveredAddress || shouldSkipAutoReply(recipient, input.headers)) return;
+	if (
+		!recipient.includes("@") ||
+		recipient === deliveredAddress ||
+		shouldSkipAutoReply(recipient, input.headers)
+	)
+		return;
 
 	const db = getDb(env);
 	const senderDecision = await resolveInboundAddress(db, recipient);
@@ -38,11 +43,13 @@ export async function sendMailboxAutoReply(
 	const [recentDelivery] = await db
 		.select({ id: autoReplyDeliveries.id })
 		.from(autoReplyDeliveries)
-		.where(and(
-			eq(autoReplyDeliveries.mailboxId, input.mailboxId),
-			eq(autoReplyDeliveries.recipient, recipient),
-			gte(autoReplyDeliveries.sentAt, new Date(Date.now() - autoReplyIntervalMs)),
-		))
+		.where(
+			and(
+				eq(autoReplyDeliveries.mailboxId, input.mailboxId),
+				eq(autoReplyDeliveries.recipient, recipient),
+				gte(autoReplyDeliveries.sentAt, new Date(Date.now() - autoReplyIntervalMs)),
+			),
+		)
 		.limit(1);
 	if (recentDelivery) return;
 
@@ -65,6 +72,7 @@ export async function sendMailboxAutoReply(
 			subject: mailbox.autoReplySubject.trim() || "Out of office",
 			text: mailbox.autoReplyBody.trim(),
 			headers,
+			replyToMessageId: input.sourceMessageId,
 		},
 		{
 			idempotencyKey: await createScopedIdempotencyKey(
@@ -97,8 +105,9 @@ function shouldSkipAutoReply(recipient: string, headers?: Record<string, string>
 	const autoSubmitted = getHeader(headers, "auto-submitted").toLowerCase();
 	if (autoSubmitted && autoSubmitted !== "no") return true;
 	if (/^(bulk|junk|list)$/i.test(getHeader(headers, "precedence"))) return true;
-	return ["list-id", "x-autoreply", "x-autorespond", "x-auto-response-suppress"]
-		.some((name) => !!getHeader(headers, name));
+	return ["list-id", "x-autoreply", "x-autorespond", "x-auto-response-suppress"].some(
+		(name) => !!getHeader(headers, name),
+	);
 }
 
 function getHeader(headers: Record<string, string> | undefined, name: string): string {

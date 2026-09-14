@@ -55,7 +55,9 @@ export async function ensureMailboxDomainRouting(
 		.select({ hostname: domains.hostname, zoneId: domains.zoneId })
 		.from(domains)
 		.where(eq(domains.userId, primaryDomain.userId));
-	const domainsByHostname = new Map(availableDomains.map((domain) => [domain.hostname.toLowerCase(), domain]));
+	const domainsByHostname = new Map(
+		availableDomains.map((domain) => [domain.hostname.toLowerCase(), domain]),
+	);
 
 	await Promise.all(
 		addresses.map(async (address) => {

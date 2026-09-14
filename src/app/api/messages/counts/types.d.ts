@@ -3,7 +3,15 @@ import type { messages } from "@/db/schema";
 
 export type MessageCountRow = Pick<
 	typeof messages.$inferSelect,
-	"mailboxId" | "folderId" | "direction" | "status" | "read" | "starred" | "snoozedUntil"
+	| "id"
+	| "mailboxId"
+	| "folderId"
+	| "direction"
+	| "status"
+	| "read"
+	| "starred"
+	| "snoozedUntil"
+	| "threadId"
 >;
 
 export type FolderAccumulator = MessageCounts["folders"];

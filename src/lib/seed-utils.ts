@@ -1,21 +1,11 @@
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import {
-	domains,
-	mailboxes,
-	messages,
-	outboundJobs,
-	users,
-} from "@/db/schema";
+import { domains, mailboxes, messages, outboundJobs, users } from "@/db/schema";
 import { hashPassword } from "@/lib/auth/password";
 import { upsertContactFromAddress } from "@/lib/contacts/service";
 import { buildSnippet } from "@/lib/email/parse";
 import { newId } from "@/lib/ids";
-import type {
-	SeedMailboxKey,
-	SeedMailboxMap,
-	SeedMessageDefinition,
-} from "@/lib/seed-types";
+import type { SeedMailboxKey, SeedMailboxMap, SeedMessageDefinition } from "@/lib/seed-types";
 
 export const demoCredentials = {
 	email: "admin@example.com",
@@ -217,8 +207,7 @@ const seedMessages: SeedMessageDefinition[] = [
 		fromAddr: `"Billing" <billing@${demoDomain}>`,
 		toAddr: `"Closed Partner Account" <closed-account@partner.test>`,
 		subject: "Failed billing notice",
-		textBody:
-			"This seeded billing notice failed because the destination mailbox no longer exists.",
+		textBody: "This seeded billing notice failed because the destination mailbox no longer exists.",
 		read: true,
 		minutesAgo: 181,
 	},
@@ -287,12 +276,7 @@ export async function ensureDemoMailboxes(
 			const [existing] = await db
 				.select()
 				.from(mailboxes)
-				.where(
-					and(
-						eq(mailboxes.domainId, domainId),
-						eq(mailboxes.localPart, definition.localPart),
-					),
-				)
+				.where(and(eq(mailboxes.domainId, domainId), eq(mailboxes.localPart, definition.localPart)))
 				.limit(1);
 			if (existing) return [definition.key, existing] as const;
 
@@ -305,11 +289,7 @@ export async function ensureDemoMailboxes(
 				displayName: definition.displayName,
 			});
 
-			const [created] = await db
-				.select()
-				.from(mailboxes)
-				.where(eq(mailboxes.id, id))
-				.limit(1);
+			const [created] = await db.select().from(mailboxes).where(eq(mailboxes.id, id)).limit(1);
 			return [definition.key, created!] as const;
 		}),
 	);
@@ -361,9 +341,7 @@ export async function insertDemoMessages(
 					text: seedMessage.textBody,
 				}),
 				error:
-					seedMessage.status === "failed"
-						? "Seeded delivery failure for UI and API testing"
-						: null,
+					seedMessage.status === "failed" ? "Seeded delivery failure for UI and API testing" : null,
 				createdAt,
 				updatedAt: createdAt,
 			});

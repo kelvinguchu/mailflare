@@ -9,7 +9,7 @@ export type MessageDetailResponse = {
 	} | null;
 	attachments?: MessageAttachment[];
 	delivery?: {
-		status: "queued" | "sending" | "sent" | "failed";
+		status: "scheduled" | "queued" | "sending" | "sent" | "canceled" | "failed";
 		attemptCount: number;
 		error: string | null;
 		updatedAt: string;

@@ -26,11 +26,12 @@ export function classifyOutboundFailure(error: unknown): OutboundFailureDisposit
 
 	if (typeof error === "object" && error !== null) {
 		const candidate = error as { status?: unknown; statusCode?: unknown };
-		const status = typeof candidate.status === "number"
-			? candidate.status
-			: typeof candidate.statusCode === "number"
-				? candidate.statusCode
-				: null;
+		const status =
+			typeof candidate.status === "number"
+				? candidate.status
+				: typeof candidate.statusCode === "number"
+					? candidate.statusCode
+					: null;
 		if (status === 429 || (status !== null && status >= 500)) return "retryable";
 		if (status !== null && status >= 400) return "permanent";
 	}
@@ -61,5 +62,5 @@ export function decideOutboundFailure(
 }
 
 export function getOutboundRetryDelaySeconds(attempt: number): number {
-	return Math.min(30 * (2 ** Math.max(0, attempt - 1)), 5 * 60);
+	return Math.min(30 * 2 ** Math.max(0, attempt - 1), 5 * 60);
 }

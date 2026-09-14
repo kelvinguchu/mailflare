@@ -7,9 +7,14 @@ import { newId } from "@/lib/ids";
 import { listAccessibleMailboxes } from "@/lib/mailboxes/access";
 import type { SessionUser } from "@/lib/auth/types";
 
-export async function ensurePersonalMailbox(env: CloudflareEnv, db: AppDatabase, user: SessionUser) {
+export async function ensurePersonalMailbox(
+	env: CloudflareEnv,
+	db: AppDatabase,
+	user: SessionUser,
+) {
 	const current = await listAccessibleMailboxes(db, user);
-	if (current.some((mailbox) => mailbox.userId === user.id && mailbox.type === "personal")) return current;
+	if (current.some((mailbox) => mailbox.userId === user.id && mailbox.type === "personal"))
+		return current;
 
 	const [localPart, hostname] = user.email.toLowerCase().split("@");
 	if (!localPart || !hostname) return current;
@@ -43,7 +48,12 @@ export async function ensurePersonalMailbox(env: CloudflareEnv, db: AppDatabase,
 		return current;
 	}
 	try {
-		await ensureMailboxDomainRouting(env, db, { id, domainId: domain.id, localPart, useAllDomains: true });
+		await ensureMailboxDomainRouting(env, db, {
+			id,
+			domainId: domain.id,
+			localPart,
+			useAllDomains: true,
+		});
 	} catch {
 		// Mailbox visibility should not depend on routing API availability.
 	}

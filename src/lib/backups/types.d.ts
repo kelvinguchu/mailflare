@@ -13,10 +13,7 @@ export type BackupWorkflowParams = {
 };
 
 export type BackupWorkflowBinding = {
-	create(options?: {
-		id?: string;
-		params?: BackupWorkflowParams;
-	}): Promise<unknown>;
+	create(options?: { id?: string; params?: BackupWorkflowParams }): Promise<unknown>;
 };
 
 export type DatabaseBackupTable = (typeof BACKUP_TABLES)[number];
@@ -58,6 +55,6 @@ export type DatabaseBackupDocument = {
 	r2: DatabaseBackupR2Snapshot;
 };
 export type NormalizedDatabaseBackupDocument = Omit<DatabaseBackupDocument, "r2"> & {
-	sourceVersion: 1 | 2 | 3 | 4 | 5 | typeof DATABASE_BACKUP_VERSION;
+	sourceVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | typeof DATABASE_BACKUP_VERSION;
 	r2: DatabaseBackupR2Snapshot | { strategy: "live-references"; objects: [] };
 };

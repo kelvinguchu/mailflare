@@ -19,7 +19,10 @@ export async function getAccountForwardingDestination(
 		.where(eq(users.id, decision.mailbox.userId))
 		.limit(1);
 	const destination = account?.forwardingEmail?.trim() ?? "";
-	if (!destination || getEmailAddress(destination).toLowerCase() === getEmailAddress(recipient).toLowerCase()) {
+	if (
+		!destination ||
+		getEmailAddress(destination).toLowerCase() === getEmailAddress(recipient).toLowerCase()
+	) {
 		return null;
 	}
 	return destination;

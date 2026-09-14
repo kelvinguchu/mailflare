@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { BACKUP_TABLES, DATABASE_BACKUP_FORMAT, DATABASE_BACKUP_VERSION } from "../src/lib/backups/format";
+import {
+	BACKUP_TABLES,
+	DATABASE_BACKUP_FORMAT,
+	DATABASE_BACKUP_VERSION,
+} from "../src/lib/backups/format";
 import { normalizeDatabaseBackupDocument } from "../src/lib/backups/export";
 import {
 	getReferencedR2Keys,
@@ -65,7 +69,8 @@ function createFakeBucket() {
 				etag: `etag-${bytes.byteLength}-${bytes[0] ?? 0}`,
 				httpMetadata: options?.httpMetadata ?? {},
 				customMetadata: options?.customMetadata ?? {},
-				storageClass: options?.storageClass === "InfrequentAccess" ? "InfrequentAccess" : "Standard",
+				storageClass:
+					options?.storageClass === "InfrequentAccess" ? "InfrequentAccess" : "Standard",
 			};
 			objects.set(key, stored);
 			return metadata(key, stored);
@@ -102,10 +107,12 @@ describe("database backup R2 snapshots", () => {
 		tables.messages = [{ raw_r2_key: "raw/message.eml" }];
 		tables.message_attachments = [{ r2_key: "attachments/report.pdf" }];
 		tables.app_settings = [{ icon_key: "branding/icon.png" }];
-		tables.dead_letter_events = [{
-			source_queue: "inbound",
-			payload: JSON.stringify({ rawR2Key: "inbound/dead-letter.eml" }),
-		}];
+		tables.dead_letter_events = [
+			{
+				source_queue: "inbound",
+				payload: JSON.stringify({ rawR2Key: "inbound/dead-letter.eml" }),
+			},
+		];
 		tables.backups = [{ r2_key: "database-backups/older/manifest.json" }];
 
 		expect(getReferencedR2Keys({ tables })).toEqual([
@@ -123,8 +130,12 @@ describe("database backup R2 snapshots", () => {
 		const tables = emptyTables();
 		tables.users = [{ avatar_key: "users/avatar.png" }];
 		tables.messages = [{ raw_r2_key: "raw/message.eml" }];
-		await bucket.put("users/avatar.png", "original-avatar", { httpMetadata: { contentType: "image/png" } });
-		await bucket.put("raw/message.eml", "original-message", { httpMetadata: { contentType: "message/rfc822" } });
+		await bucket.put("users/avatar.png", "original-avatar", {
+			httpMetadata: { contentType: "image/png" },
+		});
+		await bucket.put("raw/message.eml", "original-message", {
+			httpMetadata: { contentType: "message/rfc822" },
+		});
 
 		const r2 = await snapshotDatabaseObjects(bucket, "bak_test", { tables });
 		const document = normalizeDatabaseBackupDocument({
@@ -172,12 +183,14 @@ describe("database backup R2 snapshots", () => {
 		const tables = emptyTables();
 		tables.users = [{ avatar_key: "users/avatar.png" }];
 
-		expect(() => normalizeDatabaseBackupDocument({
-			format: DATABASE_BACKUP_FORMAT,
-			version: DATABASE_BACKUP_VERSION,
-			createdAt: "2026-09-04T00:00:00.000Z",
-			tables,
-			r2: { strategy: "independent-copies-v1", objects: [] },
-		})).toThrow("invalid R2 backup manifest");
+		expect(() =>
+			normalizeDatabaseBackupDocument({
+				format: DATABASE_BACKUP_FORMAT,
+				version: DATABASE_BACKUP_VERSION,
+				createdAt: "2026-09-04T00:00:00.000Z",
+				tables,
+				r2: { strategy: "independent-copies-v1", objects: [] },
+			}),
+		).toThrow("invalid R2 backup manifest");
 	});
 });

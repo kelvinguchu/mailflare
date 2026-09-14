@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { domains, mailboxAccess, mailboxes } from "@/db/schema";
-import type { NewMessageNotification } from "./types";
+import type { NewMessageNotification, RealtimeNotification, TaskChangeNotification } from "./types";
 
 export function getSessionTokenFromRequest(request: Request): string | undefined {
 	const cookie = request.headers.get("Cookie");
@@ -30,20 +30,22 @@ export async function getMailboxNotificationUserIds(
 		.innerJoin(domains, eq(mailboxes.domainId, domains.id))
 		.where(eq(mailboxes.id, mailboxId))
 		.limit(1);
-	const sharedUserIds = mailboxRows[0]?.type === "shared"
-		? (await db
-			.select({ userId: mailboxAccess.userId })
-			.from(mailboxAccess)
-			.where(eq(mailboxAccess.mailboxId, mailboxId)))
-			.map((access) => access.userId)
-		: [];
+	const sharedUserIds =
+		mailboxRows[0]?.type === "shared"
+			? (
+					await db
+						.select({ userId: mailboxAccess.userId })
+						.from(mailboxAccess)
+						.where(eq(mailboxAccess.mailboxId, mailboxId))
+				).map((access) => access.userId)
+			: [];
 
 	return [
-		...new Set([
-			ownerUserId,
-			mailboxRows[0]?.domainOwnerUserId,
-			...sharedUserIds,
-		].filter((userId): userId is string => !!userId)),
+		...new Set(
+			[ownerUserId, mailboxRows[0]?.domainOwnerUserId, ...sharedUserIds].filter(
+				(userId): userId is string => !!userId,
+			),
+		),
 	];
 }
 
@@ -52,6 +54,23 @@ export async function notifyUsersOfNewMessage(
 	userIds: string[],
 	payload: NewMessageNotification,
 ): Promise<void> {
+	return notifyUsers(env, userIds, payload);
+}
+
+export async function notifyUsersOfTaskChange(
+	env: CloudflareEnv,
+	userIds: string[],
+	payload: TaskChangeNotification,
+): Promise<void> {
+	return notifyUsers(env, userIds, payload);
+}
+
+async function notifyUsers(
+	env: CloudflareEnv,
+	userIds: string[],
+	payload: RealtimeNotification,
+): Promise<void> {
+	if (!env.REALTIME) return;
 	await Promise.allSettled(
 		userIds.map((userId) => {
 			const hub = env.REALTIME.getByName(userId);

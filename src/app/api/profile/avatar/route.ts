@@ -4,12 +4,7 @@ import { getDb } from "@/db";
 import { users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/cookies";
 import { getEnv } from "@/lib/cloudflare";
-import {
-	ALLOWED_AVATAR_TYPES,
-	MAX_AVATAR_SIZE,
-	avatarKeyFor,
-	isUploadedAvatarFile,
-} from "./utils";
+import { ALLOWED_AVATAR_TYPES, MAX_AVATAR_SIZE, avatarKeyFor, isUploadedAvatarFile } from "./utils";
 
 export async function GET(request: Request) {
 	const env = getEnv();
@@ -23,10 +18,7 @@ export async function GET(request: Request) {
 	const headers = new Headers();
 	headers.set("Content-Type", object.httpMetadata?.contentType ?? "application/octet-stream");
 	headers.set("X-Content-Type-Options", "nosniff");
-	headers.set(
-		"Content-Security-Policy",
-		"default-src 'none'; img-src 'self'; sandbox",
-	);
+	headers.set("Content-Security-Policy", "default-src 'none'; img-src 'self'; sandbox");
 	headers.set("Cache-Control", "private, no-cache");
 	return new Response(object.body, { headers });
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Download } from "lucide-react";
 import { useSelectedMailbox } from "@/components/mailbox-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
@@ -18,7 +17,10 @@ export default function SettingsExportPage() {
 		try {
 			await exportMailbox(selectedMailbox.id, `${selectedMailbox.localPart}.mbox`);
 		} catch (error) {
-			setExportState({ error: error instanceof Error ? error.message : "Export failed", loading: false });
+			setExportState({
+				error: error instanceof Error ? error.message : "Export failed",
+				loading: false,
+			});
 			return;
 		}
 		setExportState({ error: null, loading: false });
@@ -41,7 +43,12 @@ export default function SettingsExportPage() {
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-3 pt-5">
-					<Button type="button" variant="outline" disabled={!selectedMailbox || exportState.loading} onClick={onExport}>
+					<Button
+						type="button"
+						variant="outline"
+						disabled={!selectedMailbox || exportState.loading}
+						onClick={onExport}
+					>
 						{exportState.loading ? "Preparing..." : "Download .mbox"}
 					</Button>
 					{exportState.error && (

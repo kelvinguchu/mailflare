@@ -6,10 +6,14 @@ import { checkEnvironmentIsolation } from "./check-environment-isolation.mjs";
 const CONFIRMATION = "mailflare-staging";
 const BASE_URL = "https://mailflare-staging.agabio.workers.dev";
 const BUCKET = "mailflare-raw-staging";
-const wranglerPath = fileURLToPath(new URL("../node_modules/wrangler/bin/wrangler.js", import.meta.url));
+const wranglerPath = fileURLToPath(
+	new URL("../node_modules/wrangler/bin/wrangler.js", import.meta.url),
+);
 
 if (process.env.CC_MAIL_STAGING_RESTORE_DRILL !== CONFIRMATION) {
-	throw new Error(`Set CC_MAIL_STAGING_RESTORE_DRILL=${CONFIRMATION} to run the destructive staging-only drill`);
+	throw new Error(
+		`Set CC_MAIL_STAGING_RESTORE_DRILL=${CONFIRMATION} to run the destructive staging-only drill`,
+	);
 }
 
 const { staging } = checkEnvironmentIsolation();
@@ -17,7 +21,10 @@ if (staging.name !== CONFIRMATION || staging.vars?.DEPLOYMENT_ENV !== "staging")
 	throw new Error("The configured target is not the isolated staging environment");
 }
 
-const runId = `drill_${new Date().toISOString().replaceAll(/[-:.TZ]/g, "").slice(0, 14)}_${randomBytes(4).toString("hex")}`;
+const runId = `drill_${new Date()
+	.toISOString()
+	.replaceAll(/[-:.TZ]/g, "")
+	.slice(0, 14)}_${randomBytes(4).toString("hex")}`;
 const ids = {
 	user: `usr_${runId}`,
 	domain: `dom_${runId}`,
@@ -54,7 +61,9 @@ const objects = [
 	{
 		key: `restore-drill/${runId}/raw/message.eml`,
 		contentType: "message/rfc822",
-		original: Buffer.from("From: sender@example.invalid\r\nTo: restore-drill@example.invalid\r\nSubject: Restore drill\r\n\r\nOriginal raw body\r\n"),
+		original: Buffer.from(
+			"From: sender@example.invalid\r\nTo: restore-drill@example.invalid\r\nSubject: Restore drill\r\n\r\nOriginal raw body\r\n",
+		),
 	},
 	{ key: `restore-drill/${runId}/inline/pixel.png`, contentType: "image/png", original: png },
 	{
@@ -86,14 +95,24 @@ function runWrangler(args, options = {}) {
 	if (result.error) throw result.error;
 	if (result.status !== 0 && !options.allowFailure) {
 		const stderr = Buffer.isBuffer(result.stderr) ? result.stderr.toString("utf8") : result.stderr;
-		throw new Error(`Wrangler failed (${args.slice(0, 3).join(" ")}): ${stderr?.trim() ?? "unknown error"}`);
+		throw new Error(
+			`Wrangler failed (${args.slice(0, 3).join(" ")}): ${stderr?.trim() ?? "unknown error"}`,
+		);
 	}
 	return result;
 }
 
 function d1(sql) {
 	const result = runWrangler([
-		"d1", "execute", "DB", "--env", "staging", "--remote", "--command", sql, "--json",
+		"d1",
+		"execute",
+		"DB",
+		"--env",
+		"staging",
+		"--remote",
+		"--command",
+		sql,
+		"--json",
 	]);
 	const parsed = JSON.parse(result.stdout);
 	for (const item of parsed) {
@@ -107,23 +126,37 @@ function d1Rows(sql, resultIndex = 0) {
 }
 
 function r2Put(object, bytes) {
-	runWrangler([
-		"r2", "object", "put", `${BUCKET}/${object.key}`, "--env", "staging", "--remote",
-		"--pipe", "--content-type", object.contentType, "--force",
-	], { input: bytes, binary: true });
+	runWrangler(
+		[
+			"r2",
+			"object",
+			"put",
+			`${BUCKET}/${object.key}`,
+			"--env",
+			"staging",
+			"--remote",
+			"--pipe",
+			"--content-type",
+			object.contentType,
+			"--force",
+		],
+		{ input: bytes, binary: true },
+	);
 }
 
 function r2Get(key, allowFailure = false) {
-	const result = runWrangler([
-		"r2", "object", "get", `${BUCKET}/${key}`, "--env", "staging", "--remote", "--pipe",
-	], { binary: true, allowFailure });
+	const result = runWrangler(
+		["r2", "object", "get", `${BUCKET}/${key}`, "--env", "staging", "--remote", "--pipe"],
+		{ binary: true, allowFailure },
+	);
 	return result.status === 0 ? Buffer.from(result.stdout) : null;
 }
 
 function r2Delete(key) {
-	const result = runWrangler([
-		"r2", "object", "delete", `${BUCKET}/${key}`, "--env", "staging", "--remote", "--force",
-	], { allowFailure: true });
+	const result = runWrangler(
+		["r2", "object", "delete", `${BUCKET}/${key}`, "--env", "staging", "--remote", "--force"],
+		{ allowFailure: true },
+	);
 	return result.status === 0;
 }
 
@@ -150,10 +183,18 @@ async function api(path, init = {}) {
 
 async function restore(document) {
 	const form = new FormData();
-	form.set("backup", new Blob([JSON.stringify(document)], { type: "application/json" }), `${runId}.json`);
+	form.set(
+		"backup",
+		new Blob([JSON.stringify(document)], { type: "application/json" }),
+		`${runId}.json`,
+	);
 	const response = await api("/api/backups/restore", { method: "POST", body: form });
 	let body;
-	try { body = await response.json(); } catch { body = {}; }
+	try {
+		body = await response.json();
+	} catch {
+		body = {};
+	}
 	return { response, body };
 }
 
@@ -165,7 +206,8 @@ async function waitForBackup(id) {
 		const body = await response.json();
 		const record = body.backups.find((backup) => backup.id === id);
 		if (record?.status === "completed") return record;
-		if (record?.status === "failed") throw new Error(`Backup failed: ${record.error ?? "unknown error"}`);
+		if (record?.status === "failed")
+			throw new Error(`Backup failed: ${record.error ?? "unknown error"}`);
 		await new Promise((resolve) => setTimeout(resolve, 2_000));
 	}
 	throw new Error("Timed out waiting for the staging backup workflow");
@@ -188,7 +230,10 @@ async function preflight() {
 	const statusResponse = await fetch(`${BASE_URL}/api/setup/status`);
 	assert(statusResponse.ok, `Staging setup status returned ${statusResponse.status}`);
 	const status = await statusResponse.json();
-	assert(status.hasAdminAccount === false, "Staging already has an administrator; refusing destructive drill");
+	assert(
+		status.hasAdminAccount === false,
+		"Staging already has an administrator; refusing destructive drill",
+	);
 
 	const counts = d1Rows(`SELECT
 		(SELECT COUNT(*) FROM users) AS users,
@@ -198,7 +243,10 @@ async function preflight() {
 		(SELECT COUNT(*) FROM message_attachments) AS attachments,
 		(SELECT COUNT(*) FROM sessions) AS sessions,
 		(SELECT COUNT(*) FROM backups) AS backups`)[0];
-	assert(counts && Object.values(counts).every((value) => value === 0), `Staging is not empty: ${JSON.stringify(counts)}`);
+	assert(
+		counts && Object.values(counts).every((value) => value === 0),
+		`Staging is not empty: ${JSON.stringify(counts)}`,
+	);
 	baselineAppSettings = d1Rows("SELECT * FROM app_settings WHERE id = 'default'")[0];
 	assert(baselineAppSettings, "The default app settings row is missing");
 }
@@ -233,17 +281,36 @@ function seedFixture() {
 async function createAndDownloadBackup() {
 	const response = await api("/api/backups", { method: "POST" });
 	const body = await response.json();
-	assert(response.status === 202 && body.backupId, `Backup request failed (${response.status}): ${JSON.stringify(body)}`);
+	assert(
+		response.status === 202 && body.backupId,
+		`Backup request failed (${response.status}): ${JSON.stringify(body)}`,
+	);
 	backupId = body.backupId;
 	const record = await waitForBackup(backupId);
 	const download = await api(`/api/backups/${backupId}/download`);
 	assert(download.ok, `Backup download returned ${download.status}`);
 	const document = await download.json();
-	assert(document.format === "mailflare-database-backup" && document.version === 4, "Unexpected backup format");
-	assert(document.r2?.objects?.length === objects.length, `Expected ${objects.length} R2 snapshots`);
-	assert(document.tables.users.some((row) => row.id === ids.user), "Backup omitted the fixture user");
-	assert(document.tables.messages.some((row) => row.id === ids.message), "Backup omitted the fixture message");
-	assert(document.tables.message_attachments.filter((row) => row.message_id === ids.message).length === 2, "Backup omitted fixture attachments");
+	assert(
+		document.format === "mailflare-database-backup" && document.version === 4,
+		"Unexpected backup format",
+	);
+	assert(
+		document.r2?.objects?.length === objects.length,
+		`Expected ${objects.length} R2 snapshots`,
+	);
+	assert(
+		document.tables.users.some((row) => row.id === ids.user),
+		"Backup omitted the fixture user",
+	);
+	assert(
+		document.tables.messages.some((row) => row.id === ids.message),
+		"Backup omitted the fixture message",
+	);
+	assert(
+		document.tables.message_attachments.filter((row) => row.message_id === ids.message).length ===
+			2,
+		"Backup omitted fixture attachments",
+	);
 	addBundleToCleanup(record.r2Key, document);
 	return document;
 }
@@ -259,10 +326,17 @@ function mutateLiveState() {
 
 async function verifyFailureRollback(document) {
 	const invalid = structuredClone(document);
-	const duplicate = { ...invalid.tables.users.find((row) => row.id === ids.user), id: `usr_duplicate_${runId}`, avatar_key: null };
+	const duplicate = {
+		...invalid.tables.users.find((row) => row.id === ids.user),
+		id: `usr_duplicate_${runId}`,
+		avatar_key: null,
+	};
 	invalid.tables.users.push(duplicate);
 	const failed = await restore(invalid);
-	assert(failed.response.status === 400, `Injected failure unexpectedly returned ${failed.response.status}`);
+	assert(
+		failed.response.status === 400,
+		`Injected failure unexpectedly returned ${failed.response.status}`,
+	);
 
 	const state = d1Rows(`SELECT
 		(SELECT name FROM users WHERE id=${sql(ids.user)}) AS user_name,
@@ -270,12 +344,18 @@ async function verifyFailureRollback(document) {
 		(SELECT company_name FROM app_settings WHERE id='default') AS company_name,
 		(SELECT COUNT(*) FROM sessions WHERE id=${sql(ids.session)}) AS sessions`)[0];
 	assert(state.user_name === mutated.userName, "Failed restore changed the live user row");
-	assert(state.message_subject === mutated.messageSubject, "Failed restore changed the live message row");
+	assert(
+		state.message_subject === mutated.messageSubject,
+		"Failed restore changed the live message row",
+	);
 	assert(state.company_name === mutated.companyName, "Failed restore changed app settings");
 	assert(state.sessions === 1, "Failed restore invalidated the live session");
-	for (const object of objects) assertBytes(r2Get(object.key), object.mutated, `Rolled-back ${object.key}`);
+	for (const object of objects)
+		assertBytes(r2Get(object.key), object.mutated, `Rolled-back ${object.key}`);
 
-	const recoveries = d1Rows("SELECT id,r2_key FROM backups WHERE id LIKE 'bak_restore_%' ORDER BY created_at DESC");
+	const recoveries = d1Rows(
+		"SELECT id,r2_key FROM backups WHERE id LIKE 'bak_restore_%' ORDER BY created_at DESC",
+	);
 	assert(recoveries.length === 1, "Injected failure did not leave exactly one recovery backup");
 	failureRecoveryId = recoveries[0].id;
 	recoveryIds.add(failureRecoveryId);
@@ -287,7 +367,10 @@ async function verifyFailureRollback(document) {
 
 async function verifySuccessfulRestore(document) {
 	const restored = await restore(document);
-	assert(restored.response.ok && restored.body.ok === true, `Valid restore failed (${restored.response.status}): ${JSON.stringify(restored.body)}`);
+	assert(
+		restored.response.ok && restored.body.ok === true,
+		`Valid restore failed (${restored.response.status}): ${JSON.stringify(restored.body)}`,
+	);
 	successRecoveryId = restored.body.recoveryBackupId;
 	recoveryIds.add(successRecoveryId);
 
@@ -306,12 +389,16 @@ async function verifySuccessfulRestore(document) {
 	assert(state.sessions === 0, "Sessions were not invalidated");
 	assert(state.staging_tables === 0, "Temporary restore tables were not removed");
 	assert(state.recovery_backups === 1, "Successful restore recovery backup is missing");
-	for (const object of objects) assertBytes(r2Get(object.key), object.original, `Restored ${object.key}`);
+	for (const object of objects)
+		assertBytes(r2Get(object.key), object.original, `Restored ${object.key}`);
 	const unauthorized = await api("/api/backups");
 	assert(unauthorized.status === 403, `Invalidated session returned ${unauthorized.status}`);
 
 	const recovery = d1Rows(`SELECT r2_key FROM backups WHERE id=${sql(successRecoveryId)}`)[0];
-	assert(recovery?.r2_key && loadBundleForCleanup(recovery.r2_key), "Success recovery bundle is unreadable");
+	assert(
+		recovery?.r2_key && loadBundleForCleanup(recovery.r2_key),
+		"Success recovery bundle is unreadable",
+	);
 }
 
 function restoreBaselineAppSettings() {
@@ -365,11 +452,23 @@ function cleanup() {
 		(SELECT icon_key FROM app_settings WHERE id='default') AS icon_key,
 		(SELECT updated_at FROM app_settings WHERE id='default') AS updated_at,
 		(SELECT company_name FROM app_settings WHERE id='default') AS company_name`)[0];
-	for (const name of ["users", "domains", "mailboxes", "messages", "attachments", "sessions", "backups", "restore_tables"]) {
+	for (const name of [
+		"users",
+		"domains",
+		"mailboxes",
+		"messages",
+		"attachments",
+		"sessions",
+		"backups",
+		"restore_tables",
+	]) {
 		assert(state[name] === 0, `Post-drill cleanup left ${name} rows`);
 	}
 	for (const name of ["app_name", "icon_key", "updated_at", "company_name"]) {
-		assert(state[name] === baselineAppSettings[name], `Post-drill cleanup changed app_settings.${name}`);
+		assert(
+			state[name] === baselineAppSettings[name],
+			`Post-drill cleanup changed app_settings.${name}`,
+		);
 	}
 }
 
@@ -382,17 +481,23 @@ try {
 	const injectedFailure = await verifyFailureRollback(document);
 	await verifySuccessfulRestore(document);
 	completed = true;
-	console.log(JSON.stringify({
-		result: "passed",
-		runId,
-		backupId,
-		failureRecoveryId,
-		successRecoveryId,
-		injectedFailure,
-		r2ObjectsVerified: objects.length,
-		sessionsInvalidated: true,
-		temporaryRestoreTablesRemaining: 0,
-	}, null, 2));
+	console.log(
+		JSON.stringify(
+			{
+				result: "passed",
+				runId,
+				backupId,
+				failureRecoveryId,
+				successRecoveryId,
+				injectedFailure,
+				r2ObjectsVerified: objects.length,
+				sessionsInvalidated: true,
+				temporaryRestoreTablesRemaining: 0,
+			},
+			null,
+			2,
+		),
+	);
 } finally {
 	cleanup();
 	if (completed) console.log("Staging drill fixtures and backup bundles cleaned up.");

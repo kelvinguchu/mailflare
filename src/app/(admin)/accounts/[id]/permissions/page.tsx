@@ -16,7 +16,9 @@ export default function AccountPermissionsPage() {
 	useEffect(() => {
 		void fetchManagedAccount(id)
 			.then(setAccount)
-			.catch((error) => setMessage(error instanceof Error ? error.message : "Unable to load permissions"));
+			.catch((error) =>
+				setMessage(error instanceof Error ? error.message : "Unable to load permissions"),
+			);
 	}, [id]);
 
 	async function savePermissions() {
@@ -51,28 +53,37 @@ export default function AccountPermissionsPage() {
 						<tr>
 							<td className="px-5 py-4">
 								<p className="text-sm font-semibold text-neutral-900">Administrator access</p>
-								<p className="mt-1 text-xs text-neutral-500">Access administration pages and manage workspace settings.</p>
+								<p className="mt-1 text-xs text-neutral-500">
+									Access administration pages and manage workspace settings.
+								</p>
 							</td>
 							<td className="px-5 py-4 text-center">
 								<Checkbox
 									aria-label="Allow administrator access"
 									checked={account?.role === "admin"}
 									disabled={!account}
-									onChange={(event) => account && setAccount({ ...account, role: event.target.checked ? "admin" : "user" })}
+									onChange={(event) =>
+										account &&
+										setAccount({ ...account, role: event.target.checked ? "admin" : "user" })
+									}
 								/>
 							</td>
 						</tr>
 						<tr>
 							<td className="px-5 py-4">
 								<p className="text-sm font-semibold text-neutral-900">Manage mailboxes</p>
-								<p className="mt-1 text-xs text-neutral-500">Allow this account to add and remove its own inboxes.</p>
+								<p className="mt-1 text-xs text-neutral-500">
+									Allow this account to add and remove its own inboxes.
+								</p>
 							</td>
 							<td className="px-5 py-4 text-center">
 								<Checkbox
 									aria-label="Allow mailbox management"
 									checked={account?.canManageMailboxes ?? false}
 									disabled={!account}
-									onChange={(event) => account && setAccount({ ...account, canManageMailboxes: event.target.checked })}
+									onChange={(event) =>
+										account && setAccount({ ...account, canManageMailboxes: event.target.checked })
+									}
 								/>
 							</td>
 						</tr>

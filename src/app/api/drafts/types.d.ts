@@ -5,4 +5,5 @@ export type DraftPayload = {
 	subject?: string;
 	text?: string;
 	html?: string;
+	replyToMessageId?: string | null;
 };

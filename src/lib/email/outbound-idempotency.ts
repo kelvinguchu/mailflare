@@ -36,31 +36,37 @@ export async function createOutboundRequestHash(input: {
 	text?: string;
 	headers?: Record<string, string>;
 	mailboxId: string;
+	replyToMessageId?: string | null;
 	attachments: AttachmentContent[];
 }): Promise<string> {
-	const attachmentFingerprints = await Promise.all(input.attachments.map(async (attachment) => ({
-		filename: attachment.filename,
-		type: attachment.type,
-		disposition: attachment.disposition ?? "attachment",
-		contentId: attachment.contentId ?? null,
-		contentHash: await sha256(attachment.content),
-	})));
+	const attachmentFingerprints = await Promise.all(
+		input.attachments.map(async (attachment) => ({
+			filename: attachment.filename,
+			type: attachment.type,
+			disposition: attachment.disposition ?? "attachment",
+			contentId: attachment.contentId ?? null,
+			contentHash: await sha256(attachment.content),
+		})),
+	);
 	const headers = Object.fromEntries(
 		Object.entries(input.headers ?? {})
 			.map(([name, value]) => [name.toLowerCase(), value] as const)
 			.sort(([left], [right]) => left.localeCompare(right)),
 	);
 
-	return sha256(JSON.stringify({
-		from: input.from,
-		to: input.to,
-		subject: input.subject,
-		html: input.html ?? null,
-		text: input.text ?? null,
-		headers,
-		mailboxId: input.mailboxId,
-		attachments: attachmentFingerprints,
-	}));
+	return sha256(
+		JSON.stringify({
+			from: input.from,
+			to: input.to,
+			subject: input.subject,
+			html: input.html ?? null,
+			text: input.text ?? null,
+			headers,
+			mailboxId: input.mailboxId,
+			replyToMessageId: input.replyToMessageId ?? null,
+			attachments: attachmentFingerprints,
+		}),
+	);
 }
 
 async function sha256(value: string | ArrayBuffer): Promise<string> {

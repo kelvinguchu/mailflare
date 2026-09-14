@@ -1,8 +1,13 @@
+import { z } from "zod";
 import { NextResponse } from "next/server";
 import { and, eq, ne } from "drizzle-orm";
 import { getDb } from "@/db";
 import { users } from "@/db/schema";
-import { deliverAuthEmail, prepareAccountActivation, revokeAccountInvitation } from "@/lib/auth/recovery";
+import {
+	deliverAuthEmail,
+	prepareAccountActivation,
+	revokeAccountInvitation,
+} from "@/lib/auth/recovery";
 import { getExecutionContext } from "@/lib/cloudflare";
 import { accountInvitationSchema } from "@/lib/validators";
 import { requireAdmin } from "../../utils";
@@ -25,23 +30,35 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
 		return NextResponse.json({ error: "This account is already active" }, { status: 409 });
 	}
 	const parsed = accountInvitationSchema.safeParse(await request.json());
-	if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+	if (!parsed.success)
+		return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
 	const invitationEmail = parsed.data.invitationEmail?.toLowerCase() ?? account.resetEmail;
-	if (!invitationEmail) return NextResponse.json({ error: "An invitation email is required" }, { status: 400 });
+	if (!invitationEmail)
+		return NextResponse.json({ error: "An invitation email is required" }, { status: 400 });
 	if (invitationEmail === account.email.toLowerCase()) {
-		return NextResponse.json({ error: "Use an external email address for the invitation" }, { status: 400 });
+		return NextResponse.json(
+			{ error: "Use an external email address for the invitation" },
+			{ status: 400 },
+		);
 	}
 	if (account.activationStatus === "pending") {
 		const revoked = await revokeAccountInvitation(access.env, id, access.user!.id);
 		if (!revoked) {
-			return NextResponse.json({ error: "This account was activated while the invitation was being updated" }, { status: 409 });
+			return NextResponse.json(
+				{ error: "This account was activated while the invitation was being updated" },
+				{ status: 409 },
+			);
 		}
 	}
-	const updated = await db.update(users).set({
-		resetEmail: invitationEmail,
-		resetEmailVerifiedAt: null,
-		activationStatus: "pending",
-	}).where(and(eq(users.id, id), ne(users.activationStatus, "active"))).returning({ id: users.id });
+	const updated = await db
+		.update(users)
+		.set({
+			resetEmail: invitationEmail,
+			resetEmailVerifiedAt: null,
+			activationStatus: "pending",
+		})
+		.where(and(eq(users.id, id), ne(users.activationStatus, "active")))
+		.returning({ id: users.id });
 	if (updated.length === 0) {
 		return NextResponse.json({ error: "This account is already active" }, { status: 409 });
 	}
@@ -63,7 +80,10 @@ export async function DELETE(request: Request, { params }: AccountRouteParams) {
 		return NextResponse.json({ error: "Account not found" }, { status: 404 });
 	}
 	if (account.activationStatus === "active") {
-		return NextResponse.json({ error: "An active account has no invitation to revoke" }, { status: 409 });
+		return NextResponse.json(
+			{ error: "An active account has no invitation to revoke" },
+			{ status: 409 },
+		);
 	}
 	if (account.activationStatus === "pending") {
 		await revokeAccountInvitation(access.env, id, access.user!.id);

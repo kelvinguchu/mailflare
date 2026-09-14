@@ -33,9 +33,13 @@ export function decideOutboundDeadLetterReplay(job: {
 	messageId: string | null;
 }): OutboundReplayDecision {
 	if (job.status === "sent") return "already_sent";
+	if (job.status === "canceled") return "blocked_invalid_state";
 	if (job.status === "sending") return "blocked_in_flight";
 	if (job.error === "E_DELIVERY_OUTCOME_UNKNOWN") return "blocked_unknown_outcome";
 	if (job.status === "queued") {
+		return job.deliveryStartedAt === null ? "enqueue" : "blocked_unknown_outcome";
+	}
+	if (job.status === "scheduled") {
 		return job.deliveryStartedAt === null ? "enqueue" : "blocked_unknown_outcome";
 	}
 	if (job.status === "failed") {

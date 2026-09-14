@@ -22,7 +22,10 @@ export function primeMessageDetail(message: Message): void {
 	});
 }
 
-export async function fetchCachedMessageDetail(messageId: string, force = false): Promise<CachedMessageDetail> {
+export async function fetchCachedMessageDetail(
+	messageId: string,
+	force = false,
+): Promise<CachedMessageDetail> {
 	if (!force && detailCache.has(messageId)) return detailCache.get(messageId) ?? {};
 	if (!force && detailRequests.has(messageId)) return detailRequests.get(messageId) ?? {};
 	const request = authFetch(`/api/messages/${messageId}`)

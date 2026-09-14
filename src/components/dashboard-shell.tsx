@@ -4,11 +4,23 @@ import { usePathname } from "next/navigation";
 import { AdminNav } from "@/components/admin-nav";
 import { DashboardNav } from "@/components/dashboard-nav";
 
-const adminPrefixes = ["/admin", "/mailboxes", "/domains", "/sender-policies", "/api-keys", "/activity", "/audit-logs", "/webhooks", "/branding"];
+const adminPrefixes = [
+	"/admin",
+	"/mailboxes",
+	"/domains",
+	"/sender-policies",
+	"/api-keys",
+	"/activity",
+	"/audit-logs",
+	"/webhooks",
+	"/branding",
+];
 
 export function DashboardShellNav() {
 	const pathname = usePathname();
-	const isAdmin = adminPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+	const isAdmin = adminPrefixes.some(
+		(prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+	);
 
 	return isAdmin ? <AdminNav /> : <DashboardNav />;
 }

@@ -56,10 +56,12 @@ export async function dispatchWebhooks(
 				.update(webhookDeliveries)
 				.set({ status: "failed", lastError: "E_WEBHOOK_ENQUEUE_FAILED" })
 				.where(eq(webhookDeliveries.id, deliveryId));
-			console.error(JSON.stringify({
-				event: "webhook_enqueue_failed",
-				deliveryId,
-			}));
+			console.error(
+				JSON.stringify({
+					event: "webhook_enqueue_failed",
+					deliveryId,
+				}),
+			);
 		}
 	}
 }
@@ -161,11 +163,13 @@ export async function redeliverWebhookForUser(
 		.select({ id: webhookDeliveries.id })
 		.from(webhookDeliveries)
 		.innerJoin(webhooks, eq(webhookDeliveries.webhookId, webhooks.id))
-		.where(and(
-			eq(webhookDeliveries.id, deliveryId),
-			eq(webhooks.id, webhookId),
-			eq(webhooks.userId, userId),
-		))
+		.where(
+			and(
+				eq(webhookDeliveries.id, deliveryId),
+				eq(webhooks.id, webhookId),
+				eq(webhooks.userId, userId),
+			),
+		)
 		.limit(1);
 	if (!row) return false;
 
@@ -223,9 +227,7 @@ export async function deleteExpiredWebhookDeliveries(
 	now = new Date(),
 ): Promise<void> {
 	const cutoff = new Date(now.getTime() - WEBHOOK_DELIVERY_RETENTION_DAYS * 24 * 60 * 60 * 1_000);
-	await getDb(env)
-		.delete(webhookDeliveries)
-		.where(lt(webhookDeliveries.createdAt, cutoff));
+	await getDb(env).delete(webhookDeliveries).where(lt(webhookDeliveries.createdAt, cutoff));
 }
 
 async function recordWebhookFailure(
@@ -251,7 +253,7 @@ async function recordWebhookFailure(
 }
 
 function getWebhookRetryDelaySeconds(attempt: number): number {
-	return Math.min(30 * (2 ** Math.max(0, attempt - 1)), 15 * 60);
+	return Math.min(30 * 2 ** Math.max(0, attempt - 1), 15 * 60);
 }
 
 function includesEvent(eventsJson: string, eventType: WebhookEventType): boolean {
@@ -267,15 +269,17 @@ function normalizeStoredPayload(delivery: typeof webhookDeliveries.$inferSelect)
 	try {
 		const parsed = JSON.parse(delivery.payload) as unknown;
 		if (
-			typeof parsed === "object" && parsed !== null &&
-			"id" in parsed && parsed.id === delivery.id &&
-			"createdAt" in parsed && typeof parsed.createdAt === "string"
+			typeof parsed === "object" &&
+			parsed !== null &&
+			"id" in parsed &&
+			parsed.id === delivery.id &&
+			"createdAt" in parsed &&
+			typeof parsed.createdAt === "string"
 		) {
 			return delivery.payload;
 		}
-		const data = typeof parsed === "object" && parsed !== null && "data" in parsed
-			? parsed.data
-			: parsed;
+		const data =
+			typeof parsed === "object" && parsed !== null && "data" in parsed ? parsed.data : parsed;
 		return JSON.stringify({
 			id: delivery.id,
 			type: delivery.eventType,

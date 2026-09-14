@@ -4,10 +4,7 @@ import { requireUser } from "@/lib/auth/cookies";
 import { deleteBackup } from "@/lib/backups/service";
 import { getEnv } from "@/lib/cloudflare";
 
-export async function DELETE(
-	request: Request,
-	{ params }: { params: Promise<{ id: string }> },
-) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
 	const env = getEnv();
 	try {
 		const user = await requireUser(env, request);

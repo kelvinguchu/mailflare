@@ -24,15 +24,16 @@ function createFakeDatabase(options?: { raceOnFirstBatch?: boolean }) {
 				record.values = values;
 				return statement;
 			},
-			first: async <T>() => existingMessageId ? { id: existingMessageId } as T : null,
+			first: async <T>() => (existingMessageId ? ({ id: existingMessageId } as T) : null),
 		} as D1PreparedStatement;
 		record.statement = statement;
 		prepared.push(record);
 		return statement;
 	});
 	const batch = vi.fn(async (statements: D1PreparedStatement[]) => {
-		const messageInsert = prepared.find((record) =>
-			record.sql.startsWith("INSERT INTO messages") && statements.includes(record.statement),
+		const messageInsert = prepared.find(
+			(record) =>
+				record.sql.startsWith("INSERT INTO messages") && statements.includes(record.statement),
 		);
 		existingMessageId = String(messageInsert?.values[0] ?? "");
 		if (options?.raceOnFirstBatch) throw new Error("UNIQUE constraint failed");
@@ -88,9 +89,21 @@ describe("inbound delivery idempotency", () => {
 			"From: sender@example.com\r\nTo: info@calibercode.io\r\n\r\nHello",
 		).buffer;
 
-		const first = await createInboundDeliveryKey("sender@example.com", "info@calibercode.io", malformed);
-		const retry = await createInboundDeliveryKey("SENDER@example.com", "INFO@calibercode.io", malformed);
-		const withoutHeader = await createInboundDeliveryKey("sender@example.com", "info@calibercode.io", missing);
+		const first = await createInboundDeliveryKey(
+			"sender@example.com",
+			"info@calibercode.io",
+			malformed,
+		);
+		const retry = await createInboundDeliveryKey(
+			"SENDER@example.com",
+			"INFO@calibercode.io",
+			malformed,
+		);
+		const withoutHeader = await createInboundDeliveryKey(
+			"sender@example.com",
+			"info@calibercode.io",
+			missing,
+		);
 
 		expect(first).toMatch(/^[a-f0-9]{64}$/);
 		expect(retry).toBe(first);
@@ -100,14 +113,21 @@ describe("inbound delivery idempotency", () => {
 	it("keeps identical raw mail to different envelope recipients distinct", async () => {
 		const raw = new TextEncoder().encode("From: sender@example.com\r\n\r\nHello").buffer;
 		const first = await createInboundDeliveryKey("sender@example.com", "info@calibercode.io", raw);
-		const second = await createInboundDeliveryKey("sender@example.com", "support@calibercode.io", raw);
+		const second = await createInboundDeliveryKey(
+			"sender@example.com",
+			"support@calibercode.io",
+			raw,
+		);
 		expect(second).not.toBe(first);
 	});
 
 	it("commits one message and one attachment set across a repeated delivery", async () => {
 		const deliveryKey = "a".repeat(64);
 		const input = message(deliveryKey);
-		const attachments = [attachment(input.id, deliveryKey, 0), attachment(input.id, deliveryKey, 1)];
+		const attachments = [
+			attachment(input.id, deliveryKey, 0),
+			attachment(input.id, deliveryKey, 1),
+		];
 		const { db, batch } = createFakeDatabase();
 
 		const first = await commitInboundMessage(db, input, attachments);
@@ -136,7 +156,7 @@ describe("inbound delivery idempotency", () => {
 		const bucket = {
 			head: vi.fn(async (key: string) => {
 				const object = objects.get(key);
-				return object ? { key, ...object } as R2Object : null;
+				return object ? ({ key, ...object } as R2Object) : null;
 			}),
 			put: vi.fn(async (key: string, value: ArrayBuffer, options: R2PutOptions) => {
 				const object = {
@@ -149,14 +169,26 @@ describe("inbound delivery idempotency", () => {
 		} as Pick<R2Bucket, "head" | "put">;
 		const env = { BUCKET: bucket as R2Bucket };
 		const deliveryKey = "c".repeat(64);
-		const source = [{
-			filename: "report.txt",
-			type: "text/plain",
-			content: new TextEncoder().encode("report").buffer,
-		}];
+		const source = [
+			{
+				filename: "report.txt",
+				type: "text/plain",
+				content: new TextEncoder().encode("report").buffer,
+			},
+		];
 
-		const first = await stageInboundMessageAttachments(env, createInboundMessageId(deliveryKey), deliveryKey, source);
-		const retry = await stageInboundMessageAttachments(env, createInboundMessageId(deliveryKey), deliveryKey, source);
+		const first = await stageInboundMessageAttachments(
+			env,
+			createInboundMessageId(deliveryKey),
+			deliveryKey,
+			source,
+		);
+		const retry = await stageInboundMessageAttachments(
+			env,
+			createInboundMessageId(deliveryKey),
+			deliveryKey,
+			source,
+		);
 
 		expect(retry).toEqual(first);
 		expect(bucket.put).toHaveBeenCalledTimes(1);

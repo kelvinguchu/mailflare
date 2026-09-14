@@ -35,7 +35,11 @@ export async function addDomainForUser(
 	const provisioned = await provisionDomainOnCloudflare(env, hostname, options);
 
 	const db = getDb(env);
-	const [existing] = await db.select().from(domains).where(eq(domains.hostname, provisioned.hostname)).limit(1);
+	const [existing] = await db
+		.select()
+		.from(domains)
+		.where(eq(domains.hostname, provisioned.hostname))
+		.limit(1);
 	if (existing && existing.userId !== userId) {
 		throw new Error("Domain is already registered");
 	}
@@ -46,7 +50,10 @@ export async function addDomainForUser(
 		userId,
 		hostname: provisioned.hostname,
 		zoneId: provisioned.zone.id,
-		status: provisioned.routingEnabled || provisioned.sendingEnabled ? ("active" as const) : ("pending" as const),
+		status:
+			provisioned.routingEnabled || provisioned.sendingEnabled
+				? ("active" as const)
+				: ("pending" as const),
 		routingStatus: provisioned.routingStatus ?? null,
 		sendingSubdomainTag: provisioned.sendingSubdomainTag,
 		sendingEnabled: provisioned.sendingEnabled,
@@ -60,7 +67,12 @@ export async function addDomainForUser(
 	}
 
 	const aliasMailboxes = await db
-		.select({ id: mailboxes.id, domainId: mailboxes.domainId, localPart: mailboxes.localPart, useAllDomains: mailboxes.useAllDomains })
+		.select({
+			id: mailboxes.id,
+			domainId: mailboxes.domainId,
+			localPart: mailboxes.localPart,
+			useAllDomains: mailboxes.useAllDomains,
+		})
 		.from(mailboxes)
 		.innerJoin(domains, eq(mailboxes.domainId, domains.id))
 		.where(and(eq(domains.userId, userId), eq(mailboxes.useAllDomains, true)));

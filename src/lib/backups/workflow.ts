@@ -7,7 +7,10 @@ import { deleteBackupBundle } from "./objects";
 import { createScheduledBackupIfDue, getBackupSettings } from "./service";
 import type { BackupWorkflowParams } from "./types";
 
-export class DatabaseBackupWorkflow extends WorkflowEntrypoint<CloudflareEnv, BackupWorkflowParams> {
+export class DatabaseBackupWorkflow extends WorkflowEntrypoint<
+	CloudflareEnv,
+	BackupWorkflowParams
+> {
 	async run(event: Readonly<WorkflowEvent<BackupWorkflowParams>>, step: WorkflowStep) {
 		let backupId: string | null | undefined = event.payload?.backupId;
 		if (!backupId) {
@@ -16,7 +19,9 @@ export class DatabaseBackupWorkflow extends WorkflowEntrypoint<CloudflareEnv, Ba
 			);
 		}
 		if (!backupId) {
-			const retention = await step.do("Delete expired backups", async () => this.deleteExpiredBackups());
+			const retention = await step.do("Delete expired backups", async () =>
+				this.deleteExpiredBackups(),
+			);
 			return { skipped: true, ...retention };
 		}
 
@@ -80,12 +85,7 @@ export class DatabaseBackupWorkflow extends WorkflowEntrypoint<CloudflareEnv, Ba
 		const expired = await db
 			.select()
 			.from(backups)
-			.where(
-				and(
-					lt(backups.createdAt, cutoff),
-					inArray(backups.status, ["completed", "failed"]),
-				),
-			);
+			.where(and(lt(backups.createdAt, cutoff), inArray(backups.status, ["completed", "failed"])));
 		for (const backup of expired) {
 			await deleteBackupBundle(this.env.BUCKET, backup.id);
 			await db.delete(backups).where(eq(backups.id, backup.id));

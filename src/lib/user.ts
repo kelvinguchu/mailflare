@@ -31,11 +31,18 @@ export async function listMailboxesForUser(env: CloudflareEnv, userId: string) {
 
 export async function userHasMailboxes(env: CloudflareEnv, userId: string): Promise<boolean> {
 	const db = getDb(env);
-	const [row] = await db.select({ id: mailboxes.id }).from(mailboxes).where(and(eq(mailboxes.userId, userId), eq(mailboxes.disabled, false))).limit(1);
+	const [row] = await db
+		.select({ id: mailboxes.id })
+		.from(mailboxes)
+		.where(and(eq(mailboxes.userId, userId), eq(mailboxes.disabled, false)))
+		.limit(1);
 	return !!row;
 }
 
-export async function userHasAccessibleMailboxes(env: CloudflareEnv, user: SessionUser): Promise<boolean> {
+export async function userHasAccessibleMailboxes(
+	env: CloudflareEnv,
+	user: SessionUser,
+): Promise<boolean> {
 	const db = getDb(env);
 	const ids = await listAccessibleMailboxIds(db, user);
 	return ids.length > 0;
@@ -65,20 +72,17 @@ export async function getMailboxForUser(env: CloudflareEnv, userId: string, mail
 
 export async function markMessageAsRead(env: CloudflareEnv, userId: string, messageId: string) {
 	const db = getDb(env);
-	const [message] = await db
-		.select()
-		.from(messages)
-		.where(eq(messages.id, messageId))
-		.limit(1);
+	const [message] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
 	if (!message || message.userId !== userId) return false;
-	await db
-		.update(messages)
-		.set({ read: true })
-		.where(eq(messages.id, messageId));
+	await db.update(messages).set({ read: true }).where(eq(messages.id, messageId));
 	return true;
 }
 
-export async function markMessageAsReadForUser(env: CloudflareEnv, user: SessionUser, messageId: string) {
+export async function markMessageAsReadForUser(
+	env: CloudflareEnv,
+	user: SessionUser,
+	messageId: string,
+) {
 	const db = getDb(env);
 	const [message] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
 	if (!message?.mailboxId) return false;
@@ -123,15 +127,8 @@ export async function updateMessageStatus(
 	status: string,
 ) {
 	const db = getDb(env);
-	const [message] = await db
-		.select()
-		.from(messages)
-		.where(eq(messages.id, messageId))
-		.limit(1);
+	const [message] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
 	if (!message || message.userId !== userId) return false;
-	await db
-		.update(messages)
-		.set({ status })
-		.where(eq(messages.id, messageId));
+	await db.update(messages).set({ status }).where(eq(messages.id, messageId));
 	return true;
 }

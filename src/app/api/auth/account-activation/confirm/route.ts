@@ -22,18 +22,27 @@ export async function POST(request: Request) {
 	}
 	const parsed = accountActivationConfirmSchema.safeParse(body);
 	if (!parsed.success) {
-		return NextResponse.json({ error: "This activation link is invalid or expired" }, { status: 400 });
+		return NextResponse.json(
+			{ error: "This activation link is invalid or expired" },
+			{ status: 400 },
+		);
 	}
 	if (!(await allowAccountRecoveryAttempt(env, request, parsed.data.token, "activate"))) {
-		return NextResponse.json({ error: "Too many attempts. Try again shortly." }, {
-			status: 429,
-			headers: { "Retry-After": "60" },
-		});
+		return NextResponse.json(
+			{ error: "Too many attempts. Try again shortly." },
+			{
+				status: 429,
+				headers: { "Retry-After": "60" },
+			},
+		);
 	}
 
 	const userId = await completeAccountActivation(env, parsed.data.token, parsed.data.newPassword);
 	if (!userId) {
-		return NextResponse.json({ error: "This activation link is invalid or expired" }, { status: 400 });
+		return NextResponse.json(
+			{ error: "This activation link is invalid or expired" },
+			{ status: 400 },
+		);
 	}
 	const sessionToken = await createSession(env, userId);
 	await recordAuthActivity(env, { action: "auth.login", userId, request });

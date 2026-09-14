@@ -11,8 +11,14 @@ const MFA_CHALLENGE_MINUTES = 5;
 const RECOVERY_CODE_COUNT = 10;
 const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
-type MfaUser = Pick<typeof users.$inferSelect,
-	"id" | "email" | "mfaSecretEncrypted" | "mfaEnabledAt" | "mfaRecoveryCodeHashes" | "mfaLastUsedCounter"
+type MfaUser = Pick<
+	typeof users.$inferSelect,
+	| "id"
+	| "email"
+	| "mfaSecretEncrypted"
+	| "mfaEnabledAt"
+	| "mfaRecoveryCodeHashes"
+	| "mfaLastUsedCounter"
 >;
 
 export type MfaVerificationMethod = "totp" | "recovery";
@@ -85,10 +91,7 @@ export async function createMfaChallenge(env: CloudflareEnv, userId: string): Pr
 	const expiresAt = new Date(now.getTime() + MFA_CHALLENGE_MINUTES * 60_000);
 	const db = getDb(env);
 	await db.batch([
-		db.delete(sessions).where(and(
-			eq(sessions.userId, userId),
-			eq(sessions.kind, "mfa_challenge"),
-		)),
+		db.delete(sessions).where(and(eq(sessions.userId, userId), eq(sessions.kind, "mfa_challenge"))),
 		db.insert(sessions).values({
 			id: newId(),
 			userId,
@@ -109,23 +112,30 @@ export async function completeMfaChallenge(
 ): Promise<{ token: string; userId: string; method: MfaVerificationMethod } | null> {
 	const tokenHash = await hashSessionToken(challengeToken);
 	const db = getDb(env);
-	const [challenge] = await db.select({ id: sessions.id, userId: sessions.userId })
+	const [challenge] = await db
+		.select({ id: sessions.id, userId: sessions.userId })
 		.from(sessions)
-		.where(and(
-			eq(sessions.tokenHash, tokenHash),
-			eq(sessions.kind, "mfa_challenge"),
-			gt(sessions.expiresAt, new Date()),
-		))
+		.where(
+			and(
+				eq(sessions.tokenHash, tokenHash),
+				eq(sessions.kind, "mfa_challenge"),
+				gt(sessions.expiresAt, new Date()),
+			),
+		)
 		.limit(1);
 	if (!challenge) return null;
 
 	const method = await verifyAndConsumeMfaCode(env, challenge.userId, code);
 	if (!method) return null;
-	const deleted = await db.delete(sessions).where(and(
-		eq(sessions.id, challenge.id),
-		eq(sessions.tokenHash, tokenHash),
-		eq(sessions.kind, "mfa_challenge"),
-	));
+	const deleted = await db
+		.delete(sessions)
+		.where(
+			and(
+				eq(sessions.id, challenge.id),
+				eq(sessions.tokenHash, tokenHash),
+				eq(sessions.kind, "mfa_challenge"),
+			),
+		);
 	if (deleted.meta.changes !== 1) return null;
 	return { token: await createSession(env, challenge.userId), userId: challenge.userId, method };
 }
@@ -136,23 +146,32 @@ export async function verifyAndConsumeMfaCode(
 	code: string,
 ): Promise<MfaVerificationMethod | null> {
 	const db = getDb(env);
-	const [user] = await db.select({
-		id: users.id,
-		email: users.email,
-		mfaSecretEncrypted: users.mfaSecretEncrypted,
-		mfaEnabledAt: users.mfaEnabledAt,
-		mfaRecoveryCodeHashes: users.mfaRecoveryCodeHashes,
-		mfaLastUsedCounter: users.mfaLastUsedCounter,
-	}).from(users).where(eq(users.id, userId)).limit(1);
+	const [user] = await db
+		.select({
+			id: users.id,
+			email: users.email,
+			mfaSecretEncrypted: users.mfaSecretEncrypted,
+			mfaEnabledAt: users.mfaEnabledAt,
+			mfaRecoveryCodeHashes: users.mfaRecoveryCodeHashes,
+			mfaLastUsedCounter: users.mfaLastUsedCounter,
+		})
+		.from(users)
+		.where(eq(users.id, userId))
+		.limit(1);
 	if (!isMfaEnabled(user)) return null;
 
 	const secret = await decryptTotpSecret(env, user.mfaSecretEncrypted);
 	const counter = await verifyTotpCode(secret, code, user.mfaLastUsedCounter);
 	if (counter !== null) {
-		const result = await db.update(users).set({ mfaLastUsedCounter: counter }).where(and(
-			eq(users.id, user.id),
-			or(isNull(users.mfaLastUsedCounter), lt(users.mfaLastUsedCounter, counter)),
-		));
+		const result = await db
+			.update(users)
+			.set({ mfaLastUsedCounter: counter })
+			.where(
+				and(
+					eq(users.id, user.id),
+					or(isNull(users.mfaLastUsedCounter), lt(users.mfaLastUsedCounter, counter)),
+				),
+			);
 		return result.meta.changes === 1 ? "totp" : null;
 	}
 
@@ -163,12 +182,12 @@ export async function verifyAndConsumeMfaCode(
 	const matchIndex = await findConstantTimeMatch(hashes, candidate);
 	if (matchIndex < 0) return null;
 	const nextHashes = hashes.filter((_, index) => index !== matchIndex);
-	const result = await db.update(users).set({
-		mfaRecoveryCodeHashes: JSON.stringify(nextHashes),
-	}).where(and(
-		eq(users.id, user.id),
-		eq(users.mfaRecoveryCodeHashes, user.mfaRecoveryCodeHashes),
-	));
+	const result = await db
+		.update(users)
+		.set({
+			mfaRecoveryCodeHashes: JSON.stringify(nextHashes),
+		})
+		.where(and(eq(users.id, user.id), eq(users.mfaRecoveryCodeHashes, user.mfaRecoveryCodeHashes)));
 	return result.meta.changes === 1 ? "recovery" : null;
 }
 
@@ -193,19 +212,23 @@ async function generateTotpCode(secret: string, counter: number): Promise<string
 		counterBytes[index] = Number(remaining & 0xffn);
 		remaining >>= 8n;
 	}
-	const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, toArrayBuffer(counterBytes)));
+	const signature = new Uint8Array(
+		await crypto.subtle.sign("HMAC", key, toArrayBuffer(counterBytes)),
+	);
 	const offset = signature[signature.length - 1]! & 0x0f;
-	const binary = ((signature[offset]! & 0x7f) << 24)
-		| ((signature[offset + 1]! & 0xff) << 16)
-		| ((signature[offset + 2]! & 0xff) << 8)
-		| (signature[offset + 3]! & 0xff);
-	return (binary % (10 ** TOTP_DIGITS)).toString().padStart(TOTP_DIGITS, "0");
+	const binary =
+		((signature[offset]! & 0x7f) << 24) |
+		((signature[offset + 1]! & 0xff) << 16) |
+		((signature[offset + 2]! & 0xff) << 8) |
+		(signature[offset + 3]! & 0xff);
+	return (binary % 10 ** TOTP_DIGITS).toString().padStart(TOTP_DIGITS, "0");
 }
 
 async function importEncryptionKey(env: CloudflareEnv, usages: KeyUsage[]): Promise<CryptoKey> {
-	const value = "MFA_ENCRYPTION_KEY" in env
-		? (env as CloudflareEnv & { MFA_ENCRYPTION_KEY?: unknown }).MFA_ENCRYPTION_KEY
-		: undefined;
+	const value =
+		"MFA_ENCRYPTION_KEY" in env
+			? (env as CloudflareEnv & { MFA_ENCRYPTION_KEY?: unknown }).MFA_ENCRYPTION_KEY
+			: undefined;
 	if (typeof value !== "string") throw new Error("MFA encryption is not configured");
 	const bytes = fromBase64Url(value);
 	if (bytes.byteLength !== 32) throw new Error("MFA encryption is not configured correctly");
@@ -215,7 +238,9 @@ async function importEncryptionKey(env: CloudflareEnv, usages: KeyUsage[]): Prom
 function parseRecoveryHashes(value: string): string[] {
 	try {
 		const parsed = JSON.parse(value);
-		return Array.isArray(parsed) && parsed.every((entry) => typeof entry === "string") ? parsed : [];
+		return Array.isArray(parsed) && parsed.every((entry) => typeof entry === "string")
+			? parsed
+			: [];
 	} catch {
 		return [];
 	}
@@ -226,7 +251,10 @@ function normalizeRecoveryCode(value: string): string {
 }
 
 async function hashRecoveryCode(value: string): Promise<string> {
-	const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(normalizeRecoveryCode(value)));
+	const digest = await crypto.subtle.digest(
+		"SHA-256",
+		new TextEncoder().encode(normalizeRecoveryCode(value)),
+	);
 	return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 

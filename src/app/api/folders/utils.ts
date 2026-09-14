@@ -9,7 +9,11 @@ type Db = ReturnType<typeof getDb>;
 export async function getMailboxFolderAccess(db: Db, user: SessionUser, mailboxId: string) {
 	const access = await getMailboxAccessLevel(db, user, mailboxId);
 	if (!access?.canRead) return null;
-	return { mailboxId: access.mailbox.id, mailboxUserId: access.mailbox.userId, canManage: access.canManage };
+	return {
+		mailboxId: access.mailbox.id,
+		mailboxUserId: access.mailbox.userId,
+		canManage: access.canManage,
+	};
 }
 
 export function listFoldersForMailbox(db: Db, mailboxId: string) {

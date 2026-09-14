@@ -17,6 +17,7 @@ export async function GET(request: Request) {
 
 	const url = new URL(request.url);
 	const mailboxId = url.searchParams.get("mailboxId");
+	const threadView = url.searchParams.get("view") === "threads";
 	const db = getDb(env);
 	const conditions: SQL[] = [];
 
@@ -37,6 +38,7 @@ export async function GET(request: Request) {
 
 	const rows = await db
 		.select({
+			id: messages.id,
 			mailboxId: messages.mailboxId,
 			folderId: messages.folderId,
 			direction: messages.direction,
@@ -44,9 +46,10 @@ export async function GET(request: Request) {
 			read: messages.read,
 			starred: messages.starred,
 			snoozedUntil: messages.snoozedUntil,
+			threadId: messages.threadId,
 		})
 		.from(messages)
 		.where(and(...conditions));
 
-	return NextResponse.json({ counts: buildMessageCounts(rows) });
+	return NextResponse.json({ counts: buildMessageCounts(rows, threadView) });
 }

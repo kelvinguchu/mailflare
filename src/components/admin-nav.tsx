@@ -1,16 +1,16 @@
 "use client";
 
 import {
-  DatabaseBackup,
-  AlertTriangle,
-  Globe2,
-  Activity,
+	DatabaseBackup,
+	AlertTriangle,
+	Globe2,
+	Activity,
 	KeyRound,
-  Mail,
-  Settings,
-  Palette,
-  Users,
-  Webhook,
+	Mail,
+	Settings,
+	Palette,
+	Users,
+	Webhook,
 	ShieldBan,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,70 +20,70 @@ import { SidebarHeader } from "./sidebar-header";
 import { useSidebar } from "./sidebar-state";
 
 const sections = [
-  {
-    id: "overview",
-    // label: "Overview",
-    links: [{ href: "/admin", label: "Overview", icon: Settings }],
-  },
-  {
-    id: "email",
-    label: "Email",
-    links: [
-      { href: "/mailboxes", label: "Mailboxes", icon: Mail },
-      { href: "/domains", label: "Domains", icon: Globe2 },
-    ],
-  },
-  {
-    id: "administration",
-    label: "Administration",
-    links: [
-      { href: "/accounts", label: "Accounts", icon: Users },
-	  { href: "/sender-policies", label: "Sender policies", icon: ShieldBan },
-      { href: "/activity", label: "Activity", icon: Activity },
+	{
+		id: "overview",
+		// label: "Overview",
+		links: [{ href: "/admin", label: "Overview", icon: Settings }],
+	},
+	{
+		id: "email",
+		label: "Email",
+		links: [
+			{ href: "/mailboxes", label: "Mailboxes", icon: Mail },
+			{ href: "/domains", label: "Domains", icon: Globe2 },
+		],
+	},
+	{
+		id: "administration",
+		label: "Administration",
+		links: [
+			{ href: "/accounts", label: "Accounts", icon: Users },
+			{ href: "/sender-policies", label: "Sender policies", icon: ShieldBan },
+			{ href: "/activity", label: "Activity", icon: Activity },
 			{ href: "/delivery-failures", label: "Delivery failures", icon: AlertTriangle },
-      { href: "/backups", label: "Backups", icon: DatabaseBackup },
-    ],
-  },
-  {
-    id: "product",
-    label: "Product",
-    links: [
-      { href: "/branding", label: "Branding", icon: Palette },
+			{ href: "/backups", label: "Backups", icon: DatabaseBackup },
+		],
+	},
+	{
+		id: "product",
+		label: "Product",
+		links: [
+			{ href: "/branding", label: "Branding", icon: Palette },
 			{ href: "/api-keys", label: "API Keys", icon: KeyRound },
 			{ href: "/webhooks", label: "Webhooks", icon: Webhook },
-    ],
-  },
+		],
+	},
 ];
 
 export function AdminNav({ className }: { className?: string }) {
-  const { minimal } = useSidebar();
+	const { minimal } = useSidebar();
 
-  return (
-    <nav className={cn("flex min-h-full flex-col gap-1", className)}>
-      <SidebarHeader href="/inbox" />
-      <div className={cn("space-y-4", minimal && "space-y-2")}>
-        {sections.map((section) => {
-          const links = section.links;
-          if (links.length === 0) return null;
+	return (
+		<nav className={cn("flex min-h-full flex-col gap-1", className)}>
+			<SidebarHeader href="/inbox" />
+			<div className={cn("space-y-4", minimal && "space-y-2")}>
+				{sections.map((section) => {
+					const links = section.links;
+					if (links.length === 0) return null;
 
-          return (
-            <section key={section.id}>
-              {!minimal && section.label && (
-                <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-                  {section.label}
-                </p>
-              )}
-              <div className="space-y-1">
-                {links.map((link) => (
-                  <NavItem link={link} key={link.href} />
-                ))}
-              </div>
-            </section>
-          );
-        })}
-      </div>
-      <span className="flex-1" />
-      <SidebarFooter />
-    </nav>
-  );
+					return (
+						<section key={section.id}>
+							{!minimal && section.label && (
+								<p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+									{section.label}
+								</p>
+							)}
+							<div className="space-y-1">
+								{links.map((link) => (
+									<NavItem link={link} key={link.href} />
+								))}
+							</div>
+						</section>
+					);
+				})}
+			</div>
+			<span className="flex-1" />
+			<SidebarFooter />
+		</nav>
+	);
 }

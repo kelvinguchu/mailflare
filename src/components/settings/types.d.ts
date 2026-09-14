@@ -44,6 +44,9 @@ export type MailboxSignatureResponse = {
 		hostname: string;
 		displayName: string | null;
 		signature: string | null;
+		signatureText?: string | null;
+		signatureHtml?: string | null;
+		signatureVersion?: number;
 		hasAvatar?: boolean;
 		isPrimary?: boolean;
 	};
@@ -111,6 +114,9 @@ export type CurrentMailboxFormResponse = {
 		hostname: string;
 		displayName: string | null;
 		signature?: string | null;
+		signatureText?: string | null;
+		signatureHtml?: string | null;
+		signatureVersion?: number;
 		hasAvatar?: boolean;
 		isPrimary?: boolean;
 	};

@@ -14,11 +14,14 @@ export function selectDraftWithBody(db: Db, userId: string, draftId: string) {
 			toAddr: messages.toAddr,
 			subject: messages.subject,
 			status: messages.status,
+			replyToMessageId: messages.replyToMessageId,
 			textBody: messages.textBody,
 			htmlBody: messages.htmlBody,
 		})
 		.from(messages)
 		.where(eq(messages.id, draftId))
 		.limit(1)
-		.then(([draft]) => (draft && draft.userId === userId && draft.status === "draft" ? draft : null));
+		.then(([draft]) =>
+			draft && draft.userId === userId && draft.status === "draft" ? draft : null,
+		);
 }

@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
 import type { MessageCounts, MessageCountsDelta } from "./types";
+import type { NewMessageEvent } from "./message-realtime-types";
+import {
+	applyRealtimeMessageToCounts,
+	MESSAGE_REALTIME_EVENT,
+	MESSAGE_RECONCILE_EVENT,
+} from "./message-realtime-utils";
 import { clearMessageCountsCache, fetchMessageCounts } from "./utils";
 
 const emptyCounts: MessageCounts = {
@@ -29,8 +35,8 @@ export function useMessageCounts(mailboxId?: string | null, enabled = true) {
 
 		let cancelled = false;
 
-		async function loadCounts(force = false) {
-			setIsLoading(true);
+		async function loadCounts(force = false, showLoading = false) {
+			if (showLoading) setIsLoading(true);
 			try {
 				const nextCounts = await fetchMessageCounts(mailboxId, force);
 				if (!cancelled) setCounts(nextCounts ?? emptyCounts);
@@ -39,10 +45,18 @@ export function useMessageCounts(mailboxId?: string | null, enabled = true) {
 			}
 		}
 
-		void loadCounts();
+		void loadCounts(false, true);
 		function onMessagesChanged() {
 			clearMessageCountsCache();
 			void loadCounts(true);
+		}
+		function onRealtimeMessage(receivedEvent: Event) {
+			const event = (receivedEvent as CustomEvent<NewMessageEvent>).detail;
+			if (!event?.message) return;
+			setCounts((current) => applyRealtimeMessageToCounts(current, event.message, mailboxId));
+		}
+		function onMessagesReconcile() {
+			void loadCounts();
 		}
 		function onMessageCountsDelta(event: Event) {
 			const detail = (event as CustomEvent<MessageCountsDelta>).detail;
@@ -62,6 +76,8 @@ export function useMessageCounts(mailboxId?: string | null, enabled = true) {
 		window.addEventListener("mailflare:messages-changed", onMessagesChanged);
 		window.addEventListener("mailflare:message-counts-changed", onMessagesChanged);
 		window.addEventListener("mailflare:message-counts-delta", onMessageCountsDelta);
+		window.addEventListener(MESSAGE_REALTIME_EVENT, onRealtimeMessage);
+		window.addEventListener(MESSAGE_RECONCILE_EVENT, onMessagesReconcile);
 		const refreshInterval = window.setInterval(() => void loadCounts(true), 15_000);
 
 		return () => {
@@ -69,6 +85,8 @@ export function useMessageCounts(mailboxId?: string | null, enabled = true) {
 			window.removeEventListener("mailflare:messages-changed", onMessagesChanged);
 			window.removeEventListener("mailflare:message-counts-changed", onMessagesChanged);
 			window.removeEventListener("mailflare:message-counts-delta", onMessageCountsDelta);
+			window.removeEventListener(MESSAGE_REALTIME_EVENT, onRealtimeMessage);
+			window.removeEventListener(MESSAGE_RECONCILE_EVENT, onMessagesReconcile);
 			window.clearInterval(refreshInterval);
 		};
 	}, [enabled, mailboxId]);

@@ -24,10 +24,16 @@ export async function PUT(request: Request) {
 	const companyName = String(form.get("companyName") ?? "").trim();
 	const iconValue = form.get("icon");
 	if (!appName || appName.length > 60) {
-		return NextResponse.json({ error: "App name must be between 1 and 60 characters" }, { status: 400 });
+		return NextResponse.json(
+			{ error: "App name must be between 1 and 60 characters" },
+			{ status: 400 },
+		);
 	}
 	if (companyName.length > 100) {
-		return NextResponse.json({ error: "Company name must be 100 characters or fewer" }, { status: 400 });
+		return NextResponse.json(
+			{ error: "Company name must be 100 characters or fewer" },
+			{ status: 400 },
+		);
 	}
 	const icon = isBrandingIcon(iconValue) && iconValue.size > 0 ? iconValue : null;
 	if (icon && !BRANDING_ICON_TYPES.includes(icon.type)) {

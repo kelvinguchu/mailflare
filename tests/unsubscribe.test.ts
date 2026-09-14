@@ -7,22 +7,22 @@ function rawMessage(value: string): ArrayBuffer {
 
 describe("List-Unsubscribe parsing", () => {
 	it("prefers an HTTPS endpoint over mailto", () => {
-		const raw = rawMessage([
-			"From: sender@example.com",
-			"List-Unsubscribe: <mailto:leave@example.com>, <https://example.com/unsubscribe/123>",
-			"",
-			"Message body",
-		].join("\r\n"));
+		const raw = rawMessage(
+			[
+				"From: sender@example.com",
+				"List-Unsubscribe: <mailto:leave@example.com>, <https://example.com/unsubscribe/123>",
+				"",
+				"Message body",
+			].join("\r\n"),
+		);
 
 		expect(extractUnsubscribeUrlFromRaw(raw)).toBe("https://example.com/unsubscribe/123");
 	});
 
 	it("supports folded headers", () => {
-		const raw = rawMessage([
-			"List-Unsubscribe:",
-			" <https://example.com/unsubscribe/folded>",
-			"",
-		].join("\r\n"));
+		const raw = rawMessage(
+			["List-Unsubscribe:", " <https://example.com/unsubscribe/folded>", ""].join("\r\n"),
+		);
 
 		expect(extractUnsubscribeUrlFromRaw(raw)).toBe("https://example.com/unsubscribe/folded");
 	});

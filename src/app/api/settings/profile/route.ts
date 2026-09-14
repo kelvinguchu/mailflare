@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { ZodError } from "zod";
+import { z, ZodError } from "zod";
 import { getEnv } from "@/lib/cloudflare";
 import { getDb } from "@/db";
 import { accountRecoveryTokens, users } from "@/db/schema";
@@ -16,13 +16,14 @@ export async function PATCH(request: Request) {
 		parsed = await parseUpdateProfileRequest(request);
 	} catch (err) {
 		if (err instanceof ZodError) {
-			return NextResponse.json({ error: err.flatten() }, { status: 400 });
+			return NextResponse.json({ error: z.flattenError(err) }, { status: 400 });
 		}
 		return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 	}
 
 	const db = getDb(env);
-	const forwardingEmail = parsed.forwardingEmail === undefined ? user.forwardingEmail : parsed.forwardingEmail;
+	const forwardingEmail =
+		parsed.forwardingEmail === undefined ? user.forwardingEmail : parsed.forwardingEmail;
 	const resetEmail = normalizeEmail(parsed.resetEmail) || null;
 	const recoveryEmailChanged = resetEmail !== normalizeEmail(user.resetEmail);
 	await db.batch([

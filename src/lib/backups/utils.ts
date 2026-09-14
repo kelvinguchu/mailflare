@@ -1,4 +1,9 @@
-import type { BackupScheduleType, BackupWorkflowBinding, DatabaseBackupDocument, DatabaseRecord } from "./types";
+import type {
+	BackupScheduleType,
+	BackupWorkflowBinding,
+	DatabaseBackupDocument,
+	DatabaseRecord,
+} from "./types";
 import { DATABASE_BACKUP_VERSION } from "./format";
 
 export const BACKUP_SETTINGS_ID = "default";

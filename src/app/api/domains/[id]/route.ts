@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/cloudflare";
 import { requireUser } from "@/lib/auth/cookies";
@@ -29,7 +30,8 @@ export async function PATCH(request: Request, { params }: Params) {
 	const domain = await getDomainForUser(env, user.id, id);
 	if (!domain) return NextResponse.json({ error: "Not found" }, { status: 404 });
 	const parsed = updateDomainLimitsSchema.safeParse(await request.json());
-	if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+	if (!parsed.success)
+		return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
 	await getDb(env).update(domains).set(parsed.data).where(eq(domains.id, id));
 	await createAuditLog(env, {
 		actorUserId: user.id,

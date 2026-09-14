@@ -1,29 +1,30 @@
-import { cn } from "@/lib/utils";
-import type { SkeletonProps, SkeletonRowsProps } from "./skeleton-types";
+import { cn } from "cn";
 
-export function Skeleton({ className, ...props }: SkeletonProps) {
+function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
 	return (
 		<div
-			aria-hidden="true"
-			className={cn("animate-pulse rounded-md bg-neutral-200/80", className)}
+			data-slot="skeleton"
+			className={cn("animate-pulse rounded-md bg-muted", className)}
 			{...props}
 		/>
 	);
 }
 
-export function SkeletonRows({
+function SkeletonRows({
 	count = 5,
 	compact = false,
-}: SkeletonRowsProps) {
+	className,
+}: {
+	count?: number;
+	compact?: boolean;
+	className?: string;
+}) {
 	return (
-		<div className="divide-y divide-neutral-100">
+		<div className={cn("divide-y divide-border", className)}>
 			{Array.from({ length: count }, (_, index) => (
 				<div
 					key={index}
-					className={cn(
-						"flex items-center gap-3",
-						compact ? "px-4 py-3" : "px-6 py-4",
-					)}
+					className={cn("flex items-center gap-3", compact ? "px-4 py-3" : "px-6 py-4")}
 				>
 					<Skeleton className="h-4 w-4 shrink-0" />
 					<Skeleton className={cn("shrink-0", compact ? "h-9 w-9 rounded-full" : "h-5 w-36")} />
@@ -37,3 +38,5 @@ export function SkeletonRows({
 		</div>
 	);
 }
+
+export { Skeleton, SkeletonRows };

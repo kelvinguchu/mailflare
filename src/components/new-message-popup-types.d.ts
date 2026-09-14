@@ -1,6 +1,6 @@
-import type { NewMessageEvent } from "@/hooks/message-realtime-types";
+import type { NewMessageToast } from "@/hooks/message-realtime-types";
 
 export interface NewMessagePopupProps {
-	notification: NewMessageEvent;
+	notification: NewMessageToast;
 	onDismiss: () => void;
 }

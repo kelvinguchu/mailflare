@@ -62,7 +62,8 @@ export async function captureDeadLetterMessage(
 		diagnosticCode = toSafeDiagnosticCode(job?.error);
 	}
 
-	await env.DB.prepare(`
+	await env.DB.prepare(
+		`
 		INSERT INTO dead_letter_events (
 			id, source_queue, dead_letter_queue, queue_message_id, reference_id,
 			payload, diagnostic_code, attempt_count, status, replay_count,
@@ -72,7 +73,8 @@ export async function captureDeadLetterMessage(
 			diagnostic_code = excluded.diagnostic_code,
 			attempt_count = excluded.attempt_count,
 			updated_at = excluded.updated_at
-	`)
+	`,
+	)
 		.bind(
 			eventId,
 			source,
@@ -88,14 +90,16 @@ export async function captureDeadLetterMessage(
 		)
 		.run();
 
-	console.error(JSON.stringify({
-		event: "queue_dead_letter_captured",
-		deadLetterId: eventId,
-		sourceQueue: source,
-		referenceId: parsed.referenceId,
-		diagnosticCode,
-		attemptCount: Math.max(message.attempts, PRIMARY_QUEUE_RETRY_LIMIT),
-	}));
+	console.error(
+		JSON.stringify({
+			event: "queue_dead_letter_captured",
+			deadLetterId: eventId,
+			sourceQueue: source,
+			referenceId: parsed.referenceId,
+			diagnosticCode,
+			attemptCount: Math.max(message.attempts, PRIMARY_QUEUE_RETRY_LIMIT),
+		}),
+	);
 }
 
 export async function captureFinalOutboundFailure(
@@ -124,7 +128,8 @@ export async function captureFinalOutboundFailure(
 	const eventId = await createDeadLetterEventId(queueName, message.id);
 	const now = Math.floor(Date.now() / 1_000);
 	const diagnosticCode = toSafeDiagnosticCode(job.error);
-	await env.DB.prepare(`
+	await env.DB.prepare(
+		`
 		INSERT INTO dead_letter_events (
 			id, source_queue, dead_letter_queue, queue_message_id, reference_id,
 			payload, diagnostic_code, attempt_count, status, replay_count,
@@ -134,7 +139,8 @@ export async function captureFinalOutboundFailure(
 			diagnostic_code = excluded.diagnostic_code,
 			attempt_count = excluded.attempt_count,
 			updated_at = excluded.updated_at
-	`)
+	`,
+	)
 		.bind(
 			eventId,
 			queueName,
@@ -149,14 +155,16 @@ export async function captureFinalOutboundFailure(
 		)
 		.run();
 
-	console.error(JSON.stringify({
-		event: "outbound_delivery_failure_captured",
-		deadLetterId: eventId,
-		sourceQueue: "outbound",
-		referenceId: job.id,
-		diagnosticCode,
-		attemptCount: Math.max(job.attemptCount, message.attempts),
-	}));
+	console.error(
+		JSON.stringify({
+			event: "outbound_delivery_failure_captured",
+			deadLetterId: eventId,
+			sourceQueue: "outbound",
+			referenceId: job.id,
+			diagnosticCode,
+			attemptCount: Math.max(job.attemptCount, message.attempts),
+		}),
+	);
 }
 
 export async function listDeadLetterEvents(
@@ -210,13 +218,15 @@ export async function replayDeadLetterEvent(
 
 	const now = Math.floor(Date.now() / 1_000);
 	const staleBefore = now - 5 * 60;
-	const claimed = await env.DB.prepare(`
+	const claimed = await env.DB.prepare(
+		`
 		UPDATE dead_letter_events
 		SET status = 'replaying', updated_at = ?
 		WHERE id = ?
 			AND (status = 'unresolved' OR (status = 'replaying' AND updated_at < ?))
 		RETURNING id
-	`)
+	`,
+	)
 		.bind(now, eventId, staleBefore)
 		.first<{ id: string }>();
 	if (!claimed) {
@@ -255,24 +265,32 @@ export async function replayDeadLetterEvent(
 			outcome,
 		});
 		await env.DB.batch([
-			env.DB.prepare(`
+			env.DB.prepare(
+				`
 				UPDATE dead_letter_events
 				SET status = 'replayed', replay_count = replay_count + 1,
 					replayed_at = ?, replayed_by_user_id = ?, updated_at = ?
 				WHERE id = ? AND status = 'replaying'
-			`).bind(now, actorUserId, now, eventId),
-			env.DB.prepare(`
+			`,
+			).bind(now, actorUserId, now, eventId),
+			env.DB.prepare(
+				`
 				INSERT INTO audit_logs (id, actor_user_id, action, metadata, created_at)
 				VALUES (?, ?, 'queue.dead_letter.replay', ?, ?)
-			`).bind(auditId, actorUserId, metadata, now),
+			`,
+			).bind(auditId, actorUserId, metadata, now),
 		]);
 		return { outcome, alreadyReplayed: false };
 	} catch (error) {
-		await env.DB.prepare(`
+		await env.DB.prepare(
+			`
 			UPDATE dead_letter_events
 			SET status = 'unresolved', updated_at = ?
 			WHERE id = ? AND status = 'replaying'
-		`).bind(Math.floor(Date.now() / 1_000), eventId).run();
+		`,
+		)
+			.bind(Math.floor(Date.now() / 1_000), eventId)
+			.run();
 		throw error;
 	}
 }
@@ -298,14 +316,19 @@ async function replayOutboundJob(
 		);
 	}
 	if (decision === "blocked_in_flight") {
-		throw new DeadLetterReplayBlockedError("Replay is blocked while the outbound job is still in flight");
+		throw new DeadLetterReplayBlockedError(
+			"Replay is blocked while the outbound job is still in flight",
+		);
 	}
 	if (decision === "blocked_invalid_state") {
-		throw new DeadLetterReplayBlockedError("The outbound job cannot be replayed from its current state");
+		throw new DeadLetterReplayBlockedError(
+			"The outbound job cannot be replayed from its current state",
+		);
 	}
 
 	if (decision === "reset_and_enqueue") {
-		if (!job.messageId) throw new DeadLetterReplayBlockedError("The outbound message no longer exists");
+		if (!job.messageId)
+			throw new DeadLetterReplayBlockedError("The outbound message no longer exists");
 		await db.batch([
 			db
 				.update(outboundJobs)
@@ -321,12 +344,14 @@ async function replayOutboundJob(
 	}
 
 	await env.OUTBOUND_QUEUE.send(payload);
-	console.info(JSON.stringify({
-		event: "queue_dead_letter_requeued",
-		deadLetterId,
-		sourceQueue: "outbound",
-		referenceId: payload.jobId,
-	}));
+	console.info(
+		JSON.stringify({
+			event: "queue_dead_letter_requeued",
+			deadLetterId,
+			sourceQueue: "outbound",
+			referenceId: payload.jobId,
+		}),
+	);
 	return "outbound_requeued";
 }
 
@@ -335,7 +360,9 @@ async function createDeadLetterEventId(queueName: string, messageId: string): Pr
 		"SHA-256",
 		new TextEncoder().encode(`${queueName}\0${messageId}`),
 	);
-	const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+	const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join(
+		"",
+	);
 	return `dlq_${hex.slice(0, 32)}`;
 }
 

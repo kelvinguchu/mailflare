@@ -1,12 +1,18 @@
+import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getDb } from "@/db";
-import { mailboxes, users } from "@/db/schema";
+import { mailboxes, signatureAssets, users } from "@/db/schema";
 import { requireUser } from "@/lib/auth/cookies";
 import { getEnv } from "@/lib/cloudflare";
 import { getMailboxAccessLevel } from "@/lib/mailboxes/access";
 import { ensureMailboxDomainRouting } from "@/lib/mailboxes/domain-addresses";
 import { updateMailboxSchema } from "@/lib/validators";
+import {
+	assertSignatureAssetsBelongToMailbox,
+	sanitizeMailboxSignature,
+} from "@/lib/email/signatures";
+import { createAuditLog } from "@/lib/mailboxes/audit";
 import type { MailboxRouteParams } from "./types";
 import { getMailboxUpdateValues, selectMailboxForUser } from "./utils";
 
@@ -59,7 +65,7 @@ export async function PATCH(request: Request, { params }: MailboxRouteParams) {
 	const parsed = updateMailboxSchema.safeParse(await request.json());
 
 	if (!parsed.success) {
-		return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+		return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
 	}
 
 	const db = getDb(env);
@@ -70,10 +76,41 @@ export async function PATCH(request: Request, { params }: MailboxRouteParams) {
 		return NextResponse.json({ error: "Mailbox not found" }, { status: 404 });
 	}
 	if ("displayName" in parsed.data && user.role !== "admin") {
-		return NextResponse.json({ error: "Only an administrator can change the sender name" }, { status: 403 });
+		return NextResponse.json(
+			{ error: "Only an administrator can change the sender name" },
+			{ status: 403 },
+		);
 	}
 
 	const updateValues = getMailboxUpdateValues(parsed.data);
+	const signatureRequested =
+		"signature" in parsed.data || "signatureText" in parsed.data || "signatureHtml" in parsed.data;
+	if (signatureRequested) {
+		try {
+			const legacyUpdate = "signature" in parsed.data;
+			const requestedHtml = legacyUpdate
+				? null
+				: "signatureHtml" in parsed.data
+					? parsed.data.signatureHtml
+					: existing.signatureHtml;
+			const requestedText = legacyUpdate
+				? parsed.data.signature
+				: "signatureText" in parsed.data
+					? parsed.data.signatureText
+					: "signatureHtml" in parsed.data && parsed.data.signatureHtml
+						? undefined
+						: (existing.signatureText ?? existing.signature);
+			const signature = sanitizeMailboxSignature({ html: requestedHtml, text: requestedText });
+			await assertSignatureAssetsBelongToMailbox(env, id, signature.contentIds);
+			updateValues.signature = signature.text;
+			updateValues.signatureText = signature.text;
+			updateValues.signatureHtml = signature.html;
+			updateValues.signatureVersion = existing.signatureVersion + 1;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : "Invalid email signature";
+			return NextResponse.json({ error: message }, { status: 400 });
+		}
+	}
 	if (parsed.data.useAllDomains === true) {
 		try {
 			await ensureMailboxDomainRouting(env, db, {
@@ -91,10 +128,15 @@ export async function PATCH(request: Request, { params }: MailboxRouteParams) {
 		}
 	}
 	if (Object.keys(updateValues).length > 0) {
-		await db
-			.update(mailboxes)
-			.set(updateValues)
-			.where(eq(mailboxes.id, id));
+		await db.update(mailboxes).set(updateValues).where(eq(mailboxes.id, id));
+	}
+	if (signatureRequested) {
+		await createAuditLog(env, {
+			actorUserId: user.id,
+			mailboxId: id,
+			action: "mailbox.signature_update",
+			metadata: { version: updateValues.signatureVersion },
+		});
 	}
 
 	const [mailbox] = await selectMailboxForUser(db, user.id, id);
@@ -121,6 +163,16 @@ export async function DELETE(request: Request, { params }: MailboxRouteParams) {
 	let allowed = mailbox.userId === user.id && user.canManageMailboxes;
 	if (!allowed) allowed = await canAdminManageMailbox(db, user, mailbox);
 	if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+	const assets = await db
+		.select({ r2Key: signatureAssets.r2Key })
+		.from(signatureAssets)
+		.where(eq(signatureAssets.mailboxId, id));
 	await db.delete(mailboxes).where(eq(mailboxes.id, id));
+	const cleanup = await Promise.allSettled(assets.map((asset) => env.BUCKET.delete(asset.r2Key)));
+	if (cleanup.some((result) => result.status === "rejected")) {
+		console.error("Failed to remove one or more orphaned mailbox signature images", {
+			mailboxId: id,
+		});
+	}
 	return NextResponse.json({ ok: true });
 }

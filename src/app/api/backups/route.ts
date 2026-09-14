@@ -23,10 +23,7 @@ async function requireAdmin(request: Request) {
 export async function GET(request: Request) {
 	try {
 		const { env } = await requireAdmin(request);
-		const [settings, backupList] = await Promise.all([
-			getBackupSettings(env),
-			listBackups(env),
-		]);
+		const [settings, backupList] = await Promise.all([getBackupSettings(env), listBackups(env)]);
 		return NextResponse.json({
 			settings,
 			backups: backupList,

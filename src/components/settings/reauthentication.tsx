@@ -11,7 +11,7 @@ export function Reauthentication({ mfaEnabled }: { mfaEnabled: boolean }) {
 	const [message, setMessage] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
-	async function submit(event: React.FormEvent<HTMLFormElement>) {
+	async function submit(event: React.SubmitEvent<HTMLFormElement>) {
 		event.preventDefault();
 		const formElement = event.currentTarget;
 		setLoading(true);
@@ -27,7 +27,7 @@ export function Reauthentication({ mfaEnabled }: { mfaEnabled: boolean }) {
 					code: form.get("code") ?? "",
 				}),
 			});
-			const data = await response.json() as { error?: string };
+			const data = (await response.json()) as { error?: string };
 			if (!response.ok) throw new Error(data.error ?? "Identity confirmation failed");
 			formElement.reset();
 			setMessage("Identity confirmed for high-risk actions for the next 15 minutes.");
@@ -42,7 +42,13 @@ export function Reauthentication({ mfaEnabled }: { mfaEnabled: boolean }) {
 		<form onSubmit={submit} className="space-y-4">
 			<div className="space-y-2">
 				<Label htmlFor="reauth-password">Current password</Label>
-				<Input id="reauth-password" name="currentPassword" type="password" autoComplete="current-password" required />
+				<Input
+					id="reauth-password"
+					name="currentPassword"
+					type="password"
+					autoComplete="current-password"
+					required
+				/>
 			</div>
 			{mfaEnabled && (
 				<div className="space-y-2">
@@ -50,7 +56,9 @@ export function Reauthentication({ mfaEnabled }: { mfaEnabled: boolean }) {
 					<Input id="reauth-code" name="code" type="text" autoComplete="one-time-code" required />
 				</div>
 			)}
-			<Button type="submit" disabled={loading}>{loading ? "Confirming…" : "Confirm identity"}</Button>
+			<Button type="submit" disabled={loading}>
+				{loading ? "Confirming…" : "Confirm identity"}
+			</Button>
 			{message && <p className="text-sm font-medium text-emerald-700">{message}</p>}
 			{error && <p className="text-sm font-medium text-red-700">{error}</p>}
 		</form>

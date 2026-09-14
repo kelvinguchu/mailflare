@@ -4,11 +4,7 @@ import { messageAttachments, messages } from "@/db/schema";
 import { newId } from "@/lib/ids";
 import { getMailboxAccessLevel } from "@/lib/mailboxes/access";
 import type { SessionUser } from "@/lib/auth/types";
-import type {
-	AttachmentContent,
-	AttachmentMetadata,
-	StoredAttachment,
-} from "./attachment-types";
+import type { AttachmentContent, AttachmentMetadata, StoredAttachment } from "./attachment-types";
 
 export const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
 export const MAX_TOTAL_ATTACHMENT_SIZE = 20 * 1024 * 1024;
@@ -29,7 +25,10 @@ export function normalizeAttachmentContent(
 ): ArrayBuffer {
 	if (content instanceof ArrayBuffer) return content;
 	if (content instanceof Uint8Array) {
-		return content.buffer.slice(content.byteOffset, content.byteOffset + content.byteLength) as ArrayBuffer;
+		return content.buffer.slice(
+			content.byteOffset,
+			content.byteOffset + content.byteLength,
+		) as ArrayBuffer;
 	}
 	if (encoding === "base64") return decodeBase64Content(content);
 	return new TextEncoder().encode(content).buffer;
@@ -157,10 +156,7 @@ export async function getAttachmentForUser(
 		.select()
 		.from(messageAttachments)
 		.where(
-			and(
-				eq(messageAttachments.id, attachmentId),
-				eq(messageAttachments.messageId, messageId),
-			),
+			and(eq(messageAttachments.id, attachmentId), eq(messageAttachments.messageId, messageId)),
 		)
 		.limit(1);
 	if (!attachment) return null;

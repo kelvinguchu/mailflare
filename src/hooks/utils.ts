@@ -57,6 +57,8 @@ export function getMessageQueryParams(
 		params.set("status", folder);
 	}
 
+	// Conversations group replies into one row; drafts are always individual messages.
+	if (folder !== "drafts") params.set("view", "threads");
 	if (folderId) params.set("folderId", folderId);
 	if (mailboxId) params.set("mailboxId", mailboxId);
 	const searchFilters = filters?.query ? parseMessageSearchQuery(filters.query) : null;
@@ -98,7 +100,10 @@ export function clearMessageClientState() {
 	messageListRequests.clear();
 }
 
-export async function fetchMessageCounts(mailboxId?: string | null, force = false): Promise<MessageCounts | undefined> {
+export async function fetchMessageCounts(
+	mailboxId?: string | null,
+	force = false,
+): Promise<MessageCounts | undefined> {
 	const key = mailboxId ?? "all";
 	if (!force && messageCountsCache.has(key)) return messageCountsCache.get(key);
 	if (!force && messageCountsRequests.has(key)) return messageCountsRequests.get(key);
@@ -106,7 +111,7 @@ export async function fetchMessageCounts(mailboxId?: string | null, force = fals
 	const requestGeneration = messageCacheGeneration;
 	const countsGeneration = messageCountsGeneration;
 	const request = (async () => {
-		const params = new URLSearchParams();
+		const params = new URLSearchParams({ view: "threads" });
 		if (mailboxId) params.set("mailboxId", mailboxId);
 		const query = params.toString();
 		const res = await authFetch(`/api/messages/counts${query ? `?${query}` : ""}`);
@@ -130,27 +135,31 @@ export async function fetchMessageCounts(mailboxId?: string | null, force = fals
 	return request;
 }
 
-export async function fetchMessageList(params: URLSearchParams, force = false): Promise<MessageListResponse> {
+export async function fetchMessageList(
+	params: URLSearchParams,
+	force = false,
+	signal?: AbortSignal,
+): Promise<MessageListResponse> {
 	const key = params.toString();
 	if (!force && messageListCache.has(key)) return messageListCache.get(key) ?? {};
-	if (messageListRequests.has(key)) return messageListRequests.get(key) ?? {};
+	if (!signal && messageListRequests.has(key)) return messageListRequests.get(key) ?? {};
 
 	const requestGeneration = messageCacheGeneration;
-	const request = authFetch(`/api/messages?${key}`)
+	const request = authFetch(`/api/messages?${key}`, { signal })
 		.then((res) => res.json())
 		.then((data) => {
 			const response = data as MessageListResponse;
-			if (requestGeneration === messageCacheGeneration) {
+			if (requestGeneration === messageCacheGeneration && !signal?.aborted) {
 				messageListCache.set(key, response);
 			}
 			return response;
 		})
 		.finally(() => {
-			if (requestGeneration === messageCacheGeneration) {
+			if (messageListRequests.get(key) === request) {
 				messageListRequests.delete(key);
 			}
 		});
 
-	messageListRequests.set(key, request);
+	if (!signal) messageListRequests.set(key, request);
 	return request;
 }

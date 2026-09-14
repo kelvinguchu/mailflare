@@ -5,11 +5,9 @@ import { useState } from "react";
 import { BulkMessageSelectionPane } from "./bulk-message-selection-pane";
 import { MessageFolderPage } from "./message-folder-page";
 import type { MessageSplitLayoutProps, SelectedMessage } from "./types";
+import { getBulkActionScope } from "./utils";
 
-export function MessageSplitLayout({
-	children,
-	config,
-}: MessageSplitLayoutProps) {
+export function MessageSplitLayout({ children, config }: MessageSplitLayoutProps) {
 	const pathname = usePathname();
 	const [selectedMessages, setSelectedMessages] = useState<SelectedMessage[]>([]);
 	const detailPrefix = `${config.hrefPrefix}/`;
@@ -33,6 +31,7 @@ export function MessageSplitLayout({
 				{selectedMessages.length > 0 ? (
 					<BulkMessageSelectionPane
 						selectedMessages={selectedMessages}
+						scope={getBulkActionScope(config.folder)}
 						onClearSelection={() => setSelectedMessages([])}
 					/>
 				) : (

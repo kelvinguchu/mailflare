@@ -10,13 +10,16 @@ export async function GET() {
 			hasAdminAccount(env),
 			getPrimaryDomain(env),
 		]);
-		return NextResponse.json({
-			hasAdminAccount: adminAccountExists,
-			hasPrimaryDomain: !!domain,
-			primaryDomain: domain ? { hostname: domain.hostname } : null,
-		}, {
-			headers: { "Cache-Control": "no-store" },
-		});
+		return NextResponse.json(
+			{
+				hasAdminAccount: adminAccountExists,
+				hasPrimaryDomain: !!domain,
+				primaryDomain: domain ? { hostname: domain.hostname } : null,
+			},
+			{
+				headers: { "Cache-Control": "no-store" },
+			},
+		);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : "Could not load setup status";
 		return NextResponse.json({ error: message }, { status: 500 });

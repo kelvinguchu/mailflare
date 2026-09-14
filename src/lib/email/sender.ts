@@ -18,14 +18,14 @@ export async function getAuthorizedSenderAddress(
 	const db = getDb(env);
 	const [mailbox] = await db
 		.select({
-		localPart: mailboxes.localPart,
-		displayName: mailboxes.displayName,
-		hostname: domains.hostname,
-		domainId: mailboxes.domainId,
-		useAllDomains: mailboxes.useAllDomains,
-		disabled: mailboxes.disabled,
-		domainStatus: domains.status,
-		sendingEnabled: domains.sendingEnabled,
+			localPart: mailboxes.localPart,
+			displayName: mailboxes.displayName,
+			hostname: domains.hostname,
+			domainId: mailboxes.domainId,
+			useAllDomains: mailboxes.useAllDomains,
+			disabled: mailboxes.disabled,
+			domainStatus: domains.status,
+			sendingEnabled: domains.sendingEnabled,
 			id: mailboxes.id,
 		})
 		.from(mailboxes)
@@ -50,7 +50,11 @@ export async function getAuthorizedSenderAddress(
 	}
 	const senderAddress = requestedAddress.toLowerCase();
 	const senderHostname = senderAddress.split("@")[1] ?? "";
-	const [senderDomain] = await db.select().from(domains).where(eq(domains.hostname, senderHostname)).limit(1);
+	const [senderDomain] = await db
+		.select()
+		.from(domains)
+		.where(eq(domains.hostname, senderHostname))
+		.limit(1);
 	if (!senderDomain || senderDomain.status !== "active" || !senderDomain.sendingEnabled) {
 		throw new Error("Sender domain is not ready for sending");
 	}

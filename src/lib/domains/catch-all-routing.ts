@@ -7,17 +7,13 @@ export async function ensureEmailRoutingCatchAllToWorker(
 	zoneId: string,
 ): Promise<CfEmailRoutingRule> {
 	const workerName = getEmailWorkerName(env);
-	return cfRequest<CfEmailRoutingRule>(
-		env,
-		`/zones/${zoneId}/email/routing/rules/catch_all`,
-		{
-			method: "PUT",
-			body: JSON.stringify({
-				actions: [{ type: "worker", value: [workerName] }],
-				enabled: true,
-				matchers: [{ type: "all" }],
-				name: `Route all email to ${workerName}`,
-			}),
-		},
-	);
+	return cfRequest<CfEmailRoutingRule>(env, `/zones/${zoneId}/email/routing/rules/catch_all`, {
+		method: "PUT",
+		body: JSON.stringify({
+			actions: [{ type: "worker", value: [workerName] }],
+			enabled: true,
+			matchers: [{ type: "all" }],
+			name: `Route all email to ${workerName}`,
+		}),
+	});
 }

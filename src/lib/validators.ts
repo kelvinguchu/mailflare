@@ -5,15 +5,26 @@ export const sendEmailSchema = z.object({
 	from: z.string().min(3).max(500),
 	to: z.string().min(3).max(500),
 	subject: z.string().min(1).max(500),
-	html: z.string().max(2 * 1024 * 1024).optional(),
-	text: z.string().max(2 * 1024 * 1024).optional(),
+	html: z
+		.string()
+		.max(2 * 1024 * 1024)
+		.optional(),
+	text: z
+		.string()
+		.max(2 * 1024 * 1024)
+		.optional(),
 	mailboxId: z.string().min(1).max(200),
+	includeSignature: z.boolean().optional(),
+	replyToMessageId: z.string().min(1).max(200).nullable().optional(),
 	attachments: z
 		.array(
 			z.object({
-					filename: z.string().min(1).max(255),
-					type: z.string().min(1).max(255).default("application/octet-stream"),
-					contentBase64: z.string().min(1).max(14 * 1024 * 1024),
+				filename: z.string().min(1).max(255),
+				type: z.string().min(1).max(255).default("application/octet-stream"),
+				contentBase64: z
+					.string()
+					.min(1)
+					.max(14 * 1024 * 1024),
 			}),
 		)
 		.max(10)
@@ -21,22 +32,30 @@ export const sendEmailSchema = z.object({
 });
 
 export const registerSchema = z.object({
-	email: z.string().email(),
+	email: z.email(),
 	password: z.string().min(8),
 	name: z.string().min(1),
 });
 
 export const firstRunRegisterSchema = z.object({
 	domain: z.string().min(3),
-	username: z.string().min(1).max(64).regex(/^[a-zA-Z0-9._%+-]+$/),
+	username: z
+		.string()
+		.min(1)
+		.max(64)
+		.regex(/^[a-zA-Z0-9._%+-]+$/),
 	password: z.string().min(8),
-	resetEmail: z.string().email(),
+	resetEmail: z.email(),
 });
 
 export const primaryDomainRegisterSchema = z.object({
-	username: z.string().min(1).max(64).regex(/^[a-zA-Z0-9._%+-]+$/),
+	username: z
+		.string()
+		.min(1)
+		.max(64)
+		.regex(/^[a-zA-Z0-9._%+-]+$/),
 	password: z.string().min(8),
-	resetEmail: z.string().email(),
+	resetEmail: z.email(),
 });
 
 export const setupDomainSchema = z.object({
@@ -50,7 +69,7 @@ export const addDomainSchema = z.object({
 });
 
 export const loginSchema = z.object({
-	email: z.string().email(),
+	email: z.email(),
 	password: z.string().min(1),
 });
 
@@ -92,37 +111,59 @@ export const updateManagedAccountSchema = z.object({
 	dailySendLimit: z.number().int().min(1).max(1_000_000),
 	forwardingEmail: z.preprocess(
 		(value) => (typeof value === "string" ? value.trim() : value),
-		z.string().email().or(z.literal("")).optional().transform((value) => value === undefined ? undefined : value || null),
+		z
+			.email()
+			.or(z.literal(""))
+			.optional()
+			.transform((value) => (value === undefined ? undefined : value || null)),
 	),
 });
 
 export const createAccountSchema = z.object({
 	domainId: z.string().min(1),
-	username: z.string().min(1).max(64).regex(/^[a-zA-Z0-9._%+-]+$/),
+	username: z
+		.string()
+		.min(1)
+		.max(64)
+		.regex(/^[a-zA-Z0-9._%+-]+$/),
 	password: z.string().min(8),
 	name: z.string().trim().min(1).max(100).optional(),
 	resetEmail: z.preprocess(
 		(value) => (typeof value === "string" ? value.trim() : value),
-		z.string().email().or(z.literal("")).optional().transform((value) => value || null),
+		z
+			.email()
+			.or(z.literal(""))
+			.optional()
+			.transform((value) => value || null),
 	),
 });
 
 export const createUserAccountSchema = z.object({
-	username: z.string().trim().min(1).max(64).regex(/^[a-zA-Z0-9._%+-]+$/),
+	username: z
+		.string()
+		.trim()
+		.min(1)
+		.max(64)
+		.regex(/^[a-zA-Z0-9._%+-]+$/),
 	domainId: z.string().min(1),
-	invitationEmail: z.string().trim().email().max(320),
+	invitationEmail: z.string().trim().pipe(z.email().max(320)),
 	name: z.string().trim().min(1).max(100).optional(),
 	senderName: z.string().trim().min(1).max(100).optional(),
 	role: z.enum(["admin", "user"]).default("user"),
 });
 
 export const updateAccountSchema = z.object({
-	email: z.string().email().optional(),
+	email: z.email().optional(),
 	name: z.string().trim().min(1).max(100),
 	disabled: z.boolean().optional(),
 	password: z.preprocess(
 		(value) => (typeof value === "string" ? value.trim() : value),
-		z.string().min(8).or(z.literal("")).optional().transform((value) => value || null),
+		z
+			.string()
+			.min(8)
+			.or(z.literal(""))
+			.optional()
+			.transform((value) => value || null),
 	),
 });
 
@@ -138,13 +179,19 @@ export const accountMailboxAccessSchema = z.object({
 
 export const accountMailboxSchema = z.object({
 	domainId: z.string().min(1),
-	localPart: z.string().min(1).max(64).regex(/^[a-zA-Z0-9._%+-]+$/),
+	localPart: z
+		.string()
+		.min(1)
+		.max(64)
+		.regex(/^[a-zA-Z0-9._%+-]+$/),
 	displayName: z.string().trim().max(100).optional(),
 });
 
 export const updateMailboxSchema = z.object({
 	displayName: z.string().max(100).nullable().optional(),
 	signature: z.string().max(10_000).nullable().optional(),
+	signatureText: z.string().max(10_000).nullable().optional(),
+	signatureHtml: z.string().max(50_000).nullable().optional(),
 	autoReplyEnabled: z.boolean().optional(),
 	autoReplySubject: z.string().trim().max(200).optional(),
 	autoReplyBody: z.string().max(10_000).optional(),
@@ -161,18 +208,28 @@ export const updateProfileSchema = z.object({
 	name: z.string().trim().min(1).max(100),
 	resetEmail: z.preprocess(
 		(value) => (typeof value === "string" ? value.trim() : value),
-		z.string().email().or(z.literal("")).transform((value) => value || null),
+		z
+			.email()
+			.or(z.literal(""))
+			.transform((value) => value || null),
 	),
 	forwardingEmail: z.preprocess(
 		(value) => (typeof value === "string" ? value.trim() : value),
-		z.string().email().or(z.literal("")).optional().transform((value) => value === undefined ? undefined : value || null),
+		z
+			.email()
+			.or(z.literal(""))
+			.optional()
+			.transform((value) => (value === undefined ? undefined : value || null)),
 	),
 });
 
 export const updateForwardingEmailSchema = z.object({
 	forwardingEmail: z.preprocess(
 		(value) => (typeof value === "string" ? value.trim() : value),
-		z.string().email().or(z.literal("")).transform((value) => value || null),
+		z
+			.email()
+			.or(z.literal(""))
+			.transform((value) => value || null),
 	),
 });
 
@@ -200,7 +257,7 @@ export const reauthenticateSchema = z.object({
 });
 
 export const passwordResetRequestSchema = z.object({
-	email: z.string().trim().email().max(320),
+	email: z.string().trim().pipe(z.email().max(320)),
 });
 
 export const passwordResetConfirmSchema = z.object({
@@ -211,7 +268,7 @@ export const passwordResetConfirmSchema = z.object({
 export const accountActivationConfirmSchema = passwordResetConfirmSchema;
 
 export const accountInvitationSchema = z.object({
-	invitationEmail: z.string().trim().email().max(320).optional(),
+	invitationEmail: z.string().trim().pipe(z.email().max(320)).optional(),
 });
 
 export const recoveryEmailVerificationSchema = z.object({
@@ -228,12 +285,12 @@ export const routingRuleSchema = z.object({
 	mailboxId: z.string().min(1),
 	folderId: z.string().optional(),
 	destination: z.string().min(1).optional(),
-	forwardTo: z.string().email().optional(),
+	forwardTo: z.email().optional(),
 	priority: z.number().int().default(0),
 });
 
 export const webhookSchema = z.object({
-	url: z.string().url().max(2048),
+	url: z.url().max(2048),
 	events: z
 		.array(z.enum(["message.inbound", "message.outbound", "message.failed"]))
 		.min(1)

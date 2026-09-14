@@ -37,7 +37,12 @@ export function getCloudflareAuthHeaders(auth: CfAuth): HeadersInit {
 	};
 }
 
-export function formatCloudflareError(path: string, status: number, statusText: string, errors: CfApiError[]) {
+export function formatCloudflareError(
+	path: string,
+	status: number,
+	statusText: string,
+	errors: CfApiError[],
+) {
 	const details = errors
 		.map((error) => {
 			const code = error.code ? `code ${error.code}: ` : "";
@@ -59,7 +64,7 @@ export function getCloudflareAuthHint(errors: CfApiError[]) {
 	);
 	if (!hasAuthError) return "";
 
-	return " Verify CF_TOKEN with `curl https://api.cloudflare.com/client/v4/user/tokens/verify -H \"Authorization: Bearer <token>\"`. Use the token secret value without `Bearer`, or use CF_API_KEY plus CF_EMAIL for a Global API Key.";
+	return ' Verify CF_TOKEN with `curl https://api.cloudflare.com/client/v4/user/tokens/verify -H "Authorization: Bearer <token>"`. Use the token secret value without `Bearer`, or use CF_API_KEY plus CF_EMAIL for a Global API Key.';
 }
 
 export function getEmailWorkerName(env: CloudflareEnv): string {

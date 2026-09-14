@@ -84,7 +84,10 @@ export async function saveManagedAccount(account: ManagedAccount): Promise<void>
 export async function uploadManagedAccountAvatar(accountId: string, file: File): Promise<void> {
 	const form = new FormData();
 	form.set("file", file);
-	const response = await authFetch(`/api/accounts/${accountId}/avatar`, { method: "POST", body: form });
+	const response = await authFetch(`/api/accounts/${accountId}/avatar`, {
+		method: "POST",
+		body: form,
+	});
 	if (!response.ok) throw new Error("Unable to update avatar");
 }
 
@@ -95,13 +98,19 @@ export async function fetchManagedMailboxes(accountId: string): Promise<ManagedM
 	return data.mailboxes ?? [];
 }
 
-export async function resendManagedAccountInvitation(accountId: string, invitationEmail: string): Promise<"pending" | "delivery_disabled"> {
+export async function resendManagedAccountInvitation(
+	accountId: string,
+	invitationEmail: string,
+): Promise<"pending" | "delivery_disabled"> {
 	const res = await authFetch(`/api/accounts/${accountId}/invitation`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({ invitationEmail }),
 	});
-	const json = (await res.json()) as { error?: string; invitationDelivery?: "pending" | "delivery_disabled" };
+	const json = (await res.json()) as {
+		error?: string;
+		invitationDelivery?: "pending" | "delivery_disabled";
+	};
 	if (!res.ok) throw new Error(json.error ?? "Failed to resend invitation");
 	return json.invitationDelivery ?? "pending";
 }
@@ -119,7 +128,10 @@ export async function revokeManagedAccountSessions(accountId: string): Promise<n
 	return json.revokedSessions ?? 0;
 }
 
-export async function updateManagedMailboxName(mailboxId: string, displayName: string): Promise<void> {
+export async function updateManagedMailboxName(
+	mailboxId: string,
+	displayName: string,
+): Promise<void> {
 	const response = await authFetch(`/api/mailboxes/${mailboxId}`, {
 		method: "PATCH",
 		headers: { "Content-Type": "application/json" },

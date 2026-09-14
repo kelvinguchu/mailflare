@@ -51,20 +51,26 @@ export function AccountSettings() {
 		<div className="space-y-8 py-4">
 			<div>
 				<h1 className="text-3xl font-medium text-neutral-900">Account</h1>
-				<p className="mt-1 text-sm text-neutral-500">Manage your account details and sign-in security.</p>
+				<p className="mt-1 text-sm text-neutral-500">
+					Manage your account details and sign-in security.
+				</p>
 			</div>
 
 			<Card className="rounded-3xl border-0 bg-white px-6">
 				<CardHeader>
 					<CardTitle>Account details</CardTitle>
-					<CardDescription>Your current email is assigned to this account and cannot be changed here.</CardDescription>
+					<CardDescription>
+						Your current email is assigned to this account and cannot be changed here.
+					</CardDescription>
 				</CardHeader>
 				<CardContent className="pb-6">
 					<div className="mb-6 flex items-center gap-4 border-b border-neutral-100 pb-6">
 						<ProfileAvatarForm name={user.name} />
 						<div>
 							<p className="text-sm font-medium text-neutral-900">Profile picture</p>
-							<p className="mt-1 text-sm text-neutral-500">Choose a picture to show across your account.</p>
+							<p className="mt-1 text-sm text-neutral-500">
+								Choose a picture to show across your account.
+							</p>
 						</div>
 					</div>
 					<ProfileForm
@@ -77,20 +83,25 @@ export function AccountSettings() {
 			</Card>
 
 			<Card className="rounded-3xl border-0 bg-white px-6">
-					<CardHeader>
-						<CardTitle>Forwarding email</CardTitle>
-						<CardDescription>Send a copy of incoming messages to another email address.</CardDescription>
-					</CardHeader>
-					<CardContent className="pb-6">
-						<ForwardingEmailForm initialForwardingEmail={user.forwardingEmail ?? ""} />
-					</CardContent>
+				<CardHeader>
+					<CardTitle>Forwarding email</CardTitle>
+					<CardDescription>
+						Send a copy of incoming messages to another email address.
+					</CardDescription>
+				</CardHeader>
+				<CardContent className="pb-6">
+					<ForwardingEmailForm initialForwardingEmail={user.forwardingEmail ?? ""} />
+				</CardContent>
 			</Card>
 
 			{user.role === "admin" && (
 				<Card className="rounded-3xl border-0 bg-white px-6">
 					<CardHeader>
 						<CardTitle>Administrator security</CardTitle>
-						<CardDescription>Require an authenticator code at sign-in and confirm identity before high-risk actions.</CardDescription>
+						<CardDescription>
+							Require an authenticator code at sign-in and confirm identity before high-risk
+							actions.
+						</CardDescription>
 					</CardHeader>
 					<CardContent className="pb-6">
 						<MfaSettings />
@@ -101,7 +112,9 @@ export function AccountSettings() {
 			<Card className="rounded-3xl border-0 bg-white px-6">
 				<CardHeader>
 					<CardTitle>Confirm identity</CardTitle>
-					<CardDescription>Refresh the 15-minute authorization window used by API keys and administrator actions.</CardDescription>
+					<CardDescription>
+						Refresh the 15-minute authorization window used by API keys and administrator actions.
+					</CardDescription>
 				</CardHeader>
 				<CardContent className="pb-6">
 					<Reauthentication mfaEnabled={user.mfaEnabled} />
@@ -111,7 +124,9 @@ export function AccountSettings() {
 			<Card className="rounded-3xl border-0 bg-white px-6">
 				<CardHeader>
 					<CardTitle>Email signature</CardTitle>
-					<CardDescription>Configure the signature for the inbox currently selected above.</CardDescription>
+					<CardDescription>
+						Configure the signature for the inbox currently selected above.
+					</CardDescription>
 				</CardHeader>
 				<CardContent className="pb-6">
 					<MailboxSignatureForm />
@@ -121,7 +136,9 @@ export function AccountSettings() {
 			<Card className="rounded-3xl border-0 bg-white px-6">
 				<CardHeader>
 					<CardTitle>Sessions</CardTitle>
-					<CardDescription>Review recent sign-ins and sign out browsers you no longer use.</CardDescription>
+					<CardDescription>
+						Review recent sign-ins and sign out browsers you no longer use.
+					</CardDescription>
 				</CardHeader>
 				<CardContent className="pb-6">
 					<SessionManagement />

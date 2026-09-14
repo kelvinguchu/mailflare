@@ -64,7 +64,9 @@ describe("session management with isolated D1", () => {
 		await createSession(env, fixtureIds.owner);
 		await integrationEnv.DB.prepare(
 			"INSERT INTO sessions (id, user_id, token_hash, expires_at, created_at) VALUES (?, ?, ?, ?, ?)",
-		).bind("sess_expired", fixtureIds.owner, "expired-hash", 1_700_000_000, 1_700_000_000).run();
+		)
+			.bind("sess_expired", fixtureIds.owner, "expired-hash", 1_700_000_000, 1_700_000_000)
+			.run();
 
 		expect(await deleteExpiredSessions(env, new Date())).toBe(1);
 		expect(await countActiveSessions(env, fixtureIds.owner)).toBe(1);
@@ -74,9 +76,9 @@ describe("session management with isolated D1", () => {
 		const env = createMailEnv();
 		const token = await createSession(env, fixtureIds.owner);
 		expect(await isSessionRecentlyAuthenticated(env, fixtureIds.owner, token)).toBe(true);
-		await integrationEnv.DB.prepare(
-			"UPDATE sessions SET authenticated_at = ? WHERE user_id = ?",
-		).bind(1_700_000_000, fixtureIds.owner).run();
+		await integrationEnv.DB.prepare("UPDATE sessions SET authenticated_at = ? WHERE user_id = ?")
+			.bind(1_700_000_000, fixtureIds.owner)
+			.run();
 		expect(await isSessionRecentlyAuthenticated(env, fixtureIds.owner, token)).toBe(false);
 		expect(await markSessionAuthenticated(env, fixtureIds.owner, token)).toBe(true);
 		expect(await isSessionRecentlyAuthenticated(env, fixtureIds.owner, token)).toBe(true);
@@ -121,17 +123,19 @@ describe("session management with isolated D1", () => {
 		const currentToken = await createSession(env, fixtureIds.owner);
 		const otherToken = await createSession(env, fixtureIds.owner);
 
-		expect(await changePasswordAndRevokeRecoveryTokens(
-			env,
-			fixtureIds.owner,
-			"changed-password-123",
-			currentToken,
-		)).toBe(1);
+		expect(
+			await changePasswordAndRevokeRecoveryTokens(
+				env,
+				fixtureIds.owner,
+				"changed-password-123",
+				currentToken,
+			),
+		).toBe(1);
 		expect(await getUserFromSession(env, currentToken)).toMatchObject({ id: fixtureIds.owner });
 		expect(await getUserFromSession(env, otherToken)).toBeNull();
-		const user = await integrationEnv.DB.prepare(
-			"SELECT password_hash FROM users WHERE id = ?",
-		).bind(fixtureIds.owner).first<{ password_hash: string }>();
+		const user = await integrationEnv.DB.prepare("SELECT password_hash FROM users WHERE id = ?")
+			.bind(fixtureIds.owner)
+			.first<{ password_hash: string }>();
 		expect(verifyPassword("changed-password-123", user!.password_hash)).toBe(true);
 		expect(fetch).toHaveBeenCalledOnce();
 	});

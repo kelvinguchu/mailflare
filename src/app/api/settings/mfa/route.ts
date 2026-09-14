@@ -40,15 +40,22 @@ export async function POST(request: Request) {
 	if (!verifyPassword(parsed.currentPassword, user!.passwordHash)) {
 		return NextResponse.json({ error: "Invalid password" }, { status: 401 });
 	}
-	if (isMfaEnabled(user!)) return NextResponse.json({ error: "Multi-factor authentication is already enabled" }, { status: 409 });
+	if (isMfaEnabled(user!))
+		return NextResponse.json(
+			{ error: "Multi-factor authentication is already enabled" },
+			{ status: 409 },
+		);
 	const secret = generateTotpSecret();
 	const encrypted = await encryptTotpSecret(env, secret);
-	await getDb(env).update(users).set({
-		mfaSecretEncrypted: encrypted,
-		mfaEnabledAt: null,
-		mfaRecoveryCodeHashes: "[]",
-		mfaLastUsedCounter: null,
-	}).where(eq(users.id, user!.id));
+	await getDb(env)
+		.update(users)
+		.set({
+			mfaSecretEncrypted: encrypted,
+			mfaEnabledAt: null,
+			mfaRecoveryCodeHashes: "[]",
+			mfaLastUsedCounter: null,
+		})
+		.where(eq(users.id, user!.id));
 	return NextResponse.json({ secret, otpauthUri: buildTotpUri(user!.email, secret) });
 }
 
@@ -62,16 +69,26 @@ export async function PUT(request: Request) {
 	}
 	const secret = await decryptTotpSecret(env, user!.mfaSecretEncrypted);
 	const counter = await verifyTotpCode(secret, parsed.code);
-	if (counter === null) return NextResponse.json({ error: "Invalid verification code" }, { status: 401 });
+	if (counter === null)
+		return NextResponse.json({ error: "Invalid verification code" }, { status: 401 });
 	const recovery = await generateRecoveryCodes();
 	await refreshCurrentAuthentication(env, user!.id);
-	const updated = await getDb(env).update(users).set({
-		mfaEnabledAt: new Date(),
-		mfaRecoveryCodeHashes: JSON.stringify(recovery.hashes),
-		mfaLastUsedCounter: counter,
-	}).where(and(eq(users.id, user!.id), isNull(users.mfaEnabledAt))).returning({ id: users.id });
-	if (updated.length !== 1) return NextResponse.json({ error: "Multi-factor setup changed; start again" }, { status: 409 });
-	await createAuditLog(env, { actorUserId: user!.id, targetUserId: user!.id, action: "auth.mfa_enabled" });
+	const updated = await getDb(env)
+		.update(users)
+		.set({
+			mfaEnabledAt: new Date(),
+			mfaRecoveryCodeHashes: JSON.stringify(recovery.hashes),
+			mfaLastUsedCounter: counter,
+		})
+		.where(and(eq(users.id, user!.id), isNull(users.mfaEnabledAt)))
+		.returning({ id: users.id });
+	if (updated.length !== 1)
+		return NextResponse.json({ error: "Multi-factor setup changed; start again" }, { status: 409 });
+	await createAuditLog(env, {
+		actorUserId: user!.id,
+		targetUserId: user!.id,
+		action: "auth.mfa_enabled",
+	});
 	return NextResponse.json({ ok: true, recoveryCodes: recovery.codes });
 }
 
@@ -84,9 +101,15 @@ export async function PATCH(request: Request) {
 	if (verification) return verification;
 	const recovery = await generateRecoveryCodes();
 	await refreshCurrentAuthentication(env, user!.id);
-	await getDb(env).update(users).set({ mfaRecoveryCodeHashes: JSON.stringify(recovery.hashes) })
+	await getDb(env)
+		.update(users)
+		.set({ mfaRecoveryCodeHashes: JSON.stringify(recovery.hashes) })
 		.where(eq(users.id, user!.id));
-	await createAuditLog(env, { actorUserId: user!.id, targetUserId: user!.id, action: "auth.mfa_recovery_regenerated" });
+	await createAuditLog(env, {
+		actorUserId: user!.id,
+		targetUserId: user!.id,
+		action: "auth.mfa_recovery_regenerated",
+	});
 	return NextResponse.json({ ok: true, recoveryCodes: recovery.codes });
 }
 
@@ -98,28 +121,50 @@ export async function DELETE(request: Request) {
 	const verification = await verifyProtectedMfaAction(env, request, user!, parsed);
 	if (verification) return verification;
 	await refreshCurrentAuthentication(env, user!.id);
-	await getDb(env).update(users).set({
-		mfaSecretEncrypted: null,
-		mfaEnabledAt: null,
-		mfaRecoveryCodeHashes: "[]",
-		mfaLastUsedCounter: null,
-	}).where(eq(users.id, user!.id));
-	await createAuditLog(env, { actorUserId: user!.id, targetUserId: user!.id, action: "auth.mfa_disabled" });
+	await getDb(env)
+		.update(users)
+		.set({
+			mfaSecretEncrypted: null,
+			mfaEnabledAt: null,
+			mfaRecoveryCodeHashes: "[]",
+			mfaLastUsedCounter: null,
+		})
+		.where(eq(users.id, user!.id));
+	await createAuditLog(env, {
+		actorUserId: user!.id,
+		targetUserId: user!.id,
+		action: "auth.mfa_disabled",
+	});
 	return NextResponse.json({ ok: true });
 }
 
 async function requireAdministrator(request: Request) {
 	const env = getEnv();
 	const user = await getCurrentUser(env, request);
-	if (!user) return { env, user: null, error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
-	if (user.role !== "admin") return { env, user: null, error: NextResponse.json({ error: "Administrator access required" }, { status: 403 }) };
+	if (!user)
+		return {
+			env,
+			user: null,
+			error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+		};
+	if (user.role !== "admin")
+		return {
+			env,
+			user: null,
+			error: NextResponse.json({ error: "Administrator access required" }, { status: 403 }),
+		};
 	return { env, user, error: null };
 }
 
-async function parseBody<T>(request: Request, schema: { safeParse(value: unknown): { success: true; data: T } | { success: false } }): Promise<T | NextResponse> {
+async function parseBody<T>(
+	request: Request,
+	schema: { safeParse(value: unknown): { success: true; data: T } | { success: false } },
+): Promise<T | NextResponse> {
 	try {
 		const parsed = schema.safeParse(await readJsonBody(request, 8 * 1024));
-		return parsed.success ? parsed.data : NextResponse.json({ error: "Invalid request" }, { status: 400 });
+		return parsed.success
+			? parsed.data
+			: NextResponse.json({ error: "Invalid request" }, { status: 400 });
 	} catch (error) {
 		return NextResponse.json(
 			{ error: "Invalid request" },
@@ -134,7 +179,11 @@ async function verifyProtectedMfaAction(
 	user: typeof users.$inferSelect,
 	input: { currentPassword: string; code: string },
 ): Promise<NextResponse | null> {
-	if (!isMfaEnabled(user)) return NextResponse.json({ error: "Multi-factor authentication is not enabled" }, { status: 409 });
+	if (!isMfaEnabled(user))
+		return NextResponse.json(
+			{ error: "Multi-factor authentication is not enabled" },
+			{ status: 409 },
+		);
 	if (!(await allowAccountRecoveryAttempt(env, request, user.id, "verify"))) {
 		return NextResponse.json({ error: "Too many confirmation attempts" }, { status: 429 });
 	}
@@ -149,7 +198,8 @@ async function verifyProtectedMfaAction(
 
 async function refreshCurrentAuthentication(env: CloudflareEnv, userId: string): Promise<void> {
 	const token = (await cookies()).get(SESSION_COOKIE)?.value;
-	if (!token || !(await markSessionAuthenticated(env, userId, token))) throw new Error("Current session is unavailable");
+	if (!token || !(await markSessionAuthenticated(env, userId, token)))
+		throw new Error("Current session is unavailable");
 }
 
 function parseRecoveryCount(value: string): number {

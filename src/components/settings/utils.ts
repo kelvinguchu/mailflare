@@ -15,7 +15,10 @@ export function getMailboxAddress(mailbox: Pick<MailboxOption, "localPart" | "ho
 	return `${mailbox.localPart}@${mailbox.hostname}`;
 }
 
-export async function updateCurrentMailboxName(id: string, displayName: string): Promise<MailboxOption> {
+export async function updateCurrentMailboxName(
+	id: string,
+	displayName: string,
+): Promise<MailboxOption> {
 	const res = await authFetch(`/api/mailboxes/${id}`, {
 		method: "PATCH",
 		headers: { "Content-Type": "application/json" },
@@ -57,12 +60,17 @@ export async function updateForwardingEmail(forwardingEmail: string): Promise<st
 	});
 	const data = (await res.json()) as ForwardingEmailResponse;
 	if (!res.ok) {
-		throw new Error(typeof data.error === "string" ? data.error : "Failed to update forwarding email");
+		throw new Error(
+			typeof data.error === "string" ? data.error : "Failed to update forwarding email",
+		);
 	}
 	return data.forwardingEmail ?? "";
 }
 
-export async function updateMailboxSignature(mailboxId: string, signature: string): Promise<string> {
+export async function updateMailboxSignature(
+	mailboxId: string,
+	signature: string,
+): Promise<string> {
 	const res = await authFetch(`/api/mailboxes/${mailboxId}`, {
 		method: "PATCH",
 		headers: { "Content-Type": "application/json" },
@@ -101,7 +109,10 @@ export async function updateMailboxAutoReply(
 	};
 }
 
-export async function updatePassword(currentPassword: string, newPassword: string): Promise<number> {
+export async function updatePassword(
+	currentPassword: string,
+	newPassword: string,
+): Promise<number> {
 	const res = await authFetch("/api/settings/password", {
 		method: "PATCH",
 		headers: { "Content-Type": "application/json" },
@@ -115,7 +126,10 @@ export async function updatePassword(currentPassword: string, newPassword: strin
 	return data.revokedSessions ?? 0;
 }
 
-export async function loadSessionManagement(): Promise<Required<Pick<SessionManagementResponse, "activeSessionCount" | "recentSignIns">> & Pick<SessionManagementResponse, "currentSession">> {
+export async function loadSessionManagement(): Promise<
+	Required<Pick<SessionManagementResponse, "activeSessionCount" | "recentSignIns">> &
+		Pick<SessionManagementResponse, "currentSession">
+> {
 	const res = await authFetch("/api/settings/sessions");
 	const data = (await res.json()) as SessionManagementResponse;
 	if (!res.ok || data.activeSessionCount === undefined || !data.recentSignIns) {

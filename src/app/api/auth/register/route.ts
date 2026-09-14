@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { getEnv } from "@/lib/cloudflare";
@@ -20,7 +21,10 @@ export async function POST(request: Request) {
 	const env = getEnv();
 	const db = getDb(env);
 	if (await hasAdminAccount(env)) {
-		return NextResponse.json({ error: "Registration is closed after the first account is created" }, { status: 403 });
+		return NextResponse.json(
+			{ error: "Registration is closed after the first account is created" },
+			{ status: 403 },
+		);
 	}
 
 	let body: unknown;
@@ -32,9 +36,11 @@ export async function POST(request: Request) {
 	}
 	const firstRunParsed = firstRunRegisterSchema.safeParse(body);
 	if (!firstRunParsed.success) {
-		return NextResponse.json({ error: firstRunParsed.error.flatten() }, { status: 400 });
+		return NextResponse.json({ error: z.flattenError(firstRunParsed.error) }, { status: 400 });
 	}
-	if (!(await verifyTurnstileToken(env, request, (body as Record<string, unknown>).turnstileToken))) {
+	if (
+		!(await verifyTurnstileToken(env, request, (body as Record<string, unknown>).turnstileToken))
+	) {
 		return NextResponse.json({ error: "Verification failed. Please try again." }, { status: 400 });
 	}
 
@@ -73,7 +79,12 @@ export async function POST(request: Request) {
 			localPart: username,
 			displayName: username,
 		});
-		await ensureMailboxDomainRouting(env, db, { id: mailboxId, domainId: domain.id, localPart: username, useAllDomains: true });
+		await ensureMailboxDomainRouting(env, db, {
+			id: mailboxId,
+			domainId: domain.id,
+			localPart: username,
+			useAllDomains: true,
+		});
 	} catch (err) {
 		await db.delete(users).where(eq(users.id, userId));
 		const message = err instanceof Error ? err.message : "Domain setup failed";

@@ -8,23 +8,23 @@
 		{
 			"binding": "DB",
 			"database_name": "cc-mail-integration",
-			"database_id": "00000000-0000-0000-0000-000000000000"
+			"database_id": "00000000-0000-0000-0000-000000000000",
 		},
 		{
 			"binding": "MIGRATION_DB",
 			"database_name": "cc-mail-migration-integration",
-			"database_id": "00000000-0000-0000-0000-000000000001"
+			"database_id": "00000000-0000-0000-0000-000000000001",
 		},
 		{
 			"binding": "SETUP_DB",
 			"database_name": "cc-mail-setup-integration",
-			"database_id": "00000000-0000-0000-0000-000000000002"
-		}
+			"database_id": "00000000-0000-0000-0000-000000000002",
+		},
 	],
 	"r2_buckets": [
 		{
 			"binding": "BUCKET",
-			"bucket_name": "cc-mail-integration"
-		}
-	]
+			"bucket_name": "cc-mail-integration",
+		},
+	],
 }

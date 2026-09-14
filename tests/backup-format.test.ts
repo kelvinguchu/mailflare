@@ -10,11 +10,14 @@ import {
 	LEGACY_V1_BACKUP_TABLES,
 	LEGACY_V2_V3_BACKUP_TABLES,
 	LEGACY_V5_BACKUP_TABLES,
+	LEGACY_V6_BACKUP_TABLES,
 } from "../src/lib/backups/format";
 import { normalizeDatabaseBackupDocument } from "../src/lib/backups/export";
 import { createBackupFilename } from "../src/lib/backups/utils";
 
-function emptyTables(tableNames: readonly string[]): Record<string, Array<Record<string, unknown>>> {
+function emptyTables(
+	tableNames: readonly string[],
+): Record<string, Array<Record<string, unknown>>> {
 	return Object.fromEntries(tableNames.map((table) => [table, []]));
 }
 
@@ -29,6 +32,12 @@ describe("database backup format", () => {
 			"_cf_KV",
 			"_cf_METADATA",
 			"d1_migrations",
+			"message_search",
+			"message_search_config",
+			"message_search_content",
+			"message_search_data",
+			"message_search_docsize",
+			"message_search_idx",
 			"sqlite_sequence",
 		]);
 	});
@@ -116,6 +125,20 @@ describe("database backup format", () => {
 		});
 		expect(document.sourceVersion).toBe(5);
 		expect(document.tables.sender_policies).toEqual([]);
+	});
+
+	it("normalizes version 6 backups without calendar tasks and reminders", () => {
+		const document = normalizeDatabaseBackupDocument({
+			format: DATABASE_BACKUP_FORMAT,
+			version: 6,
+			createdAt: "2026-09-10T00:00:00.000Z",
+			tables: emptyTables(LEGACY_V6_BACKUP_TABLES),
+			r2: { strategy: "independent-copies-v1", objects: [] },
+		});
+		expect(document.sourceVersion).toBe(6);
+		expect(document.tables.calendar_tasks).toEqual([]);
+		expect(document.tables.calendar_reminders).toEqual([]);
+		expect(document.tables.calendar_reminder_deliveries).toEqual([]);
 	});
 
 	it("merges legacy message body rows while upgrading version 1", () => {

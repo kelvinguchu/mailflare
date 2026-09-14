@@ -1,6 +1,17 @@
-export type MessageStatus = "received" | "sent" | "draft" | "queued" | "failed" | "archived" | "trash" | "spam";
+export type MessageStatus =
+	| "received"
+	| "sent"
+	| "draft"
+	| "scheduled"
+	| "queued"
+	| "canceled"
+	| "failed"
+	| "archived"
+	| "trash"
+	| "spam";
 
-export type MessageFolder = "inbox" | "starred" | "snoozed" | "sent" | "drafts" | "archived" | "trash" | "spam";
+export type MessageFolder =
+	"inbox" | "starred" | "snoozed" | "sent" | "drafts" | "archived" | "trash" | "spam";
 
 export type MessageDirection = "inbound" | "outbound";
 
@@ -11,7 +22,16 @@ export type Message = {
 	folderId: string | null;
 	direction: MessageDirection;
 	providerMessageId: string | null;
-	deliveryStatus?: "queued" | "accepted" | "delivered" | "failed" | "suppressed" | "unknown" | null;
+	deliveryStatus?:
+		| "scheduled"
+		| "queued"
+		| "canceled"
+		| "accepted"
+		| "delivered"
+		| "failed"
+		| "suppressed"
+		| "unknown"
+		| null;
 	deliveryDetail?: string | null;
 	deliveryUpdatedAt?: string | null;
 	securityStatus?: "clean" | "suspicious" | "quarantined";
@@ -30,7 +50,34 @@ export type Message = {
 	starred: boolean;
 	snoozedUntil?: string | null;
 	threadId: string | null;
+	/** Parent message for drafts and sent replies. */
+	replyToMessageId?: string | null;
+	hasAttachments?: boolean;
+	/** Present when the list was requested with `view=threads`. */
+	thread?: ThreadSummary;
 	createdAt: string;
+};
+
+export type ThreadParticipant = {
+	name: string;
+	address: string;
+	isMe: boolean;
+	unread: boolean;
+};
+
+export type ThreadSummary = {
+	id: string;
+	messageCount: number;
+	unreadCount: number;
+	hasAttachments: boolean;
+	lastMessageAt: string;
+	participants: ThreadParticipant[];
+};
+
+export type MessageThread = {
+	id: string;
+	subject: string | null;
+	messages: Message[];
 };
 
 export type MessageReadFilter = "all" | "read" | "unread";

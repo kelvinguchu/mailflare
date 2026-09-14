@@ -1,17 +1,8 @@
 "use client";
 
-import {
-	createContext,
-	useCallback,
-	useContext,
-	useEffect,
-	useState,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import {
-	fetchMailboxOptions,
-	SELECTED_MAILBOX_STORAGE_KEY,
-} from "./mailbox-provider-utils";
+import { fetchMailboxOptions, SELECTED_MAILBOX_STORAGE_KEY } from "./mailbox-provider-utils";
 import { AUTH_SESSION_CHANGED_EVENT } from "@/lib/auth/client";
 
 export type MailboxOption = {
@@ -20,6 +11,9 @@ export type MailboxOption = {
 	hostname: string;
 	displayName: string | null;
 	signature?: string | null;
+	signatureText?: string | null;
+	signatureHtml?: string | null;
+	signatureVersion?: number;
 	autoReplyEnabled?: boolean;
 	autoReplySubject?: string;
 	autoReplyBody?: string;

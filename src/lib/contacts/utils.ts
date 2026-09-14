@@ -1,4 +1,8 @@
-import { getEmailDisplayName, normalizeEmailAddress, parseEmailAddressParts } from "@/lib/email/address";
+import {
+	getEmailDisplayName,
+	normalizeEmailAddress,
+	parseEmailAddressParts,
+} from "@/lib/email/address";
 
 export function getContactId(userId: string, email: string): string {
 	return `${userId}:${email.trim().toLowerCase()}`;

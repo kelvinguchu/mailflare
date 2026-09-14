@@ -9,12 +9,36 @@ import type {
 } from "./types";
 
 export const importSourceOptions: ImportSourceOption[] = [
-	{ value: "inbox", label: "Inbox", imapFolder: "INBOX", destination: "system:inbox", system: true },
+	{
+		value: "inbox",
+		label: "Inbox",
+		imapFolder: "INBOX",
+		destination: "system:inbox",
+		system: true,
+	},
 	{ value: "sent", label: "Sent", imapFolder: "Sent", destination: "system:sent", system: true },
-	{ value: "drafts", label: "Drafts", imapFolder: "Drafts", destination: "system:drafts", system: true },
-	{ value: "archived", label: "Archived", imapFolder: "Archive", destination: "system:archived", system: true },
+	{
+		value: "drafts",
+		label: "Drafts",
+		imapFolder: "Drafts",
+		destination: "system:drafts",
+		system: true,
+	},
+	{
+		value: "archived",
+		label: "Archived",
+		imapFolder: "Archive",
+		destination: "system:archived",
+		system: true,
+	},
 	{ value: "spam", label: "Spam", imapFolder: "Spam", destination: "system:spam", system: true },
-	{ value: "trash", label: "Trash", imapFolder: "Trash", destination: "system:trash", system: true },
+	{
+		value: "trash",
+		label: "Trash",
+		imapFolder: "Trash",
+		destination: "system:trash",
+		system: true,
+	},
 	{ value: "others", label: "Others", imapFolder: "", destination: "system:inbox" },
 ];
 
@@ -51,7 +75,10 @@ export function resolveImapSourceFolder(source: ImportSourceItem, folders: strin
 	return match ?? source.imapFolder;
 }
 
-export function filterCustomImapFolders(folders: string[], selectedSources: ImportSourceItem[]): string[] {
+export function filterCustomImapFolders(
+	folders: string[],
+	selectedSources: ImportSourceItem[],
+): string[] {
 	const systemAliases = new Set(
 		(["inbox", "sent", "drafts", "archived", "spam", "trash"] as ImportSourceSection[])
 			.flatMap(getFolderAliases)
@@ -65,7 +92,10 @@ export function filterCustomImapFolders(folders: string[], selectedSources: Impo
 }
 
 export function getFileImportSource(sources: ImportSourceItem[]): ImportSourceItem {
-	return sources.find((source) => source.id !== "system:others") ?? getSelectedImportSources(["inbox"])[0];
+	return (
+		sources.find((source) => source.id !== "system:others") ??
+		getSelectedImportSources(["inbox"])[0]
+	);
 }
 
 export async function ensureImportDestination(
@@ -74,7 +104,9 @@ export async function ensureImportDestination(
 ): Promise<string> {
 	if (!source.folderName) return source.destination;
 	const folders = await fetchMailboxFolders(mailboxId);
-	const existing = folders.find((folder) => folder.name.toLowerCase() === source.folderName?.toLowerCase());
+	const existing = folders.find(
+		(folder) => folder.name.toLowerCase() === source.folderName?.toLowerCase(),
+	);
 	if (existing) return `folder:${existing.id}`;
 
 	const response = await authFetch("/api/folders", {
@@ -158,5 +190,9 @@ function getFolderAliases(section: ImportSourceSection): string[] {
 }
 
 function normalizeFolderName(value: string): string {
-	return value.toLowerCase().replace(/^\[gmail\]\//, "").replace(/\s+/g, " ").trim();
+	return value
+		.toLowerCase()
+		.replace(/^\[gmail\]\//, "")
+		.replace(/\s+/g, " ")
+		.trim();
 }

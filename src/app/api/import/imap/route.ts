@@ -22,7 +22,10 @@ export async function POST(request: Request) {
 		input = parseImapImportRequest(body);
 	} catch (error) {
 		const status = error instanceof RequestBodyTooLargeError ? 413 : 400;
-		return NextResponse.json({ error: error instanceof Error ? error.message : "Invalid IMAP import request" }, { status });
+		return NextResponse.json(
+			{ error: error instanceof Error ? error.message : "Invalid IMAP import request" },
+			{ status },
+		);
 	}
 
 	const access = await getMailboxAccessLevel(getDb(env), user, input.mailboxId);
@@ -34,7 +37,9 @@ export async function POST(request: Request) {
 		const [folder] = await db
 			.select({ id: folders.id })
 			.from(folders)
-			.where(and(eq(folders.id, input.destination.folderId), eq(folders.mailboxId, access.mailbox.id)))
+			.where(
+				and(eq(folders.id, input.destination.folderId), eq(folders.mailboxId, access.mailbox.id)),
+			)
 			.limit(1);
 		if (!folder) {
 			return NextResponse.json({ error: "Folder not found" }, { status: 404 });

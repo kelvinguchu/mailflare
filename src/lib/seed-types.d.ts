@@ -5,13 +5,7 @@ export type SeedMailboxKey = "support" | "billing";
 export type SeedMailboxMap = Record<SeedMailboxKey, typeof mailboxes.$inferSelect>;
 
 export type SeedMessageStatus =
-	| "received"
-	| "sent"
-	| "draft"
-	| "trash"
-	| "spam"
-	| "queued"
-	| "failed";
+	"received" | "sent" | "draft" | "trash" | "spam" | "queued" | "failed";
 
 export type SeedMessageDefinition = {
 	mailbox: SeedMailboxKey;

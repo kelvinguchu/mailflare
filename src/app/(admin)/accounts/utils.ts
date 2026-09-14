@@ -5,7 +5,9 @@ export function getAccountInitials(account: Pick<Account, "name" | "email">): st
 	return source.slice(0, 1).toUpperCase();
 }
 
-export function getAccountMailbox(account: Pick<Account, "localPart" | "hostname" | "email">): string {
+export function getAccountMailbox(
+	account: Pick<Account, "localPart" | "hostname" | "email">,
+): string {
 	if (account.localPart && account.hostname) return `${account.localPart}@${account.hostname}`;
 	return account.email;
 }

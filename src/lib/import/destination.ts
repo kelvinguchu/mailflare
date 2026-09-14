@@ -1,11 +1,23 @@
-import type { ImportDestination, ImportMessagePlacement, ImportSystemSection } from "./destination-types";
+import type {
+	ImportDestination,
+	ImportMessagePlacement,
+	ImportSystemSection,
+} from "./destination-types";
 
-const systemSections = new Set<ImportSystemSection>(["inbox", "sent", "drafts", "archived", "spam", "trash"]);
+const systemSections = new Set<ImportSystemSection>([
+	"inbox",
+	"sent",
+	"drafts",
+	"archived",
+	"spam",
+	"trash",
+]);
 
 export const DEFAULT_IMPORT_DESTINATION = "system:inbox";
 
 export function parseImportDestination(value: unknown): ImportDestination {
-	const destination = typeof value === "string" && value.trim() ? value.trim() : DEFAULT_IMPORT_DESTINATION;
+	const destination =
+		typeof value === "string" && value.trim() ? value.trim() : DEFAULT_IMPORT_DESTINATION;
 	if (destination.startsWith("folder:")) {
 		const folderId = destination.slice("folder:".length).trim();
 		if (!folderId) throw new Error("Import folder is required");
@@ -51,7 +63,10 @@ export function getImportMessageUserId(
 	currentUserId: string,
 	mailboxUserId: string,
 ): string {
-	if (destination.type === "system" && (destination.section === "sent" || destination.section === "drafts")) {
+	if (
+		destination.type === "system" &&
+		(destination.section === "sent" || destination.section === "drafts")
+	) {
 		return currentUserId;
 	}
 	return mailboxUserId;

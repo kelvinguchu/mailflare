@@ -1,7 +1,4 @@
-import {
-	deleteEmailRoutingRule,
-	listEmailRoutingRules,
-} from "@/lib/cloudflare-api";
+import { deleteEmailRoutingRule, listEmailRoutingRules } from "@/lib/cloudflare-api";
 
 function routesToDomain(ruleValue: string | undefined, hostname: string): boolean {
 	if (!ruleValue) return false;

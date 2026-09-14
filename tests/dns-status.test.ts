@@ -6,7 +6,14 @@ describe("domain health", () => {
 		const summary = summariseDns(
 			[{ type: "MX", name: "example.test", content: "route.mx.cloudflare.net" }],
 			[],
-			[{ type: "TXT", name: "send.example.test", content: "v=spf1 include:_spf.mx.cloudflare.net ~all" }, { type: "TXT", name: "selector._domainkey.example.test", content: "v=DKIM1; p=abc" }],
+			[
+				{
+					type: "TXT",
+					name: "send.example.test",
+					content: "v=spf1 include:_spf.mx.cloudflare.net ~all",
+				},
+				{ type: "TXT", name: "selector._domainkey.example.test", content: "v=DKIM1; p=abc" },
+			],
 			[{ type: "TXT", name: "_dmarc.example.test", content: "v=DMARC1; p=none" }],
 			"example.test",
 		);

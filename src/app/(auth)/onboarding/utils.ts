@@ -6,7 +6,9 @@ export async function getDomains(): Promise<DomainListResult> {
 	return (await res.json()) as DomainListResult;
 }
 
-export async function createDomain(hostname: string): Promise<{ ok: boolean; data: DomainCreateResult }> {
+export async function createDomain(
+	hostname: string,
+): Promise<{ ok: boolean; data: DomainCreateResult }> {
 	const res = await authFetch("/api/domains", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },

@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import { getSecurityHeaders } from "../src/lib/security/headers";
 
 function getContentSecurityPolicy(environment: "development" | "production"): string {
-	return getSecurityHeaders(environment).find(
-		(header) => header.key === "Content-Security-Policy",
-	)?.value ?? "";
+	return (
+		getSecurityHeaders(environment).find((header) => header.key === "Content-Security-Policy")
+			?.value ?? ""
+	);
 }
 
 describe("security headers", () => {

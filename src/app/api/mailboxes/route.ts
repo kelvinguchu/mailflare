@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { getEnv } from "@/lib/cloudflare";
@@ -6,7 +7,10 @@ import { domains, mailboxes, users } from "@/db/schema";
 import { requireUser } from "@/lib/auth/cookies";
 import { newId } from "@/lib/ids";
 import { mailboxSchema } from "@/lib/validators";
-import { ensureMailboxDomainRouting, getMailboxDomainAddresses } from "@/lib/mailboxes/domain-addresses";
+import {
+	ensureMailboxDomainRouting,
+	getMailboxDomainAddresses,
+} from "@/lib/mailboxes/domain-addresses";
 import { ensurePersonalMailbox } from "./utils";
 
 export async function GET(request: Request) {
@@ -15,10 +19,12 @@ export async function GET(request: Request) {
 	const db = getDb(env);
 	const rows = await ensurePersonalMailbox(env, db, user);
 	return NextResponse.json({
-		mailboxes: await Promise.all(rows.map(async (mailbox) => ({
-			...mailbox,
-			senderAddresses: await getMailboxDomainAddresses(db, mailbox),
-		}))),
+		mailboxes: await Promise.all(
+			rows.map(async (mailbox) => ({
+				...mailbox,
+				senderAddresses: await getMailboxDomainAddresses(db, mailbox),
+			})),
+		),
 		canCreateShared: user.role === "admin",
 	});
 }
@@ -28,7 +34,7 @@ export async function POST(request: Request) {
 	const user = await requireUser(env, request);
 	const parsed = mailboxSchema.safeParse(await request.json());
 	if (!parsed.success) {
-		return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+		return NextResponse.json({ error: z.flattenError(parsed.error) }, { status: 400 });
 	}
 
 	const db = getDb(env);
@@ -38,7 +44,7 @@ export async function POST(request: Request) {
 			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 		}
 	}
-	const ownerUserId = mailboxType === "shared" ? user.id : parsed.data.ownerUserId ?? user.id;
+	const ownerUserId = mailboxType === "shared" ? user.id : (parsed.data.ownerUserId ?? user.id);
 	if (ownerUserId !== user.id) {
 		if (user.role !== "admin") {
 			return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -55,10 +61,12 @@ export async function POST(request: Request) {
 		.from(domains)
 		.where(eq(domains.id, parsed.data.domainId))
 		.limit(1);
-	const canUseDomain = domain && (
-		domain.userId === user.id ||
-		(user.canManageMailboxes && !!user.createdByUserId && domain.userId === user.createdByUserId)
-	);
+	const canUseDomain =
+		domain &&
+		(domain.userId === user.id ||
+			(user.canManageMailboxes &&
+				!!user.createdByUserId &&
+				domain.userId === user.createdByUserId));
 	if (!canUseDomain) {
 		return NextResponse.json({ error: "Domain not found" }, { status: 404 });
 	}
@@ -83,7 +91,12 @@ export async function POST(request: Request) {
 		type: mailboxType,
 	});
 	try {
-		await ensureMailboxDomainRouting(env, db, { id, domainId: domain.id, localPart, useAllDomains: true });
+		await ensureMailboxDomainRouting(env, db, {
+			id,
+			domainId: domain.id,
+			localPart,
+			useAllDomains: true,
+		});
 	} catch (err) {
 		await db.delete(mailboxes).where(eq(mailboxes.id, id));
 		const message = err instanceof Error ? err.message : "Failed to create Cloudflare routing rule";

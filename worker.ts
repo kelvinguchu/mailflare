@@ -32,6 +32,7 @@ import {
 } from "./src/lib/email/webhooks";
 import { deleteExpiredAccountRecoveryTokens } from "./src/lib/auth/recovery";
 import { deleteExpiredSessions } from "./src/lib/auth/session";
+import { dispatchDueCalendarReminders } from "./src/lib/calendar/reminders";
 export { RealtimeHub } from "./src/lib/realtime/hub";
 export { DatabaseBackupWorkflow } from "./src/lib/backups/workflow";
 
@@ -55,7 +56,7 @@ export default {
 		return nextHandler.fetch(request, env, ctx);
 	},
 
-	async email(message: ForwardableEmailMessage, env: CloudflareEnv, ctx: ExecutionContext) {
+	async email(message: ForwardableEmailMessage, env: CloudflareEnv, _ctx: ExecutionContext) {
 		try {
 			const decision = await resolveInboundAddress(getDb(env), message.to);
 			if (!decision?.mailbox || decision.action !== "store") {
@@ -92,30 +93,42 @@ export default {
 	},
 
 	async scheduled(controller: ScheduledController, env: CloudflareEnv) {
-		await runScheduledBackup(env, new Date(controller.scheduledTime));
+		const scheduledAt = new Date(controller.scheduledTime);
+		if (controller.cron === "* * * * *") {
+			const result = await dispatchDueCalendarReminders(env, scheduledAt);
+			console.log(JSON.stringify({ event: "calendar_reminders_processed", ...result }));
+			return;
+		}
+		await runScheduledBackup(env, scheduledAt);
 		try {
-			await deleteExpiredWebhookDeliveries(env, new Date(controller.scheduledTime));
+			await deleteExpiredWebhookDeliveries(env, scheduledAt);
 		} catch (error) {
-			console.error(JSON.stringify({
-				event: "webhook_retention_cleanup_failed",
-				error: error instanceof Error ? error.message : "Unknown cleanup error",
-			}));
+			console.error(
+				JSON.stringify({
+					event: "webhook_retention_cleanup_failed",
+					error: error instanceof Error ? error.message : "Unknown cleanup error",
+				}),
+			);
 		}
 		try {
-			await deleteExpiredAccountRecoveryTokens(env, new Date(controller.scheduledTime));
+			await deleteExpiredAccountRecoveryTokens(env, scheduledAt);
 		} catch (error) {
-			console.error(JSON.stringify({
-				event: "account_recovery_token_cleanup_failed",
-				error: error instanceof Error ? error.message : "Unknown cleanup error",
-			}));
+			console.error(
+				JSON.stringify({
+					event: "account_recovery_token_cleanup_failed",
+					error: error instanceof Error ? error.message : "Unknown cleanup error",
+				}),
+			);
 		}
 		try {
-			await deleteExpiredSessions(env, new Date(controller.scheduledTime));
+			await deleteExpiredSessions(env, scheduledAt);
 		} catch (error) {
-			console.error(JSON.stringify({
-				event: "expired_session_cleanup_failed",
-				error: error instanceof Error ? error.message : "Unknown cleanup error",
-			}));
+			console.error(
+				JSON.stringify({
+					event: "expired_session_cleanup_failed",
+					error: error instanceof Error ? error.message : "Unknown cleanup error",
+				}),
+			);
 		}
 	},
 
@@ -138,21 +151,25 @@ export default {
 				} else if (isWebhookQueueMessage(msg.body)) {
 					await processWebhookQueue(env, msg.body);
 				} else {
-					console.error(JSON.stringify({
-						event: "queue_message_malformed",
-						queue: batch.queue,
-						messageId: msg.id,
-					}));
+					console.error(
+						JSON.stringify({
+							event: "queue_message_malformed",
+							queue: batch.queue,
+							messageId: msg.id,
+						}),
+					);
 				}
 				msg.ack();
 			} catch (err) {
-				console.error(JSON.stringify({
-					event: deadLetterSource ? "dead_letter_persistence_failed" : "queue_processing_failed",
-					queue: batch.queue,
-					messageId: msg.id,
-					attempt: msg.attempts,
-					errorCode: getQueueErrorCode(err),
-				}));
+				console.error(
+					JSON.stringify({
+						event: deadLetterSource ? "dead_letter_persistence_failed" : "queue_processing_failed",
+						queue: batch.queue,
+						messageId: msg.id,
+						attempt: msg.attempts,
+						errorCode: getQueueErrorCode(err),
+					}),
+				);
 				msg.retry({
 					delaySeconds: deadLetterSource
 						? 3600
@@ -160,7 +177,7 @@ export default {
 							? err.delaySeconds
 							: err instanceof WebhookRetryError
 								? err.delaySeconds
-							: 10,
+								: 10,
 				});
 			}
 		}
