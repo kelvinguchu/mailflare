@@ -113,6 +113,72 @@ body {
 	font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
+.skip-link {
+	position: fixed;
+	top: max(0.75rem, env(safe-area-inset-top));
+	left: max(0.75rem, env(safe-area-inset-left));
+	z-index: 200;
+	max-width: calc(100vw - 1.5rem);
+	transform: translateY(calc(-100% - 2rem));
+	border-radius: 0.5rem;
+	background: var(--primary);
+	padding: 0.625rem 0.875rem;
+	color: var(--primary-foreground);
+	font-weight: 600;
+	transition: transform 150ms ease-out;
+}
+
+.skip-link:focus-visible {
+	transform: translateY(0);
+	outline: 3px solid var(--brand-accent);
+	outline-offset: 2px;
+}
+
+/*
+ * Keyboard focus for controls that do not draw their own. Layered so a component's
+ * `outline-none` + ring wins, and text fields are left out: their border shows focus,
+ * and an offset outline around them read as a stray second box.
+ */
+@layer base {
+	:where(
+		a,
+		button,
+		select,
+		input:is([type="checkbox"], [type="radio"], [type="range"], [type="file"]),
+		[tabindex]:not([tabindex="-1"])
+	):focus-visible {
+		outline: 2px solid var(--ring);
+		outline-offset: 2px;
+	}
+
+	:where(input, textarea, [contenteditable="true"]):focus-visible {
+		outline: none;
+	}
+}
+
+#main-content:focus {
+	outline: none;
+}
+
+:where(button, a, input, textarea, select) {
+	touch-action: manipulation;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	html:focus-within {
+		scroll-behavior: auto;
+	}
+
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		scroll-behavior: auto !important;
+		transition-duration: 0.01ms !important;
+	}
+}
+
 pre {
 	font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
@@ -138,7 +204,7 @@ pre {
 	color: #6c6353;
 }
 
-[data-auth-shell] input:not([type="checkbox"]):not([type="radio"]) {
+[data-auth-shell] input:not([type="checkbox"]):not([type="radio"]):not([data-input-otp]) {
 	height: 2.875rem;
 	border-radius: 0.5rem;
 	border-color: #ddd6c8;
@@ -148,11 +214,13 @@ pre {
 	font-size: 0.9375rem;
 }
 
-[data-auth-shell] input:not([type="checkbox"]):not([type="radio"])::placeholder {
+[data-auth-shell]
+	input:not([type="checkbox"]):not([type="radio"]):not([data-input-otp])::placeholder {
 	color: #a89c8b;
 }
 
-[data-auth-shell] input:not([type="checkbox"]):not([type="radio"]):focus-visible {
+[data-auth-shell]
+	input:not([type="checkbox"]):not([type="radio"]):not([data-input-otp]):focus-visible {
 	border-color: var(--brand-accent);
 	box-shadow: 0 0 0 3px rgb(232 134 42 / 0.18);
 	outline: none;

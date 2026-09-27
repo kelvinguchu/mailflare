@@ -163,7 +163,7 @@ export function DashboardNav({ className }: { className?: string }) {
 	}
 
 	return (
-		<nav className={cn("flex min-h-full flex-col gap-1", className)}>
+		<nav id="primary-navigation" className={cn("flex min-h-full flex-col gap-1", className)}>
 			<SidebarHeader href="/inbox" />
 			{linksWithCounts.map((link, i) => (
 				<NavItem link={link} key={`nav-${link.href || i}`} />
@@ -198,7 +198,6 @@ export function DashboardNav({ className }: { className?: string }) {
 												value={newFolderName}
 												onChange={(event) => setNewFolderName(event.target.value)}
 												placeholder="Receipts"
-												autoFocus
 											/>
 										</div>
 										<div className="space-y-2">

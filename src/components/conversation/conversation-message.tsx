@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import {
 	AlertTriangle,
 	Cloud,
+	ChevronDown,
+	ChevronUp,
 	ExternalLink,
 	Forward,
 	ImageOff,
@@ -33,6 +35,7 @@ import {
 	resolveInlineAttachmentUrls,
 } from "@/app/(dashboard)/inbox/[messageId]/utils";
 import type { Message } from "@/hooks/types";
+import { getMessagePreviewText } from "@/lib/email/reply-content-utils";
 import { cn } from "@/lib/utils";
 import {
 	formatCollapsedDate,
@@ -40,6 +43,7 @@ import {
 	getAvatarColor,
 	getAvatarInitials,
 	getSenderName,
+	isUnreadMessage,
 } from "./conversation-utils";
 
 const DELIVERY_LABELS: Record<string, string> = {
@@ -58,7 +62,7 @@ export function SenderAvatar({ name, address }: { name: string; address: string 
 		<span
 			aria-hidden="true"
 			className={cn(
-				"flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+				"flex size-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold",
 				getAvatarColor(address),
 			)}
 		>
@@ -75,18 +79,42 @@ export function CollapsedConversationMessage({
 	onExpand: () => void;
 }) {
 	const name = getSenderName(message);
+	const unread = isUnreadMessage(message);
 	return (
 		<button
 			type="button"
 			onClick={onExpand}
-			className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-neutral-50 sm:px-6"
+			className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 sm:px-6"
 		>
 			<SenderAvatar name={name} address={message.fromAddr} />
-			<span className="w-36 shrink-0 truncate text-sm font-medium text-neutral-900">{name}</span>
-			<span className="min-w-0 flex-1 truncate text-sm text-neutral-500">{message.snippet}</span>
-			{message.hasAttachments && <Paperclip className="size-3.5 shrink-0 text-neutral-400" />}
-			<span className="shrink-0 text-xs text-neutral-500">
-				{formatCollapsedDate(message.createdAt)}
+			<span className="min-w-0 flex-1">
+				<span className="flex items-center gap-2">
+					<span
+						className={cn(
+							"min-w-0 flex-1 truncate text-sm text-neutral-900",
+							unread ? "font-bold" : "font-semibold",
+						)}
+					>
+						{name}
+					</span>
+					{message.hasAttachments && (
+						<Paperclip
+							aria-label="Has attachments"
+							className="size-3.5 shrink-0 text-neutral-500"
+						/>
+					)}
+					<span
+						className={cn(
+							"shrink-0 text-xs",
+							unread ? "font-semibold text-neutral-900" : "text-neutral-500",
+						)}
+					>
+						{formatCollapsedDate(message.createdAt)}
+					</span>
+				</span>
+				<span className="mt-0.5 block truncate text-sm text-neutral-600">
+					{getMessagePreviewText(message.snippet) || message.snippet}
+				</span>
 			</span>
 		</button>
 	);
@@ -114,6 +142,7 @@ export function ExpandedConversationMessage({
 	const [starred, setStarred] = useState(message.starred);
 	const [previewAttachment, setPreviewAttachment] = useState<MessageAttachment | null>(null);
 	const [remoteImagesAllowed, setRemoteImagesAllowed] = useState(false);
+	const [showDetails, setShowDetails] = useState(false);
 
 	useEffect(() => setStarred(message.starred), [message.starred]);
 
@@ -147,7 +176,10 @@ export function ExpandedConversationMessage({
 		currentAccountName,
 	);
 	const senderName = message.direction === "outbound" ? "me" : fromName;
-	const ownAddress = message.direction === "inbound" ? message.toAddr : message.fromAddr;
+	const ownAddress =
+		message.direction === "inbound"
+			? (detailMessage.deliveredToAddr ?? message.toAddr)
+			: message.fromAddr;
 	const bodyDisplay = getMessageBodyDisplay(
 		data?.body?.textBody,
 		data?.body?.htmlBody,
@@ -168,14 +200,7 @@ export function ExpandedConversationMessage({
 		<article className="px-4 py-4 sm:px-6" aria-label={`Message from ${senderName}`}>
 			<header className="flex items-start gap-3">
 				<SenderAvatar name={senderName} address={message.fromAddr} />
-				<div
-					className={cn("min-w-0 flex-1", collapsible && "cursor-pointer")}
-					onClick={(event) => {
-						if (!collapsible) return;
-						if ((event.target as HTMLElement).closest("button, a")) return;
-						onCollapse();
-					}}
-				>
+				<div className="min-w-0 flex-1">
 					<p className="truncate text-sm text-neutral-900">
 						<span className="font-semibold">
 							{message.direction === "inbound" ? (
@@ -190,17 +215,26 @@ export function ExpandedConversationMessage({
 						</span>{" "}
 						<span className="text-xs text-neutral-500">&lt;{fromAddress}&gt;</span>
 					</p>
-					<p className="truncate text-xs text-neutral-500">
-						to{" "}
-						{message.direction === "outbound" ? (
-							<ContactDetailsTrigger
-								mailboxId={message.mailboxId}
-								address={message.toAddr}
-								name={toName}
+					<p className="flex min-w-0 items-center text-xs text-neutral-500">
+						<button
+							type="button"
+							aria-expanded={showDetails}
+							title={showDetails ? "Hide details" : "Show details"}
+							onClick={() => setShowDetails((value) => !value)}
+							className="inline-flex min-w-0 items-center gap-0.5 rounded-sm hover:text-neutral-800 focus-visible:ring-2 focus-visible:ring-primary/40"
+						>
+							<span className="truncate">
+								to {toName}
+								{detailMessage.ccAddr ? ", …" : ""}
+							</span>
+							<ChevronDown
+								aria-hidden="true"
+								className={cn(
+									"size-3.5 shrink-0 transition-transform",
+									showDetails && "rotate-180",
+								)}
 							/>
-						) : (
-							toName
-						)}
+						</button>
 						{deliveryLabel && (
 							<span
 								className={cn(
@@ -216,6 +250,19 @@ export function ExpandedConversationMessage({
 					</p>
 				</div>
 				<div className="flex shrink-0 items-center gap-0.5">
+					{collapsible && (
+						<Tooltip label="Collapse message">
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon-sm"
+								aria-label="Collapse message"
+								onClick={onCollapse}
+							>
+								<ChevronUp aria-hidden="true" className="size-4 text-neutral-600" />
+							</Button>
+						</Tooltip>
+					)}
 					<time
 						dateTime={message.createdAt}
 						className="mr-2 hidden text-xs whitespace-nowrap text-neutral-500 sm:block"
@@ -267,7 +314,31 @@ export function ExpandedConversationMessage({
 				</div>
 			</header>
 
-			<div className="mt-4 sm:pl-12">
+			{showDetails && (
+				<dl className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 rounded-lg border border-neutral-200 px-3 py-2 text-xs sm:ml-13 sm:max-w-xl">
+					<dt className="text-right text-neutral-500">from</dt>
+					<dd className="break-words text-neutral-900">
+						{fromName} &lt;{fromAddress}&gt;
+					</dd>
+					<dt className="text-right text-neutral-500">to</dt>
+					<dd className="break-words text-neutral-900">{detailMessage.toAddr}</dd>
+					{detailMessage.ccAddr && (
+						<>
+							<dt className="text-right text-neutral-500">cc</dt>
+							<dd className="break-words text-neutral-900">{detailMessage.ccAddr}</dd>
+						</>
+					)}
+					<dt className="text-right text-neutral-500">date</dt>
+					<dd className="text-neutral-900">
+						{new Date(message.createdAt).toLocaleString(undefined, {
+							dateStyle: "medium",
+							timeStyle: "short",
+						})}
+					</dd>
+				</dl>
+			)}
+
+			<div className="mt-4 sm:pl-13">
 				{message.securityStatus === "quarantined" && (
 					<div
 						className="mb-4 flex gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-950"

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authFetch } from "@/lib/auth/client";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 type WebhookDelivery = {
 	id: string;
@@ -74,88 +75,96 @@ export default function WebhooksPage() {
 	});
 
 	return (
-		<div className="space-y-6 max-w-3xl">
-			<h1 className="text-2xl font-semibold">Webhooks</h1>
-			{secret && (
-				<Card>
-					<CardContent className="pt-6 text-sm">
-						<p>Signing secret:</p>
-						<code className="block mt-1 text-xs break-all">{secret}</code>
-					</CardContent>
-				</Card>
-			)}
-			<Card>
-				<CardHeader>
-					<CardTitle>Add webhook</CardTitle>
-				</CardHeader>
-				<CardContent className="space-y-4">
-					<div className="space-y-2">
-						<Label>URL</Label>
-						<Input value={url} onChange={(e) => setUrl(e.target.value)} />
-					</div>
-					<Button onClick={() => create.mutate()} disabled={!url || create.isPending}>
-						Add
-					</Button>
-				</CardContent>
-			</Card>
-			<Card>
-				<CardHeader>
-					<CardTitle>Endpoints</CardTitle>
-				</CardHeader>
-				<CardContent className="text-sm no-font-mono space-y-2">
-					{(data?.webhooks ?? []).map((w) => (
-						<button
-							key={w.id}
-							type="button"
-							onClick={() => setSelectedWebhookId(w.id)}
-							className={`block w-full rounded-md border px-3 py-2 text-left hover:bg-muted ${
-								activeWebhookId === w.id ? "border-primary" : "border-border"
-							}`}
-						>
-							<span className="block truncate">{w.url}</span>
-						</button>
-					))}
-				</CardContent>
-			</Card>
-			{activeWebhookId && (
-				<Card>
-					<CardHeader>
-						<CardTitle>Delivery history</CardTitle>
-					</CardHeader>
-					<CardContent className="space-y-3">
-						{(deliveryData?.deliveries ?? []).length === 0 && (
-							<p className="text-sm text-muted-foreground">No deliveries yet.</p>
-						)}
-						{(deliveryData?.deliveries ?? []).map((delivery) => (
-							<div
-								key={delivery.id}
-								className="flex items-center justify-between gap-4 rounded-md border p-3"
-							>
-								<div className="min-w-0 text-sm">
-									<p className="truncate font-medium">{delivery.eventType}</p>
-									<p className="text-xs text-muted-foreground">
-										{delivery.status} · {delivery.attempts} attempt
-										{delivery.attempts === 1 ? "" : "s"}
-										{delivery.lastStatusCode ? ` · HTTP ${delivery.lastStatusCode}` : ""}
-									</p>
-									<p className="text-xs text-muted-foreground">
-										{new Date(delivery.createdAt).toLocaleString()}
-										{delivery.lastError ? ` · ${delivery.lastError}` : ""}
-									</p>
-								</div>
-								<Button
-									variant="outline"
-									size="sm"
-									onClick={() => redeliver.mutate(delivery.id)}
-									disabled={redeliver.isPending}
-								>
-									Redeliver
-								</Button>
+		<div className="space-y-6">
+			<AdminPageHeader title="Webhooks" />
+			<div className="grid items-start gap-6 xl:grid-cols-[minmax(0,28rem)_minmax(0,1fr)]">
+				<div className="space-y-6">
+					{secret && (
+						<Card className="rounded-3xl border-0 bg-white">
+							<CardContent className="pt-6 text-sm">
+								<p>Signing secret:</p>
+								<code className="block mt-1 text-xs break-all">{secret}</code>
+							</CardContent>
+						</Card>
+					)}
+					<Card className="rounded-3xl border-0 bg-white">
+						<CardHeader>
+							<CardTitle>Add webhook</CardTitle>
+						</CardHeader>
+						<CardContent className="space-y-4">
+							<div className="space-y-2">
+								<Label>URL</Label>
+								<Input value={url} onChange={(e) => setUrl(e.target.value)} />
 							</div>
-						))}
-					</CardContent>
-				</Card>
-			)}
+							<Button onClick={() => create.mutate()} disabled={!url || create.isPending}>
+								Add
+							</Button>
+						</CardContent>
+					</Card>
+					<Card className="rounded-3xl border-0 bg-white">
+						<CardHeader>
+							<CardTitle>Endpoints</CardTitle>
+						</CardHeader>
+						<CardContent className="text-sm no-font-mono space-y-2">
+							{(data?.webhooks ?? []).map((w) => (
+								<button
+									key={w.id}
+									type="button"
+									onClick={() => setSelectedWebhookId(w.id)}
+									className={`block w-full rounded-md border px-3 py-2 text-left hover:bg-muted ${
+										activeWebhookId === w.id ? "border-primary" : "border-border"
+									}`}
+								>
+									<span className="block truncate">{w.url}</span>
+								</button>
+							))}
+						</CardContent>
+					</Card>
+				</div>
+				{activeWebhookId ? (
+					<Card className="rounded-3xl border-0 bg-white">
+						<CardHeader>
+							<CardTitle>Delivery history</CardTitle>
+						</CardHeader>
+						<CardContent className="space-y-3">
+							{(deliveryData?.deliveries ?? []).length === 0 && (
+								<p className="text-sm text-muted-foreground">No deliveries yet.</p>
+							)}
+							{(deliveryData?.deliveries ?? []).map((delivery) => (
+								<div
+									key={delivery.id}
+									className="flex items-center justify-between gap-4 rounded-md border p-3"
+								>
+									<div className="min-w-0 text-sm">
+										<p className="truncate font-medium">{delivery.eventType}</p>
+										<p className="text-xs text-muted-foreground">
+											{delivery.status} · {delivery.attempts} attempt
+											{delivery.attempts === 1 ? "" : "s"}
+											{delivery.lastStatusCode ? ` · HTTP ${delivery.lastStatusCode}` : ""}
+										</p>
+										<p className="text-xs text-muted-foreground">
+											{new Date(delivery.createdAt).toLocaleString()}
+											{delivery.lastError ? ` · ${delivery.lastError}` : ""}
+										</p>
+									</div>
+									<Button
+										variant="outline"
+										size="sm"
+										onClick={() => redeliver.mutate(delivery.id)}
+										disabled={redeliver.isPending}
+									>
+										Redeliver
+									</Button>
+								</div>
+							))}
+						</CardContent>
+					</Card>
+				) : (
+					<p className="rounded-3xl bg-white p-6 text-sm text-neutral-500">
+						Select an endpoint to see its delivery history.
+					</p>
+				)}
+			</div>
 		</div>
 	);
 }

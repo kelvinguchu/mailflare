@@ -47,6 +47,19 @@ describe("mailbox signature sanitization", () => {
 		const html = `<img src="cid:sig.sigimg_logo@ccmail.local"><img src="cid:sig.sigimg_logo@ccmail.local">`;
 		expect(extractSignatureContentIds(html)).toEqual(["sig.sigimg_logo@ccmail.local"]);
 	});
+
+	it("requires managed images to declare informative or explicitly empty alternative text", () => {
+		expect(() =>
+			sanitizeMailboxSignature({
+				html: '<img src="cid:sig.sigimg_logo@ccmail.local">',
+			}),
+		).toThrow("alternative text");
+		expect(
+			sanitizeMailboxSignature({
+				html: '<img src="cid:sig.sigimg_logo@ccmail.local" alt="">',
+			}).html,
+		).toContain('alt=""');
+	});
 });
 
 describe("signature image inspection", () => {

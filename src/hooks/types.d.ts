@@ -39,6 +39,8 @@ export type Message = {
 	spamScore?: number;
 	fromAddr: string;
 	toAddr: string;
+	ccAddr?: string;
+	deliveredToAddr?: string | null;
 	fromContactName?: string | null;
 	toContactName?: string | null;
 	subject: string | null;
@@ -86,8 +88,15 @@ export type MessageFilterOptions = {
 	query?: string;
 	read?: MessageReadFilter;
 	title?: string;
+	sender?: string;
+	recipient?: string;
+	hasAttachments?: boolean;
+	after?: string;
+	before?: string;
 	limit?: number;
 	offset?: number;
+	pagination?: "offset" | "cursor";
+	cursor?: string;
 };
 
 export type MessageListResponse = {
@@ -95,6 +104,7 @@ export type MessageListResponse = {
 	total?: number;
 	limit?: number;
 	offset?: number;
+	nextCursor?: string;
 };
 
 export type FolderCount = {

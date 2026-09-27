@@ -17,3 +17,11 @@ export type MessageCountRow = Pick<
 export type FolderAccumulator = MessageCounts["folders"];
 
 export type CountableFolder = MessageFolder | null;
+
+export type MessageCountAggregateRow = {
+	scope: "folder" | "custom" | "mailbox";
+	key: string;
+	total: number;
+	unread: number;
+	inbox: number;
+};

@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import type { Message, MessageFolder } from "@/hooks/types";
 import type { BulkMessageAction, BulkMessageScope } from "@/app/api/messages/bulk/types";
+import type { ReadingList } from "./reading-context";
 
 export type MessageFolderConfig = {
 	folder: MessageFolder;
@@ -40,6 +41,8 @@ export type MessageFolderPageProps = {
 	compact?: boolean;
 	selectedMessageId?: string;
 	selection?: MessageSelectionControl;
+	/** Reports the loaded page so an open message can show its position and neighbours. */
+	onVisibleMessagesChange?: (list: ReadingList) => void;
 };
 
 export type MessageSplitLayoutProps = {
@@ -51,9 +54,11 @@ export type BulkMessageToolbarProps = {
 	selectedCount: number;
 	hasUnreadSelection: boolean;
 	hideSelectedCount?: boolean;
-	onAction: (action: BulkMessageAction) => void;
+	onAction: (action: BulkMessageAction, folderId?: string) => void | Promise<void>;
 	onClearSelection: () => void;
 	pending: boolean;
+	/** The folder being viewed, left out of the folder picker. */
+	currentFolderId?: string;
 };
 
 export type SelectedMessage = Pick<Message, "id" | "read">;

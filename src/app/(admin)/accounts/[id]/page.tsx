@@ -19,6 +19,8 @@ import {
 	uploadManagedAccountAvatar,
 	updateManagedMailboxName,
 } from "./utils";
+import { AccountMfaPolicy } from "@/components/admin/account-mfa-policy";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 export default function AccountDetailsPage() {
 	const { id } = useParams<{ id: string }>();
@@ -133,6 +135,10 @@ export default function AccountDetailsPage() {
 		}
 	}
 
+	async function refreshAccount() {
+		setAccount(await fetchManagedAccount(id));
+	}
+
 	if (!account)
 		return <p className="text-sm text-neutral-500">{message ?? "Loading account..."}</p>;
 	const activationLabel =
@@ -148,12 +154,7 @@ export default function AccountDetailsPage() {
 
 	return (
 		<div className="space-y-6">
-			<div>
-				<h1 className="text-3xl font-medium text-neutral-900">Details</h1>
-				<p className="mt-2 text-sm text-neutral-500">
-					Update this account&apos;s profile and status.
-				</p>
-			</div>
+			<AdminPageHeader title={account.name} />
 			<section className="space-y-5 rounded-3xl bg-white p-6">
 				<div className="flex items-center gap-4">
 					<span className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-primary/12 text-xl font-semibold text-primary">
@@ -242,8 +243,9 @@ export default function AccountDetailsPage() {
 						/>
 					</div>
 				</div>
-				<label className="flex items-center gap-3 text-sm">
+				<label htmlFor="account-enabled" className="flex items-center gap-3 text-sm">
 					<Checkbox
+						id="account-enabled"
 						checked={!account.disabled}
 						onChange={(event) => setAccount({ ...account, disabled: !event.target.checked })}
 					/>
@@ -313,6 +315,7 @@ export default function AccountDetailsPage() {
 					</>
 				)}
 			</section>
+			<AccountMfaPolicy account={account} onRefresh={refreshAccount} />
 			<section className="space-y-4 rounded-3xl bg-white p-6">
 				<div>
 					<h2 className="text-lg font-semibold text-neutral-900">Sessions</h2>

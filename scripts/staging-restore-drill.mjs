@@ -6,6 +6,7 @@ import { checkEnvironmentIsolation } from "./check-environment-isolation.mjs";
 const CONFIRMATION = "mailflare-staging";
 const BASE_URL = "https://mailflare-staging.agabio.workers.dev";
 const BUCKET = "mailflare-raw-staging";
+const EXPECTED_BACKUP_VERSION = 10;
 const wranglerPath = fileURLToPath(
 	new URL("../node_modules/wrangler/bin/wrangler.js", import.meta.url),
 );
@@ -291,7 +292,7 @@ async function createAndDownloadBackup() {
 	assert(download.ok, `Backup download returned ${download.status}`);
 	const document = await download.json();
 	assert(
-		document.format === "mailflare-database-backup" && document.version === 4,
+		document.format === "mailflare-database-backup" && document.version === EXPECTED_BACKUP_VERSION,
 		"Unexpected backup format",
 	);
 	assert(
@@ -470,6 +471,11 @@ function cleanup() {
 			`Post-drill cleanup changed app_settings.${name}`,
 		);
 	}
+	const verifiedAt = Math.floor(Date.now() / 1000);
+	d1(`INSERT INTO restore_drill_records
+		(id, environment, source, verified_at, d1_verified, r2_verified, rollback_verified,
+		 sessions_invalidated, cleanup_verified)
+		VALUES (${sql(`drill_${runId}`)}, 'staging', 'staging-script', ${verifiedAt}, 1, 1, 1, 1, 1);`);
 }
 
 try {

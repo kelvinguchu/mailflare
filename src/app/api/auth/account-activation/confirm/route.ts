@@ -6,6 +6,10 @@ import { createAuthenticatedResponse } from "@/lib/auth/http-response";
 import { allowAccountRecoveryAttempt } from "@/lib/auth/rate-limit";
 import { getEnv } from "@/lib/cloudflare";
 import { RequestBodyTooLargeError } from "@/lib/http/errors";
+import { evaluateUserMfaPolicy, syncUserMfaPolicyCoverage } from "@/lib/auth/mfa-policy";
+import { getDb } from "@/db";
+import { users } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { readJsonBody } from "@/lib/http/request";
 import { accountActivationConfirmSchema } from "@/lib/validators";
 
@@ -44,7 +48,13 @@ export async function POST(request: Request) {
 			{ status: 400 },
 		);
 	}
+	await syncUserMfaPolicyCoverage(env, userId);
+	const [user] = await getDb(env).select().from(users).where(eq(users.id, userId)).limit(1);
+	const policy = user ? await evaluateUserMfaPolicy(env, user) : null;
 	const sessionToken = await createSession(env, userId);
 	await recordAuthActivity(env, { action: "auth.login", userId, request });
-	return createAuthenticatedResponse(sessionToken, "/inbox");
+	return createAuthenticatedResponse(
+		sessionToken,
+		policy?.state === "restricted" ? "/enroll-mfa" : "/inbox",
+	);
 }

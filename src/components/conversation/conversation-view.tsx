@@ -1,16 +1,27 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronsDownUp, ChevronsUpDown, Forward, Reply } from "lucide-react";
+import Link from "next/link";
+import {
+	ChevronLeft,
+	ChevronRight,
+	ChevronsDownUp,
+	ChevronsUpDown,
+	Forward,
+	Reply,
+} from "lucide-react";
 import { useSelectedMailbox } from "@/components/mailbox-provider";
 import { MessageActions } from "@/components/message-actions/message-actions";
 import { runBulkMessageAction } from "@/components/messages/utils";
-import { usePageLoading } from "@/components/page-loading";
 import { MessageDetailSkeleton } from "@/components/page-skeletons";
-import { Button } from "@/components/ui/button";
+import { useReadingPosition, type ReadingPosition } from "@/components/messages/reading-context";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import type { MessageDetailResponse } from "@/app/(dashboard)/inbox/[messageId]/types";
 import { getCachedMessageDetailForDisplay } from "@/app/(dashboard)/inbox/[messageId]/utils";
 import type { Message, MessageThread } from "@/hooks/types";
+import { markReadInMessageListCache } from "@/hooks/utils";
 import { CollapsedConversationMessage, ExpandedConversationMessage } from "./conversation-message";
 import {
 	buildConversationItems,
@@ -25,7 +36,7 @@ import { MESSAGE_REALTIME_EVENT } from "@/hooks/message-realtime-utils";
 
 type ReplyState = { mode: ReplyMode; target: Message; detail: MessageDetailResponse | null };
 
-export function ConversationView({ messageId }: { messageId: string }) {
+export function ConversationView({ messageId }: Readonly<{ messageId: string }>) {
 	const { selectedMailbox } = useSelectedMailbox();
 	const [thread, setThread] = useState<MessageThread | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -36,7 +47,6 @@ export function ConversationView({ messageId }: { messageId: string }) {
 	const knownMessageIds = useRef(new Set<string>());
 	const scrolledThreadId = useRef<string | null>(null);
 	const replyRef = useRef<HTMLDivElement>(null);
-	usePageLoading(loading);
 
 	const applyThread = useCallback(
 		(next: MessageThread | null) => {
@@ -94,6 +104,10 @@ export function ConversationView({ messageId }: { messageId: string }) {
 	}, [applyThread, messageId]);
 
 	const messages = useMemo(() => thread?.messages ?? [], [thread]);
+	const threadId = thread?.id;
+	const reading = useReadingPosition(
+		useMemo(() => [messageId, ...messages.map((message) => message.id)], [messageId, messages]),
+	);
 
 	// Opening a conversation reads its unread messages, each only once.
 	useEffect(() => {
@@ -102,10 +116,14 @@ export function ConversationView({ messageId }: { messageId: string }) {
 			.map((message) => message.id);
 		if (unreadIds.length === 0) return;
 		for (const id of unreadIds) markedRead.current.add(id);
+		markReadInMessageListCache({
+			messageIds: unreadIds,
+			threadIds: threadId ? [threadId] : [],
+		});
 		void runBulkMessageAction(unreadIds, "read").catch(() => {
 			for (const id of unreadIds) markedRead.current.delete(id);
 		});
-	}, [messages]);
+	}, [messages, threadId]);
 
 	// Long conversations open at the first unread message, or the newest one.
 	useEffect(() => {
@@ -143,8 +161,7 @@ export function ConversationView({ messageId }: { messageId: string }) {
 
 	return (
 		<div className="h-full overflow-y-auto overscroll-contain scrollbar-gutter-stable">
-			<div className="sticky top-0 z-10 flex items-center justify-between border-b border-neutral-200 bg-white px-2 pt-3 pb-2.75">
-				<div className="flex-1" />
+			<div className="sticky top-0 z-10 flex h-12 items-center gap-2 bg-white px-2 sm:px-4">
 				<MessageActions
 					messageId={focusMessage.id}
 					mailboxId={focusMessage.mailboxId}
@@ -153,50 +170,53 @@ export function ConversationView({ messageId }: { messageId: string }) {
 					status={focusMessage.status}
 					read={messages.every((message) => !isUnreadMessage(message))}
 					unsubscribeUrl={focusDetail?.unsubscribeUrl}
-					subject={thread.subject ?? focusMessage.subject}
-					bodyText={focusDetail?.body?.textBody}
-					ownAddress={
-						focusMessage.direction === "inbound" ? focusMessage.toAddr : focusMessage.fromAddr
-					}
-					onReply={() =>
-						openReply("reply", latest, getCachedMessageDetailForDisplay(latest.id) ?? null)
-					}
+					backHref={reading?.backHref}
 				/>
+				<div className="flex-1" />
+				{reading?.position && <ReadingPager reading={reading} />}
 			</div>
 
-			<div className="max-w-4xl pb-10">
-				<div className="flex items-start gap-3 px-4 pt-5 pb-3 sm:px-6">
+			<div className="pb-12">
+				<div className="flex items-start gap-3 py-4 pr-4 pl-4 sm:pr-6 sm:pl-[76px]">
 					<h1 className="min-w-0 flex-1 text-[22px] leading-snug text-neutral-900">
 						{thread.subject ?? focusMessage.subject ?? "(no subject)"}
 						{folderLabel && (
-							<span className="ml-2 inline-flex translate-y-[-2px] items-center rounded-md bg-neutral-100 px-1.5 py-0.5 align-middle text-xs font-medium text-neutral-600">
+							<span className="ml-2 inline-flex translate-y-[-3px] items-center rounded bg-neutral-100 px-1.5 py-0.5 align-middle text-xs font-medium text-neutral-600">
 								{folderLabel}
 							</span>
 						)}
 					</h1>
 					{messages.length > 1 && (
-						<Button
-							type="button"
-							variant="ghost"
-							size="sm"
-							className="shrink-0 text-neutral-600"
-							onClick={() => {
-								if (allExpanded) {
-									setExpandedIds(new Set([latest.id]));
-									setShowAll(false);
-								} else {
-									setExpandedIds(new Set(messages.map((message) => message.id)));
-									setShowAll(true);
+						<Tooltip label={allExpanded ? "Collapse all" : "Expand all"}>
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon-sm"
+								className="shrink-0 rounded-full text-neutral-600"
+								aria-label={
+									allExpanded ? "Collapse all messages" : `Expand all ${messages.length} messages`
 								}
-							}}
-						>
-							{allExpanded ? <ChevronsDownUp /> : <ChevronsUpDown />}
-							{allExpanded ? "Collapse all" : `Expand all (${messages.length})`}
-						</Button>
+								onClick={() => {
+									if (allExpanded) {
+										setExpandedIds(new Set([latest.id]));
+										setShowAll(false);
+									} else {
+										setExpandedIds(new Set(messages.map((message) => message.id)));
+										setShowAll(true);
+									}
+								}}
+							>
+								{allExpanded ? (
+									<ChevronsDownUp aria-hidden="true" className="size-4" />
+								) : (
+									<ChevronsUpDown aria-hidden="true" className="size-4" />
+								)}
+							</Button>
+						</Tooltip>
 					)}
 				</div>
 
-				<ol className="divide-y divide-neutral-100 border-y border-neutral-100">
+				<ol className="divide-y divide-neutral-100">
 					{items.map((item) =>
 						item.kind === "hidden" ? (
 							<li key={`hidden-${item.messageIds[0]}`} className="relative py-3">
@@ -207,7 +227,7 @@ export function ConversationView({ messageId }: { messageId: string }) {
 								<button
 									type="button"
 									onClick={() => setShowAll(true)}
-									className="relative ml-4 flex size-9 items-center justify-center rounded-full border border-neutral-200 bg-white text-xs font-medium text-neutral-700 shadow-sm hover:bg-neutral-50 sm:ml-6"
+									className="relative ml-4 flex size-10 items-center justify-center rounded-full border border-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 sm:ml-6"
 									aria-label={`Show ${item.count} older messages`}
 									title={`${item.count} older messages`}
 								>
@@ -248,7 +268,7 @@ export function ConversationView({ messageId }: { messageId: string }) {
 					)}
 				</ol>
 
-				<div ref={replyRef} className="px-4 pt-5 sm:px-6 sm:pl-18">
+				<div ref={replyRef} className={cn("px-4 pt-4 sm:pr-6", reply ? "sm:pl-6" : "sm:pl-[76px]")}>
 					{reply ? (
 						<InlineReply
 							key={`${reply.mode}-${reply.target.id}`}
@@ -286,6 +306,45 @@ export function ConversationView({ messageId }: { messageId: string }) {
 					)}
 				</div>
 			</div>
+		</div>
+	);
+}
+
+function ReadingPager({ reading }: Readonly<{ reading: ReadingPosition }>) {
+	const link = (href: string | null, label: string, icon: React.ReactNode) =>
+		href ? (
+			<Tooltip label={label}>
+				<Link
+					href={href}
+					aria-label={label}
+					className={cn(
+						buttonVariants({ variant: "ghost", size: "icon-sm" }),
+						"rounded-full text-neutral-600",
+					)}
+				>
+					{icon}
+				</Link>
+			</Tooltip>
+		) : (
+			<Button
+				type="button"
+				variant="ghost"
+				size="icon-sm"
+				disabled
+				aria-label={label}
+				className="rounded-full"
+			>
+				{icon}
+			</Button>
+		);
+
+	return (
+		<div className="flex shrink-0 items-center gap-1 text-neutral-600">
+			<span className="mr-1 hidden text-xs whitespace-nowrap sm:inline">
+				{reading.position?.toLocaleString()} of {reading.total.toLocaleString()}
+			</span>
+			{link(reading.previousHref, "Newer", <ChevronLeft className="size-4" />)}
+			{link(reading.nextHref, "Older", <ChevronRight className="size-4" />)}
 		</div>
 	);
 }

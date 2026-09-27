@@ -25,6 +25,7 @@ function message(id: string, overrides: Partial<Message> = {}): Message {
 		providerMessageId: null,
 		fromAddr: `"Maya Chen" <maya@example.com>`,
 		toAddr: "me@example.com",
+		ccAddr: "",
 		subject: "Invoice",
 		snippet: "Hello",
 		status: "received",
@@ -146,7 +147,8 @@ describe("unread badge deltas", () => {
 describe("replying and list rows", () => {
 	it("replies to the sender of received mail and the recipient of sent mail", () => {
 		expect(getReplyAddresses(message("a"))).toEqual({
-			to: "maya@example.com",
+			to: '"Maya Chen" <maya@example.com>',
+			cc: "",
 			own: "me@example.com",
 		});
 		expect(
@@ -157,7 +159,23 @@ describe("replying and list rows", () => {
 					toAddr: "maya@example.com",
 				}),
 			),
-		).toEqual({ to: "maya@example.com", own: "me@example.com" });
+		).toEqual({ to: "maya@example.com", cc: "", own: "me@example.com" });
+	});
+
+	it("preserves visible recipients for reply-all while excluding the sender and delivery mailbox", () => {
+		expect(
+			getReplyAddresses(
+				message("reply-all", {
+					toAddr: "me@example.com, teammate@example.com",
+					ccAddr: "Maya <maya@example.com>, finance@example.com",
+					deliveredToAddr: "me@example.com",
+				}),
+			),
+		).toEqual({
+			to: '"Maya Chen" <maya@example.com>',
+			cc: "teammate@example.com, finance@example.com",
+			own: "me@example.com",
+		});
 	});
 
 	it("does not stack forward prefixes", () => {

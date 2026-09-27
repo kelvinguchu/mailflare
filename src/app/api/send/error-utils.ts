@@ -3,6 +3,13 @@ export function getSendErrorStatus(message: string): number {
 	if (message.includes("send rate limit") || message.includes("daily send limit")) return 429;
 	if (message === "Recipient is suppressed") return 422;
 	if (message.startsWith("Idempotency-Key must contain")) return 400;
+	if (
+		message.startsWith("Invalid recipient:") ||
+		message.startsWith("Recipients contain") ||
+		message.startsWith("Add at least one To recipient") ||
+		message.startsWith("To and Cc can contain at most")
+	)
+		return 400;
 	if (message === "Reply message is not readable in the selected mailbox") return 400;
 	if (
 		message === "Mailbox not found" ||

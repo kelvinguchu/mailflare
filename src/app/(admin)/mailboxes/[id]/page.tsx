@@ -27,6 +27,7 @@ import {
 	updateMailboxSettings,
 } from "./utils";
 import MailboxAvatarForm from "./MailboxAvatarForm";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 export default function MailboxSettingsPage() {
 	const params = useParams<{ id: string }>();
@@ -78,20 +79,15 @@ export default function MailboxSettingsPage() {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex items-start justify-between gap-4">
-				<div className="min-w-0">
-					<h1 className="truncate text-3xl font-medium text-neutral-900">Settings</h1>
-					{address ? (
-						<p className="mt-1 truncate no-font-mono text-sm text-neutral-500">{address}</p>
-					) : (
-						<Skeleton className="mt-2 h-4 w-52" />
-					)}
-				</div>
-				<div className="flex shrink-0 items-center gap-2">
-					{mailbox.data?.type === "shared" && <Badge variant="secondary">Shared</Badge>}
-					{mailbox.data?.isPrimary && <Badge variant="secondary">Primary</Badge>}
-				</div>
-			</div>
+			<AdminPageHeader
+				title={mailbox.data?.displayName || address || "Mailbox"}
+				actions={
+					<>
+						{mailbox.data?.type === "shared" && <Badge variant="secondary">Shared</Badge>}
+						{mailbox.data?.isPrimary && <Badge variant="secondary">Primary</Badge>}
+					</>
+				}
+			/>
 
 			{mailbox.isError && (
 				<p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -99,158 +95,169 @@ export default function MailboxSettingsPage() {
 				</p>
 			)}
 
-			<Card className="rounded-3xl border-0 bg-white p-6">
-				<CardHeader className="py-0">
-					<CardTitle>Account</CardTitle>
-				</CardHeader>
-				<CardContent className="space-y-4 pt-5">
-					{mailbox.data?.type === "shared" ? (
-						<MailboxAvatarForm
-							mailboxId={mailbox.data.id}
-							hasAvatar={!!mailbox.data.hasAvatar}
-							name={mailbox.data.displayName || mailbox.data.localPart}
-						/>
-					) : mailbox.data ? (
-						<p className="rounded-2xl bg-primary/8 px-4 py-3 text-sm text-primary">
-							This personal mailbox uses its owner&apos;s account profile picture.
-						</p>
-					) : (
-						<Skeleton className="h-24 w-24 rounded-full" />
-					)}
-
-					<div className="space-y-2">
-						<Label htmlFor="displayName">Name</Label>
-						<Input
-							id="displayName"
-							value={displayName}
-							onChange={(event) => setDisplayName(event.target.value)}
-							placeholder={mailbox.data?.localPart ?? "Mailbox name"}
-							disabled={mailbox.isLoading || updateName.isPending}
-						/>
-					</div>
-					<label className="flex items-start gap-3 rounded-xl bg-neutral-50 p-4">
-						<Checkbox
-							checked={useAllDomains}
-							onChange={(event) => setUseAllDomains(event.target.checked)}
-							disabled={mailbox.isLoading || updateName.isPending}
-						/>
-						<span>
-							<span className="block text-sm font-medium text-neutral-900">Use all domains</span>
-							<span className="mt-1 block text-sm text-neutral-500">
-								Receive and send mail as this username on every active domain in this admin account.
-							</span>
-						</span>
-					</label>
-					{updateName.isError && (
-						<p className="text-sm text-red-600">
-							{updateName.error instanceof Error
-								? updateName.error.message
-								: "Failed to update mailbox"}
-						</p>
-					)}
-					{updateName.isSuccess && <p className="text-sm text-green-700">Mailbox settings saved</p>}
-					<Button
-						onClick={() => updateName.mutate()}
-						disabled={mailbox.isLoading || updateName.isPending}
-					>
-						<Save className="h-4 w-4" />
-						{updateName.isPending ? "Saving..." : "Save changes"}
-					</Button>
-				</CardContent>
-			</Card>
-
-			{mailbox.data?.type === "shared" && (
+			<div className="grid items-start gap-6 xl:grid-cols-2">
 				<Card className="rounded-3xl border-0 bg-white p-6">
 					<CardHeader className="py-0">
-						<CardTitle>Shared access</CardTitle>
-						<CardDescription>
-							Members added here can read, send, organize, and manage mail in this inbox.
-						</CardDescription>
+						<CardTitle>Account</CardTitle>
 					</CardHeader>
 					<CardContent className="space-y-4 pt-5">
-						{sharedAccess.isLoading && <Skeleton className="h-16 w-full rounded-2xl" />}
-						{(sharedAccess.data?.members ?? []).map((member) => (
-							<div
-								key={member.userId}
-								className="flex items-center justify-between gap-3 rounded-2xl bg-neutral-50 px-4 py-3"
-							>
-								<div className="min-w-0">
-									<p className="truncate text-sm font-semibold text-neutral-900">
-										{member.userName}
-									</p>
-									<p className="truncate text-xs text-neutral-500">{member.userEmail}</p>
-								</div>
-								<Button
-									type="button"
-									size="icon"
-									variant="ghost"
-									aria-label={`Remove ${member.userName}`}
-									disabled={removeMember.isPending}
-									onClick={() => removeMember.mutate(member.userId)}
-								>
-									<Trash2 className="h-4 w-4 text-red-600" />
-								</Button>
-							</div>
-						))}
-						{sharedAccess.data && sharedAccess.data.members.length === 0 && (
-							<p className="rounded-2xl bg-neutral-50 px-4 py-3 text-sm text-neutral-500">
-								No members have access yet.
+						{mailbox.data?.type === "shared" ? (
+							<MailboxAvatarForm
+								mailboxId={mailbox.data.id}
+								hasAvatar={!!mailbox.data.hasAvatar}
+								name={mailbox.data.displayName || mailbox.data.localPart}
+							/>
+						) : mailbox.data ? (
+							<p className="rounded-2xl bg-primary/8 px-4 py-3 text-sm text-primary">
+								This personal mailbox uses its owner&apos;s account profile picture.
 							</p>
+						) : (
+							<Skeleton className="h-24 w-24 rounded-full" />
 						)}
-						{sharedAccess.isError && (
-							<p className="text-sm text-red-600">
-								{sharedAccess.error instanceof Error
-									? sharedAccess.error.message
-									: "Failed to load shared access"}
-							</p>
-						)}
-						<div className="flex gap-2">
-							<Select
-								value={selectedUserId}
-								onValueChange={(value) => setSelectedUserId(value as string)}
-							>
-								<SelectTrigger className="min-w-0 flex-1">
-									<SelectValue>
-										{(value) => {
-											const match = (sharedAccess.data?.availableUsers ?? []).find(
-												(account) => account.id === value,
-											);
-											return match ? `${match.name} (${match.email})` : "Choose an account";
-										}}
-									</SelectValue>
-								</SelectTrigger>
-								<SelectContent>
-									{(sharedAccess.data?.availableUsers ?? [])
-										.filter(
-											(account) =>
-												!sharedAccess.data?.members.some((member) => member.userId === account.id),
-										)
-										.map((account) => (
-											<SelectItem key={account.id} value={account.id}>
-												{account.name} ({account.email})
-											</SelectItem>
-										))}
-								</SelectContent>
-							</Select>
-							<Button
-								type="button"
-								disabled={!selectedUserId || addMember.isPending}
-								onClick={() => addMember.mutate()}
-							>
-								<UserPlus className="h-4 w-4" />
-								{addMember.isPending ? "Adding..." : "Add user"}
-							</Button>
+
+						<div className="space-y-2">
+							<Label htmlFor="displayName">Name</Label>
+							<Input
+								id="displayName"
+								value={displayName}
+								onChange={(event) => setDisplayName(event.target.value)}
+								placeholder={mailbox.data?.localPart ?? "Mailbox name"}
+								disabled={mailbox.isLoading || updateName.isPending}
+							/>
 						</div>
-						{addMember.isError && (
+						<label
+							htmlFor="mailbox-use-all-domains"
+							className="flex items-start gap-3 rounded-xl bg-neutral-50 p-4"
+						>
+							<Checkbox
+								id="mailbox-use-all-domains"
+								checked={useAllDomains}
+								onChange={(event) => setUseAllDomains(event.target.checked)}
+								disabled={mailbox.isLoading || updateName.isPending}
+							/>
+							<span>
+								<span className="block text-sm font-medium text-neutral-900">Use all domains</span>
+								<span className="mt-1 block text-sm text-neutral-500">
+									Receive and send mail as this username on every active domain in this admin
+									account.
+								</span>
+							</span>
+						</label>
+						{updateName.isError && (
 							<p className="text-sm text-red-600">
-								{addMember.error instanceof Error
-									? addMember.error.message
-									: "Failed to add account"}
+								{updateName.error instanceof Error
+									? updateName.error.message
+									: "Failed to update mailbox"}
 							</p>
 						)}
+						{updateName.isSuccess && (
+							<p className="text-sm text-green-700">Mailbox settings saved</p>
+						)}
+						<Button
+							onClick={() => updateName.mutate()}
+							disabled={mailbox.isLoading || updateName.isPending}
+						>
+							<Save className="h-4 w-4" />
+							{updateName.isPending ? "Saving..." : "Save changes"}
+						</Button>
 					</CardContent>
 				</Card>
-			)}
+
+				{mailbox.data?.type === "shared" && (
+					<Card className="rounded-3xl border-0 bg-white p-6">
+						<CardHeader className="py-0">
+							<CardTitle>Shared access</CardTitle>
+							<CardDescription>
+								Members added here can read, send, organize, and manage mail in this inbox.
+							</CardDescription>
+						</CardHeader>
+						<CardContent className="space-y-4 pt-5">
+							{sharedAccess.isLoading && <Skeleton className="h-16 w-full rounded-2xl" />}
+							{(sharedAccess.data?.members ?? []).map((member) => (
+								<div
+									key={member.userId}
+									className="flex items-center justify-between gap-3 rounded-2xl bg-neutral-50 px-4 py-3"
+								>
+									<div className="min-w-0">
+										<p className="truncate text-sm font-semibold text-neutral-900">
+											{member.userName}
+										</p>
+										<p className="truncate text-xs text-neutral-500">{member.userEmail}</p>
+									</div>
+									<Button
+										type="button"
+										size="icon"
+										variant="ghost"
+										aria-label={`Remove ${member.userName}`}
+										disabled={removeMember.isPending}
+										onClick={() => removeMember.mutate(member.userId)}
+									>
+										<Trash2 className="h-4 w-4 text-red-600" />
+									</Button>
+								</div>
+							))}
+							{sharedAccess.data && sharedAccess.data.members.length === 0 && (
+								<p className="rounded-2xl bg-neutral-50 px-4 py-3 text-sm text-neutral-500">
+									No members have access yet.
+								</p>
+							)}
+							{sharedAccess.isError && (
+								<p className="text-sm text-red-600">
+									{sharedAccess.error instanceof Error
+										? sharedAccess.error.message
+										: "Failed to load shared access"}
+								</p>
+							)}
+							<div className="flex gap-2">
+								<Select
+									value={selectedUserId}
+									onValueChange={(value) => setSelectedUserId(value as string)}
+								>
+									<SelectTrigger className="min-w-0 flex-1">
+										<SelectValue>
+											{(value) => {
+												const match = (sharedAccess.data?.availableUsers ?? []).find(
+													(account) => account.id === value,
+												);
+												return match ? `${match.name} (${match.email})` : "Choose an account";
+											}}
+										</SelectValue>
+									</SelectTrigger>
+									<SelectContent>
+										{(sharedAccess.data?.availableUsers ?? [])
+											.filter(
+												(account) =>
+													!sharedAccess.data?.members.some(
+														(member) => member.userId === account.id,
+													),
+											)
+											.map((account) => (
+												<SelectItem key={account.id} value={account.id}>
+													{account.name} ({account.email})
+												</SelectItem>
+											))}
+									</SelectContent>
+								</Select>
+								<Button
+									type="button"
+									disabled={!selectedUserId || addMember.isPending}
+									onClick={() => addMember.mutate()}
+								>
+									<UserPlus className="h-4 w-4" />
+									{addMember.isPending ? "Adding..." : "Add user"}
+								</Button>
+							</div>
+							{addMember.isError && (
+								<p className="text-sm text-red-600">
+									{addMember.error instanceof Error
+										? addMember.error.message
+										: "Failed to add account"}
+								</p>
+							)}
+						</CardContent>
+					</Card>
+				)}
+			</div>
 			{/*
       <Card className="rounded-3xl border-0 bg-white p-6">
         <CardHeader className="py-0">

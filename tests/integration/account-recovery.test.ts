@@ -19,6 +19,11 @@ import { createMailEnv, fixtureIds, resetIntegrationState, seedMailboxWorld } fr
 beforeEach(async () => {
 	await resetIntegrationState();
 	await seedMailboxWorld();
+	// Recovery tests intentionally transition the fixture administrator through
+	// pending activation, so keep a second active administrator available.
+	await integrationEnv.DB.prepare("UPDATE users SET role = 'admin' WHERE id = ?")
+		.bind(fixtureIds.stranger)
+		.run();
 });
 
 function recoveryEnv(send = vi.fn(async () => ({ messageId: "provider-auth-1" }))) {

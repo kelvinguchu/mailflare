@@ -198,7 +198,7 @@ export function MailboxSelector() {
 			<button
 				type="button"
 				onClick={() => setOpen((value) => !value)}
-				className="rounded-full p-1 transition-colors hover:bg-neutral-200"
+				className="relative rounded-full p-1 transition-colors hover:bg-neutral-200"
 				aria-label="Open account menu"
 				aria-expanded={open}
 			>
@@ -213,102 +213,106 @@ export function MailboxSelector() {
 			</button>
 
 			{open && (
-				<div className="absolute right-0 top-14 z-50 w-[360px] overflow-hidden rounded-[28px] border border-neutral-200 bg-[#eef3fb] p-3 shadow-2xl shadow-neutral-900/20">
-					<div className="rounded-[22px] bg-white px-5 py-5">
-						<div className="flex items-center gap-4">
-							<AccountAvatar
-								name={selectedName}
-								hasAvatar={selectedHasAvatar}
-								avatarUrl={selectedAvatarUrl}
-								size="large"
-								onAvatarError={() => {
-									if (!selectedMailbox) setHasAvatar(false);
-								}}
-							/>
-							<div className="min-w-0 flex-1">
-								<div className="flex items-center gap-2">
-									<p className="truncate text-lg font-semibold text-neutral-900">{selectedName}</p>
-									{selectedMailbox?.type === "shared" && (
-										<Tooltip label="Shared inbox">
-											<span
-												title="Shared inbox"
-												aria-label="Shared inbox"
-												className="shrink-0 text-primary"
-											>
-												<UsersRound className="h-4 w-4" />
-											</span>
-										</Tooltip>
-									)}
+				<div className="absolute right-0 top-14 z-50 max-h-[calc(100dvh-5rem)] w-[min(360px,calc(100vw-16px))] overflow-y-auto overscroll-contain rounded-[28px] border border-neutral-200 bg-[#eef3fb] p-3 shadow-2xl shadow-neutral-900/20">
+					<div className="min-w-0">
+						<div className="rounded-[22px] bg-white px-5 py-5">
+							<div className="flex items-center gap-4">
+								<AccountAvatar
+									name={selectedName}
+									hasAvatar={selectedHasAvatar}
+									avatarUrl={selectedAvatarUrl}
+									size="large"
+									onAvatarError={() => {
+										if (!selectedMailbox) setHasAvatar(false);
+									}}
+								/>
+								<div className="min-w-0 flex-1">
+									<div className="flex items-center gap-2">
+										<p className="truncate text-lg font-semibold text-neutral-900">
+											{selectedName}
+										</p>
+										{selectedMailbox?.type === "shared" && (
+											<Tooltip label="Shared inbox">
+												<span
+													title="Shared inbox"
+													aria-label="Shared inbox"
+													className="shrink-0 text-primary"
+												>
+													<UsersRound className="h-4 w-4" />
+												</span>
+											</Tooltip>
+										)}
+									</div>
+									<p className="truncate text-sm text-neutral-500">{selectedEmail}</p>
 								</div>
-								<p className="truncate text-sm text-neutral-500">{selectedEmail}</p>
+								<Check className="h-5 w-5 shrink-0 text-primary" />
 							</div>
-							<Check className="h-5 w-5 shrink-0 text-primary" />
-						</div>
-						<Link
-							href="/calendar"
-							onClick={() => setOpen(false)}
-							className="mt-4 flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-[#f2f6fc]"
-						>
-							<CalendarDays className="h-5 w-5 text-neutral-600" />
-							Calendar
-						</Link>
-						<Link
-							href="/settings"
-							onClick={() => setOpen(false)}
-							className="mt-1 flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-[#f2f6fc]"
-						>
-							<Settings className="h-5 w-5 text-neutral-600" />
-							Settings
-						</Link>
-					</div>
-
-					{otherMailboxes.length > 0 && (
-						<div className="mt-2 rounded-[22px] bg-white/55 p-1">
-							<p className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">
-								Other accounts
-							</p>
-							{otherMailboxes.map((mailbox) => {
-								const mailboxCount = counts.mailboxes.find(
-									(count) => count.mailboxId === mailbox.id,
-								);
-								return (
-									<MailboxAccountRow
-										key={mailbox.id}
-										mailbox={mailbox}
-										unread={mailboxCount?.unread ?? 0}
-										avatarUrl={
-											mailbox.type === "personal" ? avatarUrl : mailboxAvatarUrls[mailbox.id]
-										}
-										onSelect={() => {
-											setSelectedMailbox(mailbox);
-											setOpen(false);
-										}}
-									/>
-								);
-							})}
-						</div>
-					)}
-
-					<div className="mt-2 overflow-hidden rounded-[22px] bg-white">
-						{user?.role === "admin" && (
 							<Link
-								href="/admin"
+								href="/calendar"
 								onClick={() => setOpen(false)}
-								className={`flex items-center gap-3 border-t border-neutral-100 px-5 py-4 text-sm font-medium text-neutral-800 hover:bg-[#f2f6fc] ${adminActive ? "bg-primary/8" : ""}`}
+								className="mt-4 flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-[#f2f6fc]"
 							>
-								<ShieldCheck className="h-5 w-5 text-neutral-600" />
-								Admin
-								{adminActive && <Check className="ml-auto h-4 w-4 text-primary" />}
+								<CalendarDays className="h-5 w-5 text-neutral-600" />
+								Calendar
 							</Link>
+							<Link
+								href="/settings"
+								onClick={() => setOpen(false)}
+								className="mt-1 flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-[#f2f6fc]"
+							>
+								<Settings className="h-5 w-5 text-neutral-600" />
+								Settings
+							</Link>
+						</div>
+
+						{otherMailboxes.length > 0 && (
+							<div className="mt-2 rounded-[22px] bg-white/55 p-1">
+								<p className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+									Other accounts
+								</p>
+								{otherMailboxes.map((mailbox) => {
+									const mailboxCount = counts.mailboxes.find(
+										(count) => count.mailboxId === mailbox.id,
+									);
+									return (
+										<MailboxAccountRow
+											key={mailbox.id}
+											mailbox={mailbox}
+											unread={mailboxCount?.unread ?? 0}
+											avatarUrl={
+												mailbox.type === "personal" ? avatarUrl : mailboxAvatarUrls[mailbox.id]
+											}
+											onSelect={() => {
+												setSelectedMailbox(mailbox);
+												setOpen(false);
+											}}
+										/>
+									);
+								})}
+							</div>
 						)}
-						<button
-							type="button"
-							onClick={logout}
-							className="flex w-full items-center gap-3 border-t border-neutral-100 px-5 py-4 text-left text-sm font-medium text-neutral-800 hover:bg-[#f2f6fc]"
-						>
-							<LogOut className="h-5 w-5 text-neutral-600" />
-							Sign out
-						</button>
+
+						<div className="mt-2 overflow-hidden rounded-[22px] bg-white">
+							{user?.role === "admin" && (
+								<Link
+									href="/admin"
+									onClick={() => setOpen(false)}
+									className={`flex items-center gap-3 border-t border-neutral-100 px-5 py-4 text-sm font-medium text-neutral-800 hover:bg-[#f2f6fc] ${adminActive ? "bg-primary/8" : ""}`}
+								>
+									<ShieldCheck className="h-5 w-5 text-neutral-600" />
+									Admin
+									{adminActive && <Check className="ml-auto h-4 w-4 text-primary" />}
+								</Link>
+							)}
+							<button
+								type="button"
+								onClick={logout}
+								className="flex w-full items-center gap-3 border-t border-neutral-100 px-5 py-4 text-left text-sm font-medium text-neutral-800 hover:bg-[#f2f6fc]"
+							>
+								<LogOut className="h-5 w-5 text-neutral-600" />
+								Sign out
+							</button>
+						</div>
 					</div>
 				</div>
 			)}

@@ -11,6 +11,10 @@ import {
 	LEGACY_V5_BACKUP_TABLES,
 	LEGACY_V6_BACKUP_TABLES,
 	LEGACY_V7_BACKUP_TABLES,
+	LEGACY_V8_BACKUP_TABLES,
+	LEGACY_V9_BACKUP_TABLES,
+	LEGACY_V10_BACKUP_TABLES,
+	LEGACY_V11_BACKUP_TABLES,
 } from "@/lib/backups/format";
 import { restoreDatabaseRecords } from "@/lib/backups/restore";
 import type { DatabaseBackupDocument, DatabaseRecord } from "@/lib/backups/types";
@@ -72,8 +76,8 @@ describe("database backups with isolated D1 and R2", () => {
 		expect(stagingTables.results).toEqual([]);
 	});
 
-	it("restores legacy versions 1 through 7 through the live D1 path", async () => {
-		for (const version of [1, 2, 3, 4, 5, 6, 7] as const) {
+	it("restores legacy versions 1 through 11 through the live D1 path", async () => {
+		for (const version of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const) {
 			const names =
 				version === 1
 					? LEGACY_V1_BACKUP_TABLES
@@ -85,7 +89,15 @@ describe("database backups with isolated D1 and R2", () => {
 								? LEGACY_V6_BACKUP_TABLES
 								: version === 7
 									? LEGACY_V7_BACKUP_TABLES
-									: LEGACY_V2_V3_BACKUP_TABLES;
+									: version === 8
+										? LEGACY_V8_BACKUP_TABLES
+										: version === 9
+											? LEGACY_V9_BACKUP_TABLES
+											: version === 10
+												? LEGACY_V10_BACKUP_TABLES
+												: version === 11
+													? LEGACY_V11_BACKUP_TABLES
+													: LEGACY_V2_V3_BACKUP_TABLES;
 			const tables = emptyTables(names);
 			tables.users = [
 				{
@@ -119,6 +131,29 @@ describe("database backups with isolated D1 and R2", () => {
 			}>();
 			expect(user).toEqual({ id: `legacy_user_${version}`, name: `Legacy ${version}` });
 		}
+	});
+
+	it("restores version 10 message rows with safe recipient defaults", async () => {
+		await seedEveryBackupTable();
+		const bundle = await createBackupBundle(integrationEnv, "backup_legacy_v10");
+		const legacy = structuredClone(bundle.document) as unknown as {
+			version: number;
+			tables: Record<string, DatabaseRecord[]>;
+		};
+		legacy.version = 10;
+		for (const message of legacy.tables.messages ?? []) {
+			delete message.cc_addr;
+			delete message.delivered_to_addr;
+		}
+
+		await restoreDatabaseRecords(
+			integrationEnv,
+			new TextEncoder().encode(JSON.stringify(legacy)).buffer,
+		);
+		const restored = await integrationEnv.DB.prepare(
+			"SELECT cc_addr, delivered_to_addr FROM messages WHERE id = 'message_backup'",
+		).first<{ cc_addr: string; delivered_to_addr: string | null }>();
+		expect(restored).toEqual({ cc_addr: "", delivered_to_addr: null });
 	});
 
 	it("rolls back R2 and preserves live rows when the final restore batch fails", async () => {

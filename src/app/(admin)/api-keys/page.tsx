@@ -21,6 +21,7 @@ import { CardGridSkeleton } from "@/components/page-skeletons";
 import { authFetch } from "@/lib/auth/client";
 import type { ApiKey } from "./types";
 import { parseApiKeyScopes } from "./utils";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 export default function ApiKeysPage() {
 	const qc = useQueryClient();
@@ -56,41 +57,47 @@ export default function ApiKeysPage() {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex items-center justify-between gap-4">
-				<h1 className="text-2xl font-semibold">API Keys</h1>
-				<Dialog open={createOpen} onOpenChange={setCreateOpen}>
-					<DialogTrigger asChild>
-						<Button>
-							<Plus className="h-4 w-4" />
-							New API key
-						</Button>
-					</DialogTrigger>
-					<DialogContent>
-						<DialogHeader>
-							<DialogTitle>Create API key</DialogTitle>
-							<DialogDescription>Create a key with send and read permissions.</DialogDescription>
-						</DialogHeader>
-						<DialogBody>
-							<div className="space-y-4">
-								<div className="space-y-2">
-									<Label>Name</Label>
-									<Input
-										value={name}
-										onChange={(e) => setName(e.target.value)}
-										placeholder="Production app"
-									/>
-								</div>
-								{create.isError && (
-									<p className="text-sm text-red-600">{(create.error as Error).message}</p>
-								)}
-								<Button onClick={() => create.mutate()} disabled={!name || create.isPending}>
-									{create.isPending ? "Creating..." : "Create key"}
+			<AdminPageHeader
+				title="API keys"
+				actions={
+					<>
+						<Dialog open={createOpen} onOpenChange={setCreateOpen}>
+							<DialogTrigger asChild>
+								<Button>
+									<Plus className="h-4 w-4" />
+									New API key
 								</Button>
-							</div>
-						</DialogBody>
-					</DialogContent>
-				</Dialog>
-			</div>
+							</DialogTrigger>
+							<DialogContent>
+								<DialogHeader>
+									<DialogTitle>Create API key</DialogTitle>
+									<DialogDescription>
+										Create a key with send and read permissions.
+									</DialogDescription>
+								</DialogHeader>
+								<DialogBody>
+									<div className="space-y-4">
+										<div className="space-y-2">
+											<Label>Name</Label>
+											<Input
+												value={name}
+												onChange={(e) => setName(e.target.value)}
+												placeholder="Production app"
+											/>
+										</div>
+										{create.isError && (
+											<p className="text-sm text-red-600">{(create.error as Error).message}</p>
+										)}
+										<Button onClick={() => create.mutate()} disabled={!name || create.isPending}>
+											{create.isPending ? "Creating..." : "Create key"}
+										</Button>
+									</div>
+								</DialogBody>
+							</DialogContent>
+						</Dialog>
+					</>
+				}
+			/>
 			{newKey && (
 				<Card className="border-primary/10 bg-primary/10">
 					<CardContent className="pt-6">
@@ -109,7 +116,7 @@ export default function ApiKeysPage() {
 						No API keys yet
 					</p>
 				)}
-				<div className="grid gap-3">
+				<div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
 					{(data?.apiKeys ?? []).map((key) => (
 						<div
 							key={key.id}

@@ -205,9 +205,9 @@ export default function CalendarPage() {
 
 	return (
 		<div className="flex h-full min-h-0 flex-col">
-			<header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-neutral-100 px-4 py-3 sm:px-6">
+			<header className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-2 border-b border-neutral-100 px-3 py-3 sm:gap-x-3 sm:px-6">
 				<h1 className="flex items-center gap-2 text-xl font-medium text-neutral-900">
-					<CalendarDays className="size-6 text-primary" />
+					<CalendarDays aria-hidden="true" className="size-6 text-primary" />
 					<span className="sr-only sm:not-sr-only">Calendar</span>
 				</h1>
 				<div className="flex items-center gap-1">
@@ -242,7 +242,12 @@ export default function CalendarPage() {
 				<h2 className="text-lg text-neutral-800" aria-live="polite">
 					{rangeTitle(view, days, anchor)}
 				</h2>
-				{(events.isFetching || tasks.isFetching) && <Spinner className="text-neutral-400" />}
+				{(events.isFetching || tasks.isFetching) && (
+					<span role="status" className="inline-flex items-center gap-2 text-sm text-neutral-500">
+						<Spinner aria-hidden="true" className="text-neutral-400" />
+						<span className="sr-only">Updating calendar…</span>
+					</span>
+				)}
 				<span className="flex-1" />
 				<div
 					className="flex rounded-full bg-neutral-100 p-0.5"
@@ -296,7 +301,11 @@ export default function CalendarPage() {
 			</header>
 
 			<div className="flex min-h-0 flex-1">
-				<section className="flex min-w-0 flex-1 flex-col overflow-auto" aria-label="Calendar grid">
+				<section
+					className="flex min-w-0 flex-1 flex-col overflow-auto overscroll-contain"
+					aria-label="Calendar grid"
+					aria-busy={events.isFetching || tasks.isFetching}
+				>
 					{loadError && (
 						<p
 							role="alert"
@@ -305,7 +314,14 @@ export default function CalendarPage() {
 							{errorMessage(loadError, "Couldn’t load your calendar.")}
 						</p>
 					)}
-					<div className="min-h-0 flex-1">
+					<div
+						className={cn(
+							"h-full min-h-0 flex-1",
+							view === "month" && "min-w-[44rem]",
+							view === "week" && "min-w-[56rem]",
+							view === "day" && "min-w-[28rem]",
+						)}
+					>
 						{view === "month" ? <MonthView {...gridProps} /> : <TimeGridView {...gridProps} />}
 					</div>
 				</section>

@@ -9,6 +9,10 @@ import { normalizeEmailAddress } from "./address";
 const ORIGINAL_MESSAGE_RE = /^-{2,}\s*Original Message\s*-{2,}$/i;
 const UNDERSCORE_SEPARATOR_RE = /^_{8,}$/;
 const WROTE_RE = /^On\s+(.+?)\s+wrote:\s*$/i;
+/** Quote headers without a date, such as `alex@example.com wrote:`. */
+const ADDRESS_WROTE_RE = /^(?:.{0,80}?<)?\S+@\S+?>?\s+wrote:\s*$/i;
+/** Mail clients wrap long `On …, Name <address> wrote:` headers over up to three lines. */
+const MAX_WROTE_HEADER_LINES = 3;
 const HEADER_RE = /^(From|To|Cc|Subject|Date|Sent):\s*(.*)$/i;
 
 export function splitRepliedEmailContent(
@@ -28,10 +32,10 @@ export function splitRepliedEmailContent(
 		return splitSeparatorQuotedContent(lines, underscoreSeparatorIndex, options);
 	}
 
-	const wroteIndex = lines.findIndex((line) => WROTE_RE.test(line.trim()));
-	if (wroteIndex >= 0) {
-		const markerLine = lines[wroteIndex]?.trim() ?? "";
-		const quotedLines = stripSingleQuotePrefix(lines.slice(wroteIndex + 1));
+	const wrote = findWroteHeader(lines);
+	if (wrote) {
+		const { index: wroteIndex, end: wroteEnd, markerLine } = wrote;
+		const quotedLines = stripSingleQuotePrefix(lines.slice(wroteEnd + 1));
 		return {
 			latestContent: trimEmptyLines(lines.slice(0, wroteIndex)).join("\n").trim(),
 			quotedContent: buildQuotedContent(
@@ -124,19 +128,60 @@ function splitSeparatorQuotedContent(
 	};
 }
 
+/** Finds a quote header that may be wrapped across several lines. */
+function findWroteHeader(
+	lines: string[],
+): { index: number; end: number; markerLine: string } | null {
+	for (let index = 0; index < lines.length; index += 1) {
+		const first = lines[index]?.trim() ?? "";
+		if (!first) continue;
+		if (ADDRESS_WROTE_RE.test(first)) return { index, end: index, markerLine: first };
+		if (!/^On\s/i.test(first)) continue;
+		let joined = first;
+		const last = Math.min(lines.length, index + MAX_WROTE_HEADER_LINES);
+		for (let end = index; end < last; end += 1) {
+			if (end > index) joined = `${joined} ${lines[end]?.trim() ?? ""}`.trim();
+			if (WROTE_RE.test(joined)) return { index, end, markerLine: joined };
+		}
+	}
+	return null;
+}
+
+const PREVIEW_CUT_PATTERNS = [
+	/\s*\bOn\s+(?:[A-Z][a-z]{2,8}\.?,?\s+)?(?:\d{1,2}\s+[A-Z][a-z]{2,9}\.?,?\s+\d{4}|[A-Z][a-z]{2,9}\.?\s+\d{1,2},?\s+\d{4}|\d{4}-\d{2}-\d{2})/,
+	/\s*\bOn\s.{0,160}?\bwrote:/i,
+	/\s*(?:"[^"]{1,80}"\s*)?<?\S+@\S+?>?\s+wrote:/i,
+	/\s*-{2,}\s*(?:Original|Forwarded) Message/i,
+	/\s+>\s/,
+];
+
+/**
+ * A single-line preview of a message without quoted history, for list rows and collapsed
+ * conversation messages. Also handles snippets whose line breaks were already flattened.
+ */
+export function getMessagePreviewText(content: string | null | undefined): string {
+	const latest = splitRepliedEmailContent(content).latestContent.replace(/\s+/g, " ").trim();
+	let end = latest.length;
+	for (const pattern of PREVIEW_CUT_PATTERNS) {
+		const match = pattern.exec(latest);
+		if (match && match.index > 0 && match.index < end) end = match.index;
+	}
+	return latest.slice(0, end).trim();
+}
+
 function getWroteDateLine(line: string): string {
 	const match = line.match(WROTE_RE);
 	const rawDateLine = match?.[1]?.trim() ?? "";
+	const withoutAddress = rawDateLine.replace(/\s*<[^>]+>\s*$/, "");
+	// The sender name follows the time, e.g. `Tue, 15 Sept 2026, 19:05 Alex Doe`.
+	const throughTime = /^(.*?\b\d{1,2}:\d{2}(?:\s?[AP]M)?)(?=\W|$)/i.exec(withoutAddress)?.[1];
 	return (
-		rawDateLine
-			.replace(/,\s*["']?[^,<"]+["']?\s*<[^>]+>\s*$/i, "")
-			.replace(/\b([0-9]{1,2}:[0-9]{2}\s?(?:AM|PM))(?:,?\s+.*)?$/i, "$1")
-			.trim() || "Unknown time"
+		(throughTime ?? withoutAddress.replace(/,\s*["']?[^,\d]+["']?,?$/, "")).trim() || "Unknown time"
 	);
 }
 
 function getWroteAddress(line: string): string | undefined {
-	return line.match(/<([^>]+@[^>]+)>/)?.[1];
+	return line.match(/<([^>]+@[^>]+)>/)?.[1] ?? line.match(/(\S+@[^\s>]+)\s+wrote:/i)?.[1];
 }
 
 function normalizeContent(content: string | null | undefined): string {

@@ -1,5 +1,5 @@
 import type { MessageCounts, MessageFolder } from "@/hooks/types";
-import type { CountableFolder, MessageCountRow } from "./types";
+import type { CountableFolder, MessageCountAggregateRow, MessageCountRow } from "./types";
 
 export function getMessageFolder(row: MessageCountRow): CountableFolder {
 	if (row.snoozedUntil && row.snoozedUntil > new Date()) return "snoozed";
@@ -84,4 +84,29 @@ export function buildMessageCounts(rows: MessageCountRow[], threadUnread = false
 
 export function getFolderLabelCount(folder: MessageFolder, counts: MessageCounts["folders"]) {
 	return counts[folder].unread;
+}
+
+export function buildMessageCountsFromAggregateRows(
+	rows: MessageCountAggregateRow[],
+): MessageCounts {
+	const folders = createEmptyFolderCounts();
+	const customFolders: MessageCounts["customFolders"] = {};
+	const mailboxes: MessageCounts["mailboxes"] = [];
+
+	for (const row of rows) {
+		if (row.scope === "folder" && row.key in folders) {
+			folders[row.key as MessageFolder] = { total: row.total, unread: row.unread };
+		} else if (row.scope === "custom") {
+			customFolders[row.key] = { total: row.total, unread: row.unread };
+		} else if (row.scope === "mailbox") {
+			mailboxes.push({
+				mailboxId: row.key,
+				total: row.total,
+				unread: row.unread,
+				inbox: row.inbox,
+			});
+		}
+	}
+
+	return { folders, customFolders, mailboxes };
 }

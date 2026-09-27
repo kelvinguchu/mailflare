@@ -15,23 +15,43 @@ export async function fetchDraft(draftId: string): Promise<ComposeDraft> {
 export function buildSendFormData(input: {
 	attachments: ComposeAttachment[];
 	from: string;
+	includeSignature?: boolean;
 	mailboxId?: string;
 	subject: string;
 	text: string;
 	to: string;
+	cc?: string;
 	replyToMessageId?: string | null;
 }): FormData {
 	const form = new FormData();
 	form.set("from", input.from);
 	form.set("to", input.to);
+	if (input.cc) form.set("cc", input.cc);
 	form.set("subject", input.subject);
 	form.set("text", input.text);
+	if (input.includeSignature !== undefined) {
+		form.set("includeSignature", String(input.includeSignature));
+	}
 	if (input.mailboxId) form.set("mailboxId", input.mailboxId);
 	if (input.replyToMessageId) form.set("replyToMessageId", input.replyToMessageId);
 	for (const attachment of input.attachments) {
 		form.append("attachments", attachment.file);
 	}
 	return form;
+}
+
+/**
+ * Removes one signature block inserted by the legacy text composer. New sends ask the server to
+ * append the mailbox's canonical signature, so retaining this block would duplicate it.
+ */
+export function removeLegacySignature(text: string, signature: string | null | undefined): string {
+	const value = signature?.trim() ?? "";
+	if (!value) return text;
+	if (text.trim() === value) return "";
+	const block = `\n\n${value}`;
+	const index = text.indexOf(block);
+	if (index < 0) return text;
+	return text.slice(0, index) + text.slice(index + block.length);
 }
 
 export function formatAttachmentSize(size: number): string {
@@ -59,4 +79,21 @@ export function applyMailboxSignature(
 function formatSignatureBlock(signature: string | null | undefined): string {
 	const value = signature?.trim() ?? "";
 	return value ? `\n\n${value}` : "";
+}
+
+export const MAX_ATTACHMENTS = 10;
+export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+export const MAX_TOTAL_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+
+/** Why `files` can't be added to a message that already has `current`, or null when they can. */
+export function getAttachmentLimitError(current: File[], files: File[]): string | null {
+	if (current.length + files.length > MAX_ATTACHMENTS) {
+		return `A message can include at most ${MAX_ATTACHMENTS} attachments`;
+	}
+	if (files.some((file) => file.size > MAX_ATTACHMENT_BYTES)) {
+		return "Each attachment must be 10 MB or smaller";
+	}
+	const total = [...current, ...files].reduce((sum, file) => sum + file.size, 0);
+	if (total > MAX_TOTAL_ATTACHMENT_BYTES) return "Attachments must total 20 MB or less";
+	return null;
 }

@@ -11,6 +11,7 @@ import { readJsonBody } from "@/lib/http/request";
 import { RequestBodyTooLargeError } from "@/lib/http/errors";
 import { getDraftSender, userOwnsDraft } from "../utils";
 import { buildOutboundThreading } from "@/lib/email/threading";
+import { requestDraftDeletion } from "@/lib/storage/lifecycle";
 
 export async function GET(request: Request, { params }: DraftRouteParams) {
 	const { id } = await params;
@@ -85,6 +86,7 @@ export async function PATCH(request: Request, { params }: DraftRouteParams) {
 			replyToMessageId: threading.replyToMessageId,
 			threadId: threading.threadId,
 			toAddr: input.to ?? "",
+			ccAddr: input.cc ?? "",
 			subject: input.subject ?? null,
 			snippet: buildSnippet(text || null, html || null),
 			textBody: text || null,
@@ -99,13 +101,12 @@ export async function DELETE(request: Request, { params }: DraftRouteParams) {
 	const { id } = await params;
 	const env = getEnv();
 	const user = await requireUser(env, request);
-	const db = getDb(env);
-	const [draft] = await db.select().from(messages).where(eq(messages.id, id)).limit(1);
-
-	if (!userOwnsDraft(draft, user.id)) {
+	const result = await requestDraftDeletion(env, user.id, id);
+	if (result.outcome === "not_found" || result.outcome === "not_allowed") {
 		return NextResponse.json({ error: "Draft not found" }, { status: 404 });
 	}
-
-	await db.delete(messages).where(eq(messages.id, id));
-	return NextResponse.json({ ok: true });
+	return NextResponse.json(
+		{ ok: true, jobId: result.jobId, status: result.completed ? "completed" : "pending" },
+		{ status: result.completed ? 200 : 202 },
+	);
 }

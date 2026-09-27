@@ -58,12 +58,13 @@ export function formatPostalAddressList(
 	addresses: Address[] | undefined,
 	fallback: string | null,
 ): string | null {
-	const mailbox = addresses
-		?.map(getFirstPostalMailbox)
-		.find((item): item is Mailbox => !!item?.address);
-	if (!mailbox?.address) return fallback;
+	const mailboxes = (addresses ?? []).flatMap((address) => {
+		if ("address" in address) return address.address ? [address] : [];
+		return address.group ?? [];
+	});
+	if (mailboxes.length === 0) return fallback;
 
-	return formatEmailAddress(mailbox.address, mailbox.name);
+	return mailboxes.map((mailbox) => formatEmailAddress(mailbox.address, mailbox.name)).join(", ");
 }
 
 function getFirstPostalMailbox(address: Address | undefined): Mailbox | null {

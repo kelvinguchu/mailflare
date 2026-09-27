@@ -31,6 +31,7 @@ import { authFetch } from "@/lib/auth/client";
 import { createUserAccountSchema } from "@/lib/validators";
 import { useBranding } from "@/components/branding-provider";
 import type { Account, AccountResponse, Domain } from "./types";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 const LOCAL_PART_DISALLOWED = /[^a-z0-9._%+-]/g;
 
@@ -206,23 +207,24 @@ export default function AccountsPage() {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex items-center justify-between gap-4">
-				<div>
-					<h1 className="text-3xl font-medium text-neutral-900">Accounts</h1>
-					<p className="mt-2 text-sm text-neutral-500">Manage accounts and their inboxes.</p>
-				</div>
-				<Button onClick={() => setCreateOpen(true)}>
-					<Plus className="h-4 w-4" />
-					New account
-				</Button>
-			</div>
+			<AdminPageHeader
+				title="Accounts"
+				actions={
+					<>
+						<Button onClick={() => setCreateOpen(true)}>
+							<Plus className="h-4 w-4" />
+							New account
+						</Button>
+					</>
+				}
+			/>
 			{message && !createOpen && (
 				<p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
 					{message}
 				</p>
 			)}
 			<div className="relative">
-				<div className="grid gap-3">
+				<div className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
 					{loading && <p className="text-sm text-neutral-500">Loading...</p>}
 					{accounts.map((account) => (
 						<Link

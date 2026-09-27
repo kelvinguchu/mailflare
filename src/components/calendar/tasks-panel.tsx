@@ -202,6 +202,8 @@ export function TasksPanel({
 			</div>
 
 			<div
+				role="group"
+				aria-label="Tasks"
 				className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4"
 				onKeyDown={onTaskListKeyDown}
 			>

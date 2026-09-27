@@ -1,4 +1,5 @@
 import type { AttachmentContent } from "./attachment-types";
+import { normalizeRecipients } from "./recipients";
 
 const MAX_IDEMPOTENCY_KEY_LENGTH = 200;
 
@@ -31,6 +32,7 @@ export async function createScopedIdempotencyKey(
 export async function createOutboundRequestHash(input: {
 	from: string;
 	to: string;
+	cc?: string;
 	subject: string;
 	html?: string;
 	text?: string;
@@ -39,6 +41,7 @@ export async function createOutboundRequestHash(input: {
 	replyToMessageId?: string | null;
 	attachments: AttachmentContent[];
 }): Promise<string> {
+	const recipients = normalizeRecipients({ to: input.to, cc: input.cc });
 	const attachmentFingerprints = await Promise.all(
 		input.attachments.map(async (attachment) => ({
 			filename: attachment.filename,
@@ -57,7 +60,8 @@ export async function createOutboundRequestHash(input: {
 	return sha256(
 		JSON.stringify({
 			from: input.from,
-			to: input.to,
+			to: recipients.toHeader,
+			cc: recipients.ccHeader,
 			subject: input.subject,
 			html: input.html ?? null,
 			text: input.text ?? null,

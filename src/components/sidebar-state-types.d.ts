@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 export type SidebarState = {
 	minimal: boolean;
+	narrow: boolean;
 	toggle(): void;
 };
 

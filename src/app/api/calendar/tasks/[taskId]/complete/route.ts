@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth/cookies";
+import { getCurrentUser } from "@/lib/auth/cookies";
 import { getEnv } from "@/lib/cloudflare";
 import { setCalendarTaskCompleted } from "@/lib/calendar/tasks";
 import { CalendarInputError } from "@/lib/calendar/validation";
@@ -19,7 +19,8 @@ async function setCompleted(
 	completed: boolean,
 ) {
 	const env = getEnv();
-	const user = await requireUser(env, request);
+	const user = await getCurrentUser(env, request);
+	if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	try {
 		const { taskId } = await params;
 		return NextResponse.json({

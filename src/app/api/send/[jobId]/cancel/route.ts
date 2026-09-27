@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth/cookies";
+import { getCurrentUser } from "@/lib/auth/cookies";
 import { getEnv } from "@/lib/cloudflare";
 import { cancelScheduledOutboundJob } from "@/lib/email/undo-send";
 
 export async function POST(request: Request, context: { params: Promise<{ jobId: string }> }) {
 	const env = getEnv();
-	const user = await requireUser(env, request);
+	const user = await getCurrentUser(env, request);
+	if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	const { jobId } = await context.params;
 	const result = await cancelScheduledOutboundJob(env, user.id, jobId);
 

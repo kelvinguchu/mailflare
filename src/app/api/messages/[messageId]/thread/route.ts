@@ -53,7 +53,7 @@ export async function GET(request: Request, { params }: MessageThreadRouteParams
 	const contactMap = await getContactDisplayNameMap(
 		env,
 		target.userId,
-		rows.flatMap((row) => [row.fromAddr, row.toAddr]),
+		rows.flatMap((row) => [row.fromAddr, row.toAddr, row.ccAddr]),
 	);
 	const mailboxName = access.mailbox.displayName ?? access.mailbox.localPart;
 	const responseMessages = rows.map(

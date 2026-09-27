@@ -2,7 +2,16 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { AlignLeft, CalendarDays, Globe, MapPin, Pencil, Trash2, UsersRound } from "lucide-react";
+import {
+	AlignLeft,
+	CalendarClock,
+	CalendarDays,
+	Globe,
+	MapPin,
+	Pencil,
+	Trash2,
+	UsersRound,
+} from "lucide-react";
 import { useSelectedMailbox } from "@/components/mailbox-provider";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,6 +47,7 @@ import {
 	utcDateKey,
 	wallClockToInstant,
 } from "@/lib/calendar/wall-clock";
+import { AdvisoryReschedule } from "./advisory-reschedule";
 import { FormError, GuestInput, SenderSelect, TimezoneSelect } from "./calendar-fields";
 import type { EventDialogState, EventDraft, ReminderTarget } from "./calendar-types";
 import { errorMessage, findSenderOption, senderOptions } from "./calendar-utils";
@@ -73,7 +83,13 @@ export function EventDialog({ state, onStateChange }: EventDialogProps) {
 						/>
 					) : (
 						state.mode === "view" && (
-							<EventDetails event={state.event} onEdit={() => setEditing(true)} onDeleted={close} />
+							<EventDetails
+								key={`${state.event.id}:${state.event.startsAt}`}
+								event={state.event}
+								onEdit={() => setEditing(true)}
+								onDeleted={close}
+								onRescheduled={(event) => onStateChange({ mode: "view", event })}
+							/>
 						)
 					)}
 				</DialogContent>
@@ -96,10 +112,12 @@ function EventDetails({
 	event,
 	onEdit,
 	onDeleted,
+	onRescheduled,
 }: {
 	event: CalendarEventRecord;
 	onEdit: () => void;
 	onDeleted: () => void;
+	onRescheduled: (event: CalendarEventRecord) => void;
 }) {
 	const queryClient = useQueryClient();
 	const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -107,6 +125,10 @@ function EventDetails({
 	const attendees = parseEventAttendees(event);
 	const target = eventReminderTarget(event);
 	const differentZone = !event.allDay && event.timezone !== browserTimezone();
+	const managedByCaliberCode = /^cc_(advisory_\d+|event_[a-z0-9]+)$/i.test(event.id);
+	// Paid advisory sessions can be moved; the CMS then emails the client.
+	const reschedulable = /^cc_advisory_\d+$/.test(event.id);
+	const [rescheduling, setRescheduling] = useState(false);
 
 	const remove = useMutation({
 		mutationFn: () => deleteCalendarEvent(event.id, deleteKey.current),
@@ -168,10 +190,27 @@ function EventDetails({
 						)}
 					</div>
 				)}
-				<ItemReminders target={target} />
+				{managedByCaliberCode ? (
+					<p className="text-xs text-neutral-500">Managed by CaliberCode · reminder 24 hours before</p>
+				) : <ItemReminders target={target} />}
+				{rescheduling && (
+					<AdvisoryReschedule
+						event={event}
+						onCancel={() => setRescheduling(false)}
+						onRescheduled={onRescheduled}
+					/>
+				)}
 				<FormError message={remove.isError ? errorMessage(remove.error) : null} />
 			</DialogBody>
-			<DialogFooter className="items-center">
+			{reschedulable && !rescheduling && (
+				<DialogFooter className="items-center">
+					<Button type="button" onClick={() => setRescheduling(true)}>
+						<CalendarClock />
+						Reschedule
+					</Button>
+				</DialogFooter>
+			)}
+			{!managedByCaliberCode && <DialogFooter className="items-center">
 				{confirmingDelete ? (
 					<>
 						<p className="mr-auto text-sm text-neutral-600">
@@ -212,7 +251,7 @@ function EventDetails({
 						</Button>
 					</>
 				)}
-			</DialogFooter>
+			</DialogFooter>}
 		</>
 	);
 }
@@ -446,7 +485,6 @@ function EventForm({
 					placeholder="Add title"
 					value={values.title}
 					maxLength={200}
-					autoFocus
 					onChange={(changeEvent) => set("title", changeEvent.target.value)}
 					className="h-11 border-0 border-b border-neutral-200 rounded-none px-0 text-lg shadow-none focus-visible:border-primary focus-visible:ring-0"
 				/>

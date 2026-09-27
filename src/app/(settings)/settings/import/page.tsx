@@ -205,7 +205,7 @@ export default function SettingsImportPage() {
 							onClick={() => setSourceDropdownOpen((open) => !open)}
 							className="flex w-full items-center justify-between rounded-md border border-neutral-200 bg-white px-3 py-2 text-left text-sm shadow-sm shadow-neutral-200/50"
 						>
-							<label className="flex-1">Selected</label>
+							<span className="flex-1">Selected</span>
 							<span className="truncate">{sourceSummary}</span>
 							<span className="text-neutral-400 px-2">▾</span>
 						</button>
@@ -364,8 +364,12 @@ export default function SettingsImportPage() {
 											onChange={(event) => setImapForm({ ...imapForm, limit: event.target.value })}
 										/>
 									</div>
-									<label className="flex items-end gap-2 pb-2 text-sm text-neutral-700">
+									<label
+										htmlFor="imap-secure-connection"
+										className="flex items-end gap-2 pb-2 text-sm text-neutral-700"
+									>
 										<Checkbox
+											id="imap-secure-connection"
 											checked={imapForm.secure}
 											onChange={(event) =>
 												setImapForm({

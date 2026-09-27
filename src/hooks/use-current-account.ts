@@ -6,6 +6,7 @@ export type CurrentAccount = {
 	name: string;
 	email: string;
 	role: string;
+	mfaEnabled?: boolean;
 };
 
 export const CURRENT_ACCOUNT_QUERY_KEY = ["auth", "current-account"] as const;

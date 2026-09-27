@@ -98,10 +98,37 @@ export function sanitizeMailboxSignature(input: {
 	html?: string | null;
 	text?: string | null;
 }): SanitizedMailboxSignature {
+	assertManagedImagesDeclareAlternative(input.html);
 	const html = sanitizeSignatureHtml(input.html);
 	const suppliedText = normalizeSignatureText(input.text);
 	const text = suppliedText ?? (html ? signatureHtmlToText(html) : null);
 	return { html, text, contentIds: extractSignatureContentIds(html) };
+}
+
+function assertManagedImagesDeclareAlternative(value: string | null | undefined): void {
+	const source = value?.trim();
+	if (!source) return;
+	const document = parseDocument(source, {
+		decodeEntities: true,
+		lowerCaseAttributeNames: true,
+	});
+	const visit = (node: AnyNode): void => {
+		if (!isTag(node)) return;
+		if (node.name.toLowerCase() === "img") {
+			const sourceValue = node.attribs.src?.trim() ?? "";
+			const contentId = sourceValue.toLowerCase().startsWith("cid:") ? sourceValue.slice(4) : "";
+			if (
+				CONTENT_ID_PATTERN.test(contentId) &&
+				!Object.prototype.hasOwnProperty.call(node.attribs, "alt")
+			) {
+				throw new Error(
+					"Every signature image must have alternative text or an explicit empty alt for decorative images",
+				);
+			}
+		}
+		for (const child of node.children) visit(child);
+	};
+	for (const node of document.children) visit(node);
 }
 
 export async function assertSignatureAssetsBelongToMailbox(
@@ -223,6 +250,7 @@ function renderSanitizedNode(node: AnyNode, depth: number): string {
 	if (!ALLOWED_TAGS.has(tag)) return children;
 	const attributes = sanitizeAttributes(tag, node.attribs);
 	if (tag === "img" && !attributes.src) return "";
+	if (tag === "a" && !attributes.href) return children;
 	const serializedAttributes = Object.entries(attributes)
 		.map(([name, value]) => ` ${name}="${escapeHtml(value)}"`)
 		.join("");

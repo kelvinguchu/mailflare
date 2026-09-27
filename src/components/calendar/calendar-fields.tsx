@@ -137,6 +137,9 @@ export function GuestInput({
 				))}
 				<input
 					id={id}
+					name="guest"
+					type="email"
+					aria-label="Guest email address"
 					value={draft}
 					onChange={(event) => {
 						setDraft(event.target.value);

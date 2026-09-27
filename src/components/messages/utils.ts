@@ -1,6 +1,7 @@
 import type { Message } from "@/hooks/types";
 import { authFetch } from "@/lib/auth/client";
 import { getEmailDisplayName } from "@/lib/email/address";
+import { getMessagePreviewText } from "@/lib/email/reply-content-utils";
 import dayjs from "dayjs";
 import type { MailboxOption } from "@/components/mailbox-provider";
 import type { EmailPageTitleInput } from "./types";
@@ -51,7 +52,7 @@ export function isInboundConversationRow(message: Message): boolean {
 
 export function getMessagePreview(message: Message, folder: MessageFolderConfig["folder"]) {
 	if (folder === "drafts") return message.snippet || message.toAddr || "No content";
-	return message.snippet || "No preview";
+	return getMessagePreviewText(message.snippet) || message.snippet || "No preview";
 }
 
 export function formatMessageListTimestamp(createdAt: string): string {
@@ -104,11 +105,12 @@ export async function runBulkMessageAction(
 	action: string,
 	notify = true,
 	scope: BulkMessageScope = "message",
+	folderId?: string,
 ) {
 	const response = await authFetch("/api/messages/bulk", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ messageIds, action, scope }),
+		body: JSON.stringify({ messageIds, action, scope, folderId }),
 	});
 
 	if (!response.ok) throw new Error("Unable to update selected messages");

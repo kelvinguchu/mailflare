@@ -40,6 +40,7 @@ export function MessageAttachmentCard({
 				<span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-neutral-900">
 					<video
 						src={previewUrl}
+						aria-hidden="true"
 						muted
 						preload="metadata"
 						playsInline

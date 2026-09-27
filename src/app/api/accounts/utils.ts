@@ -21,6 +21,7 @@ export function listAccountsForAdmin(db: Db) {
 			invitationSentAt: users.invitationSentAt,
 			invitationExpiresAt: users.invitationExpiresAt,
 			disabled: users.disabled,
+			archivedAt: users.archivedAt,
 			avatarKey: users.avatarKey,
 			canManageMailboxes: users.canManageMailboxes,
 			createdAt: users.createdAt,
@@ -58,6 +59,7 @@ export function accountListItemFromUser(user: {
 	invitationSentAt: Date | null;
 	invitationExpiresAt: Date | null;
 	disabled: boolean;
+	archivedAt?: Date | null;
 	avatarKey?: string | null;
 	canManageMailboxes?: boolean;
 	createdAt: Date;
@@ -77,6 +79,7 @@ export function accountListItemFromUser(user: {
 			!!user.invitationExpiresAt &&
 			user.invitationExpiresAt.getTime() <= Date.now(),
 		disabled: user.disabled,
+		archivedAt: user.archivedAt ?? null,
 		hasAvatar: !!user.avatarKey,
 		canManageMailboxes: !!user.canManageMailboxes,
 		createdAt: user.createdAt,

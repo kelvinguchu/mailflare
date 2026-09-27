@@ -111,9 +111,10 @@ export default function DomainItemCard({
 			<details className="text-xs text-neutral-600">
 				<summary className="cursor-pointer">Sending limits</summary>
 				<div className="mt-3 flex flex-wrap items-end gap-3">
-					<label>
+					<label htmlFor={`domain-${item.id}-per-minute`}>
 						Per minute
 						<Input
+							id={`domain-${item.id}-per-minute`}
 							className="mt-1 w-28"
 							type="number"
 							min={1}
@@ -121,9 +122,10 @@ export default function DomainItemCard({
 							onChange={(event) => setPerMinute(Number(event.target.value))}
 						/>
 					</label>
-					<label>
+					<label htmlFor={`domain-${item.id}-per-day`}>
 						Per day
 						<Input
+							id={`domain-${item.id}-per-day`}
 							className="mt-1 w-32"
 							type="number"
 							min={1}

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { ComposeSnapshot } from "./types";
 
@@ -30,6 +30,24 @@ export function ComposeProvider({ children }: { children: ReactNode }) {
 	const [draftId, setDraftId] = useState<string | null>(null);
 	const [restoredSnapshot, setRestoredSnapshot] = useState<ComposeSnapshot | null>(null);
 	const [session, setSession] = useState(0);
+	const returnFocusRef = useRef<HTMLElement | null>(null);
+
+	useEffect(() => {
+		if (open || !returnFocusRef.current) return;
+		returnFocusRef.current.focus();
+		returnFocusRef.current = null;
+	}, [open]);
+
+	function rememberFocus() {
+		returnFocusRef.current =
+			document.activeElement instanceof HTMLElement ? document.activeElement : null;
+	}
+
+	function closeComposer() {
+		setOpen(false);
+		setDraftId(null);
+		setRestoredSnapshot(null);
+	}
 
 	return (
 		<ComposeContext.Provider
@@ -39,26 +57,25 @@ export function ComposeProvider({ children }: { children: ReactNode }) {
 				restoredSnapshot,
 				session,
 				openComposer: () => {
+					rememberFocus();
 					setDraftId(null);
 					setRestoredSnapshot(null);
 					setOpen(true);
 				},
 				openDraftComposer: (nextDraftId) => {
+					rememberFocus();
 					setDraftId(nextDraftId);
 					setRestoredSnapshot(null);
 					setOpen(true);
 				},
 				restoreComposer: (snapshot) => {
+					rememberFocus();
 					setDraftId(null);
 					setRestoredSnapshot(snapshot);
 					setSession((current) => current + 1);
 					setOpen(true);
 				},
-				closeComposer: () => {
-					setOpen(false);
-					setDraftId(null);
-					setRestoredSnapshot(null);
-				},
+				closeComposer,
 			}}
 		>
 			{children}

@@ -24,7 +24,3 @@ export async function preloadMailboxPage(href: string, mailboxId?: string) {
 	);
 	await fetchMessageList(params);
 }
-
-export function waitForNavigationProgress(duration = 350) {
-	return new Promise<void>((resolve) => window.setTimeout(resolve, duration));
-}

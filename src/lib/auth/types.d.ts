@@ -17,7 +17,12 @@ export type SessionUser = {
 	mfaEnabledAt: Date | null;
 	mfaRecoveryCodeHashes: string;
 	mfaLastUsedCounter: number | null;
+	mfaPolicyCoveredAt: Date | null;
+	mfaPolicyExemptUntil: Date | null;
+	mfaPolicyExemptionReason: string | null;
+	mfaPolicyExemptedByUserId: string | null;
 	disabled: boolean;
+	archivedAt: Date | null;
 	canManageMailboxes: boolean;
 	createdByUserId: string | null;
 	createdAt: Date;

@@ -1,36 +1,73 @@
+import { desc, sql } from "drizzle-orm";
 import { sqliteTable, text, integer, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 
-export const users = sqliteTable("users", {
+export const users = sqliteTable(
+	"users",
+	{
+		id: text("id").primaryKey(),
+		email: text("email").notNull().unique(),
+		resetEmail: text("reset_email"),
+		resetEmailVerifiedAt: integer("reset_email_verified_at", { mode: "timestamp" }),
+		forwardingEmail: text("forwarding_email"),
+		passwordHash: text("password_hash").notNull(),
+		name: text("name").notNull(),
+		avatarKey: text("avatar_key"),
+		role: text("role", { enum: ["admin", "user"] })
+			.notNull()
+			.default("user"),
+		activationStatus: text("activation_status", { enum: ["active", "pending", "revoked"] })
+			.notNull()
+			.default("active"),
+		activatedAt: integer("activated_at", { mode: "timestamp" }),
+		invitationSentAt: integer("invitation_sent_at", { mode: "timestamp" }),
+		invitationExpiresAt: integer("invitation_expires_at", { mode: "timestamp" }),
+		mfaSecretEncrypted: text("mfa_secret_encrypted"),
+		mfaEnabledAt: integer("mfa_enabled_at", { mode: "timestamp" }),
+		mfaRecoveryCodeHashes: text("mfa_recovery_code_hashes").notNull().default("[]"),
+		mfaLastUsedCounter: integer("mfa_last_used_counter"),
+		mfaPolicyCoveredAt: integer("mfa_policy_covered_at", { mode: "timestamp" }),
+		mfaPolicyExemptUntil: integer("mfa_policy_exempt_until", { mode: "timestamp" }),
+		mfaPolicyExemptionReason: text("mfa_policy_exemption_reason"),
+		mfaPolicyExemptedByUserId: text("mfa_policy_exempted_by_user_id").references(
+			(): AnySQLiteColumn => users.id,
+			{ onDelete: "set null" },
+		),
+		disabled: integer("disabled", { mode: "boolean" }).notNull().default(false),
+		archivedAt: integer("archived_at", { mode: "timestamp" }),
+		sendRateLimitPerMinute: integer("send_rate_limit_per_minute").notNull().default(20),
+		dailySendLimit: integer("daily_send_limit").notNull().default(500),
+		canManageMailboxes: integer("can_manage_mailboxes", { mode: "boolean" })
+			.notNull()
+			.default(false),
+		createdByUserId: text("created_by_user_id").references((): AnySQLiteColumn => users.id, {
+			onDelete: "set null",
+		}),
+		createdAt: integer("created_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
+	},
+	(t) => [
+		index("users_archived_role_idx").on(t.archivedAt, t.role, t.disabled),
+		index("users_mfa_policy_coverage_idx").on(
+			t.activationStatus,
+			t.disabled,
+			t.role,
+			t.mfaPolicyCoveredAt,
+		),
+	],
+);
+
+export const mfaPolicySettings = sqliteTable("mfa_policy_settings", {
 	id: text("id").primaryKey(),
-	email: text("email").notNull().unique(),
-	resetEmail: text("reset_email"),
-	resetEmailVerifiedAt: integer("reset_email_verified_at", { mode: "timestamp" }),
-	forwardingEmail: text("forwarding_email"),
-	passwordHash: text("password_hash").notNull(),
-	name: text("name").notNull(),
-	avatarKey: text("avatar_key"),
-	role: text("role", { enum: ["admin", "user"] })
+	mode: text("mode", { enum: ["optional", "administrators", "all_users"] })
 		.notNull()
-		.default("user"),
-	activationStatus: text("activation_status", { enum: ["active", "pending", "revoked"] })
-		.notNull()
-		.default("active"),
-	activatedAt: integer("activated_at", { mode: "timestamp" }),
-	invitationSentAt: integer("invitation_sent_at", { mode: "timestamp" }),
-	invitationExpiresAt: integer("invitation_expires_at", { mode: "timestamp" }),
-	mfaSecretEncrypted: text("mfa_secret_encrypted"),
-	mfaEnabledAt: integer("mfa_enabled_at", { mode: "timestamp" }),
-	mfaRecoveryCodeHashes: text("mfa_recovery_code_hashes").notNull().default("[]"),
-	mfaLastUsedCounter: integer("mfa_last_used_counter"),
-	disabled: integer("disabled", { mode: "boolean" }).notNull().default(false),
-	sendRateLimitPerMinute: integer("send_rate_limit_per_minute").notNull().default(20),
-	dailySendLimit: integer("daily_send_limit").notNull().default(500),
-	canManageMailboxes: integer("can_manage_mailboxes", { mode: "boolean" }).notNull().default(false),
-	createdByUserId: text("created_by_user_id").references((): AnySQLiteColumn => users.id, {
+		.default("optional"),
+	gracePeriodDays: integer("grace_period_days").notNull().default(7),
+	updatedByUserId: text("updated_by_user_id").references(() => users.id, {
 		onDelete: "set null",
 	}),
-	createdAt: integer("created_at", { mode: "timestamp" })
+	updatedAt: integer("updated_at", { mode: "timestamp" })
 		.notNull()
 		.$defaultFn(() => new Date()),
 });
@@ -245,6 +282,8 @@ export const messages = sqliteTable(
 		folderId: text("folder_id").references(() => folders.id, { onDelete: "set null" }),
 		fromAddr: text("from_addr").notNull(),
 		toAddr: text("to_addr").notNull(),
+		ccAddr: text("cc_addr").notNull().default(""),
+		deliveredToAddr: text("delivered_to_addr"),
 		subject: text("subject"),
 		snippet: text("snippet"),
 		textBody: text("text_body"),
@@ -274,6 +313,7 @@ export const messages = sqliteTable(
 		read: integer("read", { mode: "boolean" }).notNull().default(false),
 		starred: integer("starred", { mode: "boolean" }).notNull().default(false),
 		snoozedUntil: integer("snoozed_until", { mode: "timestamp" }),
+		trashedAt: integer("trashed_at", { mode: "timestamp" }),
 		threadId: text("thread_id"),
 		createdAt: integer("created_at", { mode: "timestamp" })
 			.notNull()
@@ -283,9 +323,46 @@ export const messages = sqliteTable(
 		index("messages_user_created_idx").on(t.userId, t.createdAt),
 		index("messages_mailbox_idx").on(t.mailboxId),
 		index("messages_mailbox_thread_created_idx").on(t.mailboxId, t.threadId, t.createdAt),
+		index("messages_mailbox_status_created_id_idx").on(
+			t.mailboxId,
+			t.status,
+			desc(t.createdAt),
+			desc(t.id),
+		),
+		index("messages_mailbox_folder_created_id_idx").on(
+			t.mailboxId,
+			t.folderId,
+			desc(t.createdAt),
+			desc(t.id),
+		),
+		index("messages_mailbox_read_created_id_idx").on(
+			t.mailboxId,
+			t.read,
+			desc(t.createdAt),
+			desc(t.id),
+		),
+		index("messages_mailbox_starred_created_id_idx").on(
+			t.mailboxId,
+			t.starred,
+			desc(t.createdAt),
+			desc(t.id),
+		),
+		index("messages_mailbox_snoozed_created_id_idx").on(
+			t.mailboxId,
+			t.snoozedUntil,
+			desc(t.createdAt),
+			desc(t.id),
+		),
+		index("messages_mailbox_thread_key_created_id_idx").on(
+			t.mailboxId,
+			sql`coalesce(${t.threadId}, ${t.id})`,
+			desc(t.createdAt),
+			desc(t.id),
+		),
 		index("messages_mailbox_provider_message_idx").on(t.mailboxId, t.providerMessageId),
 		index("messages_folder_idx").on(t.folderId),
 		uniqueIndex("messages_inbound_delivery_key_idx").on(t.inboundDeliveryKey),
+		index("messages_trash_retention_idx").on(t.status, t.trashedAt),
 	],
 );
 
@@ -314,6 +391,44 @@ export const messageAttachments = sqliteTable(
 	},
 	(t) => [index("message_attachments_message_idx").on(t.messageId)],
 );
+
+export const storageDeletionJobs = sqliteTable(
+	"storage_deletion_jobs",
+	{
+		id: text("id").primaryKey(),
+		messageId: text("message_id").notNull().unique(),
+		actorUserId: text("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+		mailboxId: text("mailbox_id").references(() => mailboxes.id, { onDelete: "set null" }),
+		reason: text("reason", { enum: ["user", "draft", "retention"] }).notNull(),
+		status: text("status", { enum: ["pending", "processing", "failed", "completed"] })
+			.notNull()
+			.default("pending"),
+		objectKeys: text("object_keys").notNull().default("[]"),
+		attemptCount: integer("attempt_count").notNull().default(0),
+		nextAttemptAt: integer("next_attempt_at", { mode: "timestamp" }),
+		lastError: text("last_error"),
+		createdAt: integer("created_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
+		updatedAt: integer("updated_at", { mode: "timestamp" })
+			.notNull()
+			.$defaultFn(() => new Date()),
+		completedAt: integer("completed_at", { mode: "timestamp" }),
+	},
+	(t) => [
+		index("storage_deletion_jobs_due_idx").on(t.status, t.nextAttemptAt, t.createdAt),
+		index("storage_deletion_jobs_completed_idx").on(t.completedAt),
+	],
+);
+
+export const storageLifecycleState = sqliteTable("storage_lifecycle_state", {
+	prefix: text("prefix").primaryKey(),
+	cursor: text("cursor"),
+	lastScannedAt: integer("last_scanned_at", { mode: "timestamp" }),
+	updatedAt: integer("updated_at", { mode: "timestamp" })
+		.notNull()
+		.$defaultFn(() => new Date()),
+});
 
 export const outboundJobs = sqliteTable(
 	"outbound_jobs",
@@ -764,8 +879,70 @@ export const backups = sqliteTable(
 	(t) => [index("backups_created_idx").on(t.createdAt), index("backups_status_idx").on(t.status)],
 );
 
+export const operationalSettings = sqliteTable("operational_settings", {
+	id: text("id").primaryKey(),
+	queueBacklogWarning: integer("queue_backlog_warning").notNull().default(100),
+	queueOldestMinutesWarning: integer("queue_oldest_minutes_warning").notNull().default(15),
+	deliveryFailed24hWarning: integer("delivery_failed_24h_warning").notNull().default(1),
+	deliveryUnknown24hWarning: integer("delivery_unknown_24h_warning").notNull().default(1),
+	webhookFailed24hWarning: integer("webhook_failed_24h_warning").notNull().default(1),
+	reminderFailed24hWarning: integer("reminder_failed_24h_warning").notNull().default(1),
+	deadLetterUnresolvedWarning: integer("dead_letter_unresolved_warning").notNull().default(1),
+	backupStaleHours: integer("backup_stale_hours").notNull().default(0),
+	d1GrowthPercentWarning: integer("d1_growth_percent_warning").notNull().default(25),
+	r2GrowthPercentWarning: integer("r2_growth_percent_warning").notNull().default(25),
+	updatedAt: integer("updated_at", { mode: "timestamp" })
+		.notNull()
+		.$defaultFn(() => new Date()),
+});
+
+export const operationalSnapshots = sqliteTable(
+	"operational_snapshots",
+	{
+		id: text("id").primaryKey(),
+		capturedAt: integer("captured_at", { mode: "timestamp" }).notNull(),
+		d1Bytes: integer("d1_bytes").notNull(),
+		r2ObjectCount: integer("r2_object_count").notNull(),
+		r2Bytes: integer("r2_bytes").notNull(),
+		r2ScanComplete: integer("r2_scan_complete", { mode: "boolean" }).notNull().default(true),
+		inboundBacklogCount: integer("inbound_backlog_count"),
+		inboundBacklogBytes: integer("inbound_backlog_bytes"),
+		inboundOldestAt: integer("inbound_oldest_at", { mode: "timestamp" }),
+		outboundBacklogCount: integer("outbound_backlog_count"),
+		outboundBacklogBytes: integer("outbound_backlog_bytes"),
+		outboundOldestAt: integer("outbound_oldest_at", { mode: "timestamp" }),
+		webhookBacklogCount: integer("webhook_backlog_count"),
+		webhookBacklogBytes: integer("webhook_backlog_bytes"),
+		webhookOldestAt: integer("webhook_oldest_at", { mode: "timestamp" }),
+	},
+	(t) => [index("operational_snapshots_captured_idx").on(desc(t.capturedAt))],
+);
+
+export const restoreDrillRecords = sqliteTable(
+	"restore_drill_records",
+	{
+		id: text("id").primaryKey(),
+		backupId: text("backup_id").references(() => backups.id, { onDelete: "set null" }),
+		environment: text("environment", { enum: ["staging", "production"] }).notNull(),
+		source: text("source", { enum: ["staging-script", "manual"] }).notNull(),
+		verifiedByUserId: text("verified_by_user_id").references(() => users.id, {
+			onDelete: "set null",
+		}),
+		verifiedAt: integer("verified_at", { mode: "timestamp" }).notNull(),
+		d1Verified: integer("d1_verified", { mode: "boolean" }).notNull().default(false),
+		r2Verified: integer("r2_verified", { mode: "boolean" }).notNull().default(false),
+		rollbackVerified: integer("rollback_verified", { mode: "boolean" }).notNull().default(false),
+		sessionsInvalidated: integer("sessions_invalidated", { mode: "boolean" })
+			.notNull()
+			.default(false),
+		cleanupVerified: integer("cleanup_verified", { mode: "boolean" }).notNull().default(false),
+	},
+	(t) => [index("restore_drill_records_verified_idx").on(desc(t.verifiedAt))],
+);
+
 export const schema = {
 	users,
+	mfaPolicySettings,
 	domains,
 	mailboxes,
 	signatureAssets,
@@ -776,6 +953,8 @@ export const schema = {
 	apiKeys,
 	messages,
 	messageAttachments,
+	storageDeletionJobs,
+	storageLifecycleState,
 	outboundJobs,
 	senderPolicies,
 	deadLetterEvents,
@@ -792,5 +971,8 @@ export const schema = {
 	auditLogs,
 	backupSettings,
 	backups,
+	operationalSettings,
+	operationalSnapshots,
+	restoreDrillRecords,
 	appSettings,
 };

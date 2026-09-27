@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { and, eq, isNull } from "drizzle-orm";
 import { getDb } from "@/db";
 import { users } from "@/db/schema";
-import { getCurrentUser } from "@/lib/auth/cookies";
+import { getCurrentSessionUser } from "@/lib/auth/cookies";
 import {
 	buildTotpUri,
 	decryptTotpSecret,
@@ -22,18 +22,26 @@ import { RequestBodyTooLargeError } from "@/lib/http/errors";
 import { readJsonBody } from "@/lib/http/request";
 import { createAuditLog } from "@/lib/mailboxes/audit";
 import { mfaBeginSchema, mfaCodeSchema, mfaProtectedActionSchema } from "@/lib/validators";
+import { evaluateUserMfaPolicy } from "@/lib/auth/mfa-policy";
 
 export async function GET(request: Request) {
-	const { user, error } = await requireAdministrator(request);
+	const { env, user, error } = await requireMfaSettingsUser(request);
 	if (error) return error;
+	const policy = await evaluateUserMfaPolicy(env, user!);
 	return NextResponse.json({
 		enabled: isMfaEnabled(user!),
 		recoveryCodesRemaining: parseRecoveryCount(user!.mfaRecoveryCodeHashes),
+		policy: {
+			state: policy.state,
+			required: policy.required,
+			deadline: policy.deadline?.toISOString() ?? null,
+			exemptUntil: policy.exemptUntil?.toISOString() ?? null,
+		},
 	});
 }
 
 export async function POST(request: Request) {
-	const { env, user, error } = await requireAdministrator(request);
+	const { env, user, error } = await requireMfaSettingsUser(request);
 	if (error) return error;
 	const parsed = await parseBody(request, mfaBeginSchema);
 	if (parsed instanceof NextResponse) return parsed;
@@ -60,7 +68,7 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
-	const { env, user, error } = await requireAdministrator(request);
+	const { env, user, error } = await requireMfaSettingsUser(request);
 	if (error) return error;
 	const parsed = await parseBody(request, mfaCodeSchema);
 	if (parsed instanceof NextResponse) return parsed;
@@ -93,7 +101,7 @@ export async function PUT(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-	const { env, user, error } = await requireAdministrator(request);
+	const { env, user, error } = await requireMfaSettingsUser(request);
 	if (error) return error;
 	const parsed = await parseBody(request, mfaProtectedActionSchema);
 	if (parsed instanceof NextResponse) return parsed;
@@ -114,12 +122,19 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-	const { env, user, error } = await requireAdministrator(request);
+	const { env, user, error } = await requireMfaSettingsUser(request);
 	if (error) return error;
 	const parsed = await parseBody(request, mfaProtectedActionSchema);
 	if (parsed instanceof NextResponse) return parsed;
 	const verification = await verifyProtectedMfaAction(env, request, user!, parsed);
 	if (verification) return verification;
+	const policy = await evaluateUserMfaPolicy(env, user!);
+	if (policy.required && policy.state !== "exempt") {
+		return NextResponse.json(
+			{ error: "Multi-factor authentication is required by workspace policy" },
+			{ status: 409 },
+		);
+	}
 	await refreshCurrentAuthentication(env, user!.id);
 	await getDb(env)
 		.update(users)
@@ -138,20 +153,14 @@ export async function DELETE(request: Request) {
 	return NextResponse.json({ ok: true });
 }
 
-async function requireAdministrator(request: Request) {
+async function requireMfaSettingsUser(request: Request) {
 	const env = getEnv();
-	const user = await getCurrentUser(env, request);
+	const user = await getCurrentSessionUser(env, request);
 	if (!user)
 		return {
 			env,
 			user: null,
 			error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
-		};
-	if (user.role !== "admin")
-		return {
-			env,
-			user: null,
-			error: NextResponse.json({ error: "Administrator access required" }, { status: 403 }),
 		};
 	return { env, user, error: null };
 }

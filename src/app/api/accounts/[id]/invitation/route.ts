@@ -26,6 +26,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
 	if (!account || (account.id !== access.user!.id && account.createdByUserId !== access.user!.id)) {
 		return NextResponse.json({ error: "Account not found" }, { status: 404 });
 	}
+	if (account.archivedAt) {
+		return NextResponse.json({ error: "Archived accounts cannot be invited" }, { status: 409 });
+	}
 	if (account.activationStatus === "active") {
 		return NextResponse.json({ error: "This account is already active" }, { status: 409 });
 	}
@@ -78,6 +81,12 @@ export async function DELETE(request: Request, { params }: AccountRouteParams) {
 	const account = await selectAccountById(getDb(access.env), id);
 	if (!account || (account.id !== access.user!.id && account.createdByUserId !== access.user!.id)) {
 		return NextResponse.json({ error: "Account not found" }, { status: 404 });
+	}
+	if (account.archivedAt) {
+		return NextResponse.json(
+			{ error: "Archived accounts have no active invitation" },
+			{ status: 409 },
+		);
 	}
 	if (account.activationStatus === "active") {
 		return NextResponse.json(

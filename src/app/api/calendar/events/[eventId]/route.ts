@@ -15,7 +15,7 @@ import {
 	parseStoredAttendees,
 	rejectCalendarRecurrence,
 } from "@/lib/calendar/validation";
-import { requireUser } from "@/lib/auth/cookies";
+import { getCurrentUser } from "@/lib/auth/cookies";
 import { getEnv } from "@/lib/cloudflare";
 import { getEmailAddress } from "@/lib/email/address";
 import {
@@ -27,7 +27,8 @@ import type { CalendarEventRouteParams } from "./types";
 
 export async function GET(request: Request, { params }: CalendarEventRouteParams) {
 	const env = getEnv();
-	const user = await requireUser(env, request);
+	const user = await getCurrentUser(env, request);
+	if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	try {
 		const { eventId } = await params;
 		return NextResponse.json({ event: await requireOwnedEvent(env, user.id, eventId) });
@@ -41,10 +42,14 @@ export async function GET(request: Request, { params }: CalendarEventRouteParams
 
 export async function PATCH(request: Request, { params }: CalendarEventRouteParams) {
 	const env = getEnv();
-	const user = await requireUser(env, request);
+	const user = await getCurrentUser(env, request);
+	if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	try {
 		const idempotencyKey = normalizeIdempotencyKey(request.headers.get("Idempotency-Key"));
 		const { eventId } = await params;
+		if (/^cc_(advisory_\d+|event_[a-z0-9]+)$/i.test(eventId)) {
+			return NextResponse.json({ error: "Managed by CaliberCode" }, { status: 403 });
+		}
 		const input = (await request.json()) as CalendarEventInput;
 		rejectCalendarRecurrence(input.recurrenceRule);
 		const existing = await requireOwnedEvent(env, user.id, eventId);
@@ -98,10 +103,14 @@ export async function PATCH(request: Request, { params }: CalendarEventRoutePara
 
 export async function DELETE(request: Request, { params }: CalendarEventRouteParams) {
 	const env = getEnv();
-	const user = await requireUser(env, request);
+	const user = await getCurrentUser(env, request);
+	if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	try {
 		const idempotencyKey = normalizeIdempotencyKey(request.headers.get("Idempotency-Key"));
 		const { eventId } = await params;
+		if (/^cc_(advisory_\d+|event_[a-z0-9]+)$/i.test(eventId)) {
+			return NextResponse.json({ error: "Managed by CaliberCode" }, { status: 403 });
+		}
 		const event = await requireOwnedEvent(env, user.id, eventId);
 		const attendees = parseStoredAttendees(event.attendees);
 		if (event.mailboxId && event.organizer && attendees.length > 0) {

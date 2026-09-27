@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FileText, Minimize2, Paperclip, Send, X } from "lucide-react";
+import { Minimize2, Paperclip, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,12 +15,16 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { useSelectedMailbox } from "@/components/mailbox-provider";
+import { getUndoSendDelayPreference } from "@/lib/email/undo-send-preference";
 import { authFetch } from "@/lib/auth/client";
 import { formatEmailAddress, getEmailAddress } from "@/lib/email/address";
 import { useCompose } from "./compose-context";
 import { sendWithUndo } from "./send-with-undo";
-import { applyMailboxSignature, fetchDraft, formatAttachmentSize } from "./utils";
+import { AttachmentList } from "./attachment-list";
+import { fetchDraft, getAttachmentLimitError, removeLegacySignature } from "./utils";
 import type { ComposeAttachment, ComposeSnapshot } from "./types";
+import { RecipientField } from "./recipient-field";
+import { normalizeRecipients, RecipientValidationError } from "@/lib/email/recipients";
 
 function showComposeError(message: string) {
 	toast.add({ type: "error", title: message });
@@ -45,6 +49,8 @@ export function ComposeForm({
 		initialSnapshot?.replyToMessageId ?? null,
 	);
 	const [to, setTo] = useState(initialSnapshot?.to ?? "");
+	const [cc, setCc] = useState(initialSnapshot?.cc ?? "");
+	const [showCc, setShowCc] = useState(Boolean(initialSnapshot?.cc));
 	const [subject, setSubject] = useState(initialSnapshot?.subject ?? "");
 	const [text, setText] = useState(initialSnapshot?.text ?? "");
 	const [attachments, setAttachments] = useState<ComposeAttachment[]>(
@@ -59,13 +65,12 @@ export function ComposeForm({
 		initialSnapshot?.selectedFrom ?? null,
 	);
 	const [selectedFrom, setSelectedFrom] = useState("");
-	const [undoDelaySeconds, setUndoDelaySeconds] = useState(
-		initialSnapshot?.undoDelaySeconds ?? "10",
-	);
 	const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const draftSave = useRef<Promise<string | null> | null>(null);
 	const attachmentInput = useRef<HTMLInputElement | null>(null);
-	const previousSignature = useRef("");
+	const recipientInput = useRef<HTMLInputElement | null>(null);
+	const ccInput = useRef<HTMLInputElement | null>(null);
+	const focusedRecipient = useRef(false);
 	// Resending an unchanged message reuses its Idempotency-Key; any edit starts a new send.
 	const pendingSend = useRef<{ fingerprint: string; key: string } | null>(
 		initialSnapshot
@@ -76,6 +81,13 @@ export function ComposeForm({
 	useEffect(() => {
 		if (!selectedMailbox && mailboxes.length === 1) setSelectedMailbox(mailboxes[0]);
 	}, [mailboxes, selectedMailbox, setSelectedMailbox]);
+
+	useEffect(() => {
+		if (mode !== "popup" || loadingDraft || focusedRecipient.current) return;
+		if (draftIdToLoad && !draftId) return;
+		focusedRecipient.current = true;
+		recipientInput.current?.focus();
+	}, [draftId, draftIdToLoad, loadingDraft, mode]);
 
 	const senderAddresses = useMemo(() => {
 		if (!selectedMailbox) return [];
@@ -118,6 +130,8 @@ export function ComposeForm({
 				setDraftId(draft.id);
 				setReplyToMessageId(draft.replyToMessageId ?? null);
 				setTo(draft.toAddr);
+				setCc(draft.ccAddr);
+				setShowCc(Boolean(draft.ccAddr));
 				setSubject(draft.subject ?? "");
 				setText(draft.textBody ?? "");
 				setLoadedDraftMailboxId(draft.mailboxId);
@@ -151,15 +165,12 @@ export function ComposeForm({
 
 	useEffect(() => {
 		if (loadingDraft) return;
-		const nextSignature = selectedMailbox?.signature ?? "";
-		setText((current) => applyMailboxSignature(current, previousSignature.current, nextSignature));
-		previousSignature.current = nextSignature;
+		setText((current) => removeLegacySignature(current, selectedMailbox?.signature));
 	}, [loadingDraft, selectedMailbox?.id, selectedMailbox?.signature]);
 
 	useEffect(() => {
 		const bodyContent = text.trim();
-		const signatureOnly = bodyContent === (selectedMailbox?.signature?.trim() ?? "");
-		const hasContent = to.trim() || subject.trim() || (bodyContent && !signatureOnly);
+		const hasContent = to.trim() || cc.trim() || subject.trim() || bodyContent;
 		if (!fromAddr || !hasContent || loadingDraft) return;
 		if (saveTimer.current) clearTimeout(saveTimer.current);
 
@@ -169,6 +180,7 @@ export function ComposeForm({
 					mailboxId: selectedMailbox?.id,
 					from: fromAddr,
 					to,
+					cc,
 					subject,
 					text,
 					replyToMessageId,
@@ -193,6 +205,7 @@ export function ComposeForm({
 		};
 	}, [
 		draftId,
+		cc,
 		fromAddr,
 		loadingDraft,
 		replyToMessageId,
@@ -206,15 +219,26 @@ export function ComposeForm({
 	function onSubmit(event: React.SubmitEvent<HTMLFormElement>) {
 		event.preventDefault();
 		if (!fromAddr || loadingDraft) return;
+		let recipients;
+		try {
+			recipients = normalizeRecipients({ to, cc });
+		} catch (error) {
+			showComposeError(
+				error instanceof RecipientValidationError ? error.message : "Add valid recipients",
+			);
+			recipientInput.current?.focus();
+			return;
+		}
 		const message = {
-			to,
+			to: recipients.toHeader,
+			cc: recipients.ccHeader,
 			subject,
 			text,
 			attachments,
 			mailboxId: selectedMailbox?.id ?? null,
 			selectedFrom,
 			from: fromAddr,
-			undoDelaySeconds,
+			undoDelaySeconds: String(getUndoSendDelayPreference()),
 			replyToMessageId,
 		};
 		const fingerprint = snapshotFingerprint(message);
@@ -241,30 +265,22 @@ export function ComposeForm({
 		setDraftId(null);
 		setReplyToMessageId(null);
 		setTo("");
+		setCc("");
+		setShowCc(false);
 		setSubject("");
-		setText(applyMailboxSignature("", "", selectedMailbox?.signature));
+		setText("");
 		setAttachments([]);
 	}
 
 	function addAttachments(files: FileList | null) {
 		if (!files) return;
 		const nextFiles = Array.from(files);
-		const nextCount = attachments.length + nextFiles.length;
-		const totalSize = [...attachments.map((attachment) => attachment.file), ...nextFiles].reduce(
-			(total, file) => total + file.size,
-			0,
+		const limitError = getAttachmentLimitError(
+			attachments.map((attachment) => attachment.file),
+			nextFiles,
 		);
-
-		if (nextCount > 10) {
-			showComposeError("A message can include at most 10 attachments");
-			return;
-		}
-		if (nextFiles.some((file) => file.size > 10 * 1024 * 1024)) {
-			showComposeError("Each attachment must be 10 MB or smaller");
-			return;
-		}
-		if (totalSize > 20 * 1024 * 1024) {
-			showComposeError("Attachments must total 20 MB or less");
+		if (limitError) {
+			showComposeError(limitError);
 			return;
 		}
 
@@ -284,23 +300,25 @@ export function ComposeForm({
 
 	const frameClass =
 		mode === "popup"
-			? "fixed bottom-4 right-4 z-40 flex h-[min(520px,calc(100vh-88px))] w-[min(560px,calc(100vw-32px))] flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-2xl"
+			? "fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 flex h-[min(520px,calc(100dvh-88px))] w-[min(560px,calc(100vw-32px))] flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-2xl max-sm:right-2 max-sm:left-2 max-sm:w-auto"
 			: "flex h-full min-h-[720px] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm";
 
 	return (
 		<form onSubmit={onSubmit} className={frameClass}>
 			<div className="flex h-9 items-center justify-between bg-primary px-4 text-sm font-medium text-primary-foreground">
-				<span>{loadingDraft ? "Loading draft" : draftId ? "Draft saved" : "New Message"}</span>
+				<span role="status" aria-live="polite">
+					{loadingDraft ? "Loading draft…" : draftId ? "Draft saved" : "New Message"}
+				</span>
 				{mode === "popup" && (
 					<div className="flex items-center gap-1 text-primary-foreground/70">
-						<Minimize2 className="h-4 w-4" />
+						<Minimize2 aria-hidden="true" className="h-4 w-4" />
 						<button
 							type="button"
 							onClick={onClose}
 							aria-label="Close"
-							className="rounded-sm p-1 transition-colors hover:bg-primary-foreground/15 hover:text-primary-foreground"
+							className="rounded-sm p-1 transition-colors hover:bg-primary-foreground/15 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
 						>
-							<X className="h-4 w-4" />
+							<X aria-hidden="true" className="h-4 w-4" />
 						</button>
 					</div>
 				)}
@@ -310,6 +328,7 @@ export function ComposeForm({
 					From
 				</Label>
 				<Select
+					name="from"
 					value={selectedMailbox && selectedFrom ? `${selectedMailbox.id}|${selectedFrom}` : ""}
 					onValueChange={(value) => selectSender(value as string)}
 					disabled={loadingDraft || senderOptions.length === 0}
@@ -335,20 +354,44 @@ export function ComposeForm({
 					</SelectContent>
 				</Select>
 			</div>
-			<div className="border-b border-neutral-100 px-4 py-1">
-				<Label htmlFor={`${mode}-to`} className="sr-only">
-					To
-				</Label>
-				<Input
-					id={`${mode}-to`}
-					value={to}
-					onChange={(event) => setTo(event.target.value)}
-					type="text"
-					placeholder='Recipients, or "Maya Chen" <maya@example.com>'
-					required
-					disabled={loadingDraft}
-					className="h-8 border-0 px-0 py-1 shadow-none focus-visible:ring-0"
-				/>
+			<div className="border-b border-neutral-100 px-4">
+				<div className="flex items-start gap-2">
+					<div className="min-w-0 flex-1">
+						<RecipientField
+							id={`${mode}-to`}
+							label="To"
+							value={to}
+							onChange={setTo}
+							inputRef={recipientInput}
+							required
+							disabled={loadingDraft}
+						/>
+					</div>
+					<button
+						type="button"
+						aria-expanded={showCc}
+						aria-controls={`${mode}-cc-row`}
+						onClick={() => {
+							setShowCc((current) => !current);
+							if (!showCc) requestAnimationFrame(() => ccInput.current?.focus());
+						}}
+						className="mt-2 rounded px-2 py-1 text-xs font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 focus-visible:ring-2 focus-visible:ring-primary/40"
+					>
+						Cc
+					</button>
+				</div>
+				{showCc && (
+					<div id={`${mode}-cc-row`}>
+						<RecipientField
+							id={`${mode}-cc`}
+							label="Cc"
+							value={cc}
+							onChange={setCc}
+							inputRef={ccInput}
+							disabled={loadingDraft}
+						/>
+					</div>
+				)}
 			</div>
 			<div className="border-b border-neutral-100 px-4 py-1">
 				<Label htmlFor={`${mode}-subject`} className="sr-only">
@@ -356,6 +399,8 @@ export function ComposeForm({
 				</Label>
 				<Input
 					id={`${mode}-subject`}
+					name="subject"
+					autoComplete="off"
 					value={subject}
 					onChange={(event) => setSubject(event.target.value)}
 					placeholder="Subject"
@@ -370,41 +415,24 @@ export function ComposeForm({
 				</Label>
 				<Textarea
 					id={`${mode}-text`}
+					name="body"
+					autoComplete="off"
 					value={text}
 					onChange={(event) => setText(event.target.value)}
 					disabled={loadingDraft}
 					className="h-full min-h-full resize-none border-0 px-0 shadow-none focus-visible:ring-0"
 				/>
 			</div>
-			{attachments.length > 0 && (
-				<div className="flex flex-wrap gap-2 border-t border-neutral-100 px-4 py-3">
-					{attachments.map((attachment) => (
-						<div
-							key={attachment.id}
-							className="flex max-w-full items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm"
-						>
-							<FileText className="h-4 w-4 shrink-0 text-neutral-500" />
-							<span className="max-w-48 truncate">{attachment.file.name}</span>
-							<span className="text-xs text-neutral-400">
-								{formatAttachmentSize(attachment.file.size)}
-							</span>
-							<button
-								type="button"
-								onClick={() =>
-									setAttachments((current) => current.filter((item) => item.id !== attachment.id))
-								}
-								className="rounded-full p-1 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"
-							>
-								<X className="h-3.5 w-3.5" />
-								<span className="sr-only">Remove attachment</span>
-							</button>
-						</div>
-					))}
-				</div>
-			)}
-			<div className="flex items-center gap-3 border-t border-neutral-100 px-4 py-3">
+			<AttachmentList
+				attachments={attachments}
+				onRemove={(id) => setAttachments((current) => current.filter((item) => item.id !== id))}
+				className="border-t border-neutral-100 px-4 py-3"
+			/>
+			<div className="flex flex-wrap items-center gap-2 border-t border-neutral-100 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:gap-3">
 				<Input
 					ref={attachmentInput}
+					name="attachments"
+					aria-label="Add attachments"
 					type="file"
 					multiple
 					className="hidden"
@@ -417,30 +445,17 @@ export function ComposeForm({
 					onClick={() => attachmentInput.current?.click()}
 					disabled={loadingDraft}
 				>
-					<Paperclip className="h-4 w-4" />
+					<Paperclip aria-hidden="true" className="h-4 w-4" />
 					Attach
 				</Button>
-				<span className="flex-1" />
-				<p className="text-xs text-neutral-500">
+				<p
+					className="order-last w-full text-xs text-neutral-500 sm:order-none sm:w-auto sm:flex-1"
+					aria-live="polite"
+				>
 					{draftId ? "Saved to drafts" : "Autosaves as draft"}
 				</p>
-				<Select
-					value={undoDelaySeconds}
-					onValueChange={(value) => setUndoDelaySeconds(value as string)}
-				>
-					<SelectTrigger size="sm" className="w-28" aria-label="Undo Send delay">
-						<SelectValue>{(value) => `Undo: ${String(value)}s`}</SelectValue>
-					</SelectTrigger>
-					<SelectContent>
-						{[5, 10, 20, 30].map((seconds) => (
-							<SelectItem key={seconds} value={String(seconds)}>
-								Undo: {seconds}s
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
 				<Button type="submit" disabled={loadingDraft || !fromAddr} className="rounded-full px-5">
-					<Send className="h-4 w-4" />
+					<Send aria-hidden="true" className="h-4 w-4" />
 					Send
 				</Button>
 			</div>
@@ -453,6 +468,7 @@ function snapshotFingerprint(message: Omit<ComposeSnapshot, "sendKey" | "draftId
 		message.replyToMessageId ?? null,
 		message.from,
 		message.to,
+		message.cc,
 		message.subject,
 		message.text,
 		message.undoDelaySeconds,

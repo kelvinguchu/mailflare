@@ -80,6 +80,7 @@ export async function POST(request: Request) {
 		threadId: threading.threadId,
 		fromAddr: sender.fromAddr,
 		toAddr: input.to ?? "",
+		ccAddr: input.cc ?? "",
 		subject: input.subject ?? null,
 		snippet: buildSnippet(text || null, html || null),
 		textBody: text || null,

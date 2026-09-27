@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Archive, Mail, MailOpen, ShieldAlert, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { BulkMessageAction } from "@/app/api/messages/bulk/types";
+import { MoveToFolderDialog } from "./move-to-folder-dialog";
 import type { BulkMessageToolbarProps } from "./types";
 
 export function BulkMessageToolbar({
@@ -20,7 +22,9 @@ export function BulkMessageToolbar({
 	onAction,
 	onClearSelection,
 	pending,
+	currentFolderId,
 }: BulkMessageToolbarProps) {
+	const [folderDialogOpen, setFolderDialogOpen] = useState(false);
 	return (
 		<div className="flex min-w-0 items-center gap-2 text-neutral-600 w-full">
 			{!hideSelectedCount && (
@@ -76,7 +80,8 @@ export function BulkMessageToolbar({
 					value=""
 					disabled={pending}
 					onValueChange={(value) => {
-						if (value) onAction(value as BulkMessageAction);
+						if (value === "folder") setFolderDialogOpen(true);
+						else if (value) void onAction(value as BulkMessageAction);
 					}}
 				>
 					<SelectTrigger
@@ -90,6 +95,7 @@ export function BulkMessageToolbar({
 						<SelectItem value="archive">Archived</SelectItem>
 						<SelectItem value="spam">Spam</SelectItem>
 						<SelectItem value="trash">Trash</SelectItem>
+						<SelectItem value="folder">Folder…</SelectItem>
 					</SelectContent>
 				</Select>
 			</Tooltip>
@@ -104,6 +110,13 @@ export function BulkMessageToolbar({
 					<X className="h-4 w-4" />
 				</Button>
 			</Tooltip>
+			<MoveToFolderDialog
+				open={folderDialogOpen}
+				onOpenChange={setFolderDialogOpen}
+				count={selectedCount}
+				excludeFolderId={currentFolderId}
+				onMove={(folder) => onAction("folder", folder.id)}
+			/>
 		</div>
 	);
 }

@@ -6,6 +6,17 @@ import { authFetch } from "@/lib/auth/client";
 import type { AuthGuardProps } from "./auth-guard-types";
 import { LoadingTransition } from "@/components/loading-transition";
 
+/**
+ * What this page load has already confirmed. Route groups each mount their own guard, so without
+ * this, moving from mail to settings or admin would cover the screen again. The check still runs
+ * on every navigation and redirects if the session or role changed.
+ */
+const confirmed = { session: false, role: null as string | null };
+
+function alreadyConfirmed(requireRole: string | undefined): boolean {
+	return confirmed.session && (!requireRole || confirmed.role === requireRole);
+}
+
 export function AuthGuard({
 	children,
 	mode = "protected",
@@ -14,7 +25,9 @@ export function AuthGuard({
 }: AuthGuardProps) {
 	const pathname = usePathname();
 	const router = useRouter();
-	const [authorized, setAuthorized] = useState(mode === "public");
+	const [authorized, setAuthorized] = useState(
+		() => mode === "public" || alreadyConfirmed(requireRole),
+	);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -29,6 +42,10 @@ export function AuthGuard({
 				if (cancelled) return;
 
 				if (!response.ok) {
+					if (response.status === 401) {
+						confirmed.session = false;
+						confirmed.role = null;
+					}
 					if (mode === "protected" && response.status === 401) router.replace("/login");
 					else setAuthorized(true);
 					return;
@@ -38,7 +55,12 @@ export function AuthGuard({
 					hasMailboxes?: boolean;
 					isSetup?: boolean;
 					user?: { role?: string };
+					mfaPolicy?: { state?: string };
 				};
+				if (data.mfaPolicy?.state === "restricted" && pathname !== "/enroll-mfa") {
+					router.replace("/enroll-mfa");
+					return;
+				}
 				if (mode === "public") {
 					router.replace("/inbox");
 					return;
@@ -65,6 +87,8 @@ export function AuthGuard({
 					return;
 				}
 
+				confirmed.session = true;
+				confirmed.role = data.user?.role ?? null;
 				setAuthorized(true);
 			} catch {
 				if (!cancelled) setAuthorized(true);

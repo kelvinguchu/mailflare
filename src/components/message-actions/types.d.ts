@@ -10,11 +10,8 @@ export type MessageActionsProps = {
 	status: string;
 	read: boolean;
 	unsubscribeUrl?: string | null;
-	subject?: string | null;
-	bodyText?: string | null;
-	ownAddress?: string | null;
-	/** Replaces the popup reply, e.g. with a conversation's inline reply. */
-	onReply?: () => void;
+	/** Where Back, and actions that remove the conversation from view, return to. */
+	backHref?: string;
 };
 
 export type SingleMessageAction = BulkMessageAction | "reply";

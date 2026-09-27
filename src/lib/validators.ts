@@ -3,7 +3,8 @@ import { DEFAULT_FOLDER_COLOR, FOLDER_COLOR_VALUES } from "@/lib/folders/colors"
 
 export const sendEmailSchema = z.object({
 	from: z.string().min(3).max(500),
-	to: z.string().min(3).max(500),
+	to: z.string().min(3).max(10_000),
+	cc: z.string().max(10_000).optional(),
 	subject: z.string().min(1).max(500),
 	html: z
 		.string()
@@ -117,6 +118,7 @@ export const updateManagedAccountSchema = z.object({
 			.optional()
 			.transform((value) => (value === undefined ? undefined : value || null)),
 	),
+	confirmation: z.string().trim().min(1).max(320).optional(),
 });
 
 export const createAccountSchema = z.object({
@@ -251,6 +253,20 @@ export const mfaProtectedActionSchema = z.object({
 	code: z.string().trim().min(6).max(32),
 });
 
+export const mfaPolicySchema = z.object({
+	mode: z.enum(["optional", "administrators", "all_users"]),
+	gracePeriodDays: z.number().int().min(0).max(30),
+});
+
+export const mfaPolicyExceptionSchema = z.object({
+	exemptUntil: z.iso.datetime(),
+	reason: z.string().trim().min(3).max(500),
+});
+
+export const mfaResetSchema = z.object({
+	confirmation: z.string().trim().min(1).max(320),
+});
+
 export const reauthenticateSchema = z.object({
 	currentPassword: z.string().min(1).max(128),
 	code: z.string().trim().max(32).optional().default(""),
@@ -270,6 +286,28 @@ export const accountActivationConfirmSchema = passwordResetConfirmSchema;
 export const accountInvitationSchema = z.object({
 	invitationEmail: z.string().trim().pipe(z.email().max(320)).optional(),
 });
+
+export const accountResetSchema = z.object({
+	invitationEmail: z.string().trim().pipe(z.email().max(320)),
+	confirmation: z.string().trim().min(1).max(320),
+});
+
+export const mailboxOwnershipTransferSchema = z.object({
+	newOwnerUserId: z.string().trim().min(1).max(200),
+	confirmation: z.string().trim().min(1).max(320),
+});
+
+export const accountLifecycleSchema = z.discriminatedUnion("action", [
+	z.object({
+		action: z.literal("archive"),
+		successorUserId: z.string().trim().min(1).max(200).optional(),
+		confirmation: z.string().trim().min(1).max(320),
+	}),
+	z.object({
+		action: z.literal("delete"),
+		confirmation: z.string().trim().min(1).max(320),
+	}),
+]);
 
 export const recoveryEmailVerificationSchema = z.object({
 	token: z.string().regex(/^[a-f0-9]{64}$/),

@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getDb } from "@/db";
 import { mailboxes, signatureAssets } from "@/db/schema";
-import { requireUser } from "@/lib/auth/cookies";
+import { getCurrentUser } from "@/lib/auth/cookies";
 import { getEnv } from "@/lib/cloudflare";
 import { extractSignatureContentIds } from "@/lib/email/signatures";
 import { getMailboxAccessLevel } from "@/lib/mailboxes/access";
@@ -12,7 +12,8 @@ import type { SignatureAssetRouteParams } from "./types";
 export async function GET(request: Request, { params }: SignatureAssetRouteParams) {
 	const { assetId, id } = await params;
 	const env = getEnv();
-	const user = await requireUser(env, request);
+	const user = await getCurrentUser(env, request);
+	if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	const db = getDb(env);
 	const access = await getMailboxAccessLevel(db, user, id);
 	if (!access?.canRead) return new Response("Not found", { status: 404 });
@@ -37,7 +38,8 @@ export async function GET(request: Request, { params }: SignatureAssetRouteParam
 export async function DELETE(request: Request, { params }: SignatureAssetRouteParams) {
 	const { assetId, id } = await params;
 	const env = getEnv();
-	const user = await requireUser(env, request);
+	const user = await getCurrentUser(env, request);
+	if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	const db = getDb(env);
 	const access = await getMailboxAccessLevel(db, user, id);
 	if (!access?.canManage) {

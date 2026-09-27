@@ -3,6 +3,7 @@ import type { Message, MessageThread, ThreadParticipant } from "@/hooks/types";
 import { authFetch } from "@/lib/auth/client";
 import { getDisplayNameForAddress } from "@/lib/contacts/utils";
 import { getEmailAddress } from "@/lib/email/address";
+import { formatRecipientList, parseRecipientList } from "@/lib/email/recipients";
 import type { ConversationItem, ParticipantToken } from "./types";
 
 export async function fetchMessageThread(messageId: string): Promise<MessageThread | null> {
@@ -105,10 +106,30 @@ export function buildConversationItems(
 }
 
 /** Who a reply to this message goes to, and which of our addresses it comes from. */
-export function getReplyAddresses(message: Pick<Message, "direction" | "fromAddr" | "toAddr">) {
-	return message.direction === "inbound"
-		? { to: getEmailAddress(message.fromAddr), own: getEmailAddress(message.toAddr) }
-		: { to: getEmailAddress(message.toAddr), own: getEmailAddress(message.fromAddr) };
+export function getReplyAddresses(
+	message: Pick<Message, "direction" | "fromAddr" | "toAddr" | "ccAddr" | "deliveredToAddr">,
+) {
+	const own = getEmailAddress(
+		message.direction === "inbound"
+			? (message.deliveredToAddr ?? message.toAddr)
+			: message.fromAddr,
+	).toLowerCase();
+	if (message.direction === "outbound") {
+		return { to: message.toAddr, cc: message.ccAddr ?? "", own };
+	}
+
+	const sender = safeRecipients(message.fromAddr)[0];
+	const excluded = new Set([own, sender?.address].filter(Boolean));
+	const cc = [...safeRecipients(message.toAddr), ...safeRecipients(message.ccAddr)].filter(
+		(recipient, index, all) =>
+			!excluded.has(recipient.address) &&
+			all.findIndex((item) => item.address === recipient.address) === index,
+	);
+	return {
+		to: sender?.formatted ?? getEmailAddress(message.fromAddr),
+		cc: formatRecipientList(cc),
+		own,
+	};
 }
 
 export function buildForwardSubject(subject: string | null | undefined): string {
@@ -118,7 +139,7 @@ export function buildForwardSubject(subject: string | null | undefined): string 
 }
 
 export function buildForwardText(
-	message: Pick<Message, "fromAddr" | "toAddr" | "subject" | "createdAt">,
+	message: Pick<Message, "fromAddr" | "toAddr" | "ccAddr" | "subject" | "createdAt">,
 	bodyText: string | null | undefined,
 ): string {
 	return [
@@ -129,10 +150,19 @@ export function buildForwardText(
 		`Date: ${dayjs(message.createdAt).format("ddd, MMM D, YYYY [at] h:mm A")}`,
 		`Subject: ${message.subject ?? "(no subject)"}`,
 		`To: ${message.toAddr}`,
+		...(message.ccAddr ? [`Cc: ${message.ccAddr}`] : []),
 		"",
 		(bodyText ?? "").trim(),
 		"",
 	].join("\n");
+}
+
+function safeRecipients(value: string | null | undefined) {
+	try {
+		return parseRecipientList(value ?? "");
+	} catch {
+		return [];
+	}
 }
 
 const relativeTime = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });

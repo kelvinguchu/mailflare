@@ -41,46 +41,179 @@ const MIGRATION_NAMES = [
 	"0039_add_conversation_threads.sql",
 	"0040_add_task_assignments.sql",
 	"0041_add_rich_mailbox_signatures.sql",
+	"0042_complete_indexed_message_search.sql",
+	"0043_improve_message_list_performance.sql",
+	"0044_add_storage_lifecycle.sql",
+	"0045_add_account_archival.sql",
+	"0046_add_operational_visibility.sql",
+	"0047_add_cc_recipient_semantics.sql",
+	"0048_add_mfa_policy.sql",
 ];
 
 const SEARCH_SCHEMA_STATEMENTS = [
 	`CREATE VIRTUAL TABLE message_search USING fts5(
 		message_id UNINDEXED,
-		search_text,
+		sender,
+		recipients,
 		subject,
+		snippet,
+		body,
+		attachment_names,
 		tokenize = 'trigram'
 	)`,
 	`CREATE TRIGGER message_search_after_insert
 	AFTER INSERT ON messages
 	BEGIN
-		INSERT INTO message_search (message_id, search_text, subject)
+		INSERT INTO message_search (
+			rowid,
+			message_id,
+			sender,
+			recipients,
+			subject,
+			snippet,
+			body,
+			attachment_names
+		)
 		VALUES (
+			new.rowid,
 			new.id,
-			new.from_addr || ' ' || new.to_addr || ' ' || coalesce(new.subject, '') || ' ' || coalesce(new.snippet, ''),
-			coalesce(new.subject, '')
+			new.from_addr,
+			new.to_addr || ' ' || new.cc_addr,
+			coalesce(new.subject, ''),
+			coalesce(new.snippet, ''),
+			coalesce(new.text_body, '') || ' ' || coalesce(new.html_body, ''),
+			''
 		);
 	END`,
 	`CREATE TRIGGER message_search_after_delete
 	AFTER DELETE ON messages
 	BEGIN
-		DELETE FROM message_search WHERE message_id = old.id;
+		DELETE FROM message_search WHERE rowid = old.rowid;
 	END`,
 	`CREATE TRIGGER message_search_after_update
-	AFTER UPDATE OF id, from_addr, to_addr, subject, snippet ON messages
+	AFTER UPDATE OF id, from_addr, to_addr, cc_addr, subject, snippet, text_body, html_body ON messages
 	BEGIN
-		DELETE FROM message_search WHERE message_id = old.id;
-		INSERT INTO message_search (message_id, search_text, subject)
-		VALUES (
+		DELETE FROM message_search WHERE rowid = old.rowid;
+		INSERT INTO message_search (
+			rowid,
+			message_id,
+			sender,
+			recipients,
+			subject,
+			snippet,
+			body,
+			attachment_names
+		)
+		SELECT
+			new.rowid,
 			new.id,
-			new.from_addr || ' ' || new.to_addr || ' ' || coalesce(new.subject, '') || ' ' || coalesce(new.snippet, ''),
-			coalesce(new.subject, '')
-		);
+			new.from_addr,
+			new.to_addr || ' ' || new.cc_addr,
+			coalesce(new.subject, ''),
+			coalesce(new.snippet, ''),
+			coalesce(new.text_body, '') || ' ' || coalesce(new.html_body, ''),
+			coalesce((
+				SELECT group_concat(message_attachments.filename, ' ')
+				FROM message_attachments
+				WHERE message_attachments.message_id = new.id
+			), '');
+	END`,
+	`CREATE TRIGGER message_search_attachment_after_insert
+	AFTER INSERT ON message_attachments
+	BEGIN
+		UPDATE message_search
+		SET attachment_names = coalesce((
+			SELECT group_concat(message_attachments.filename, ' ')
+			FROM message_attachments
+			WHERE message_attachments.message_id = new.message_id
+		), '')
+		WHERE rowid = (SELECT rowid FROM messages WHERE id = new.message_id);
+	END`,
+	`CREATE TRIGGER message_search_attachment_after_delete
+	AFTER DELETE ON message_attachments
+	BEGIN
+		UPDATE message_search
+		SET attachment_names = coalesce((
+			SELECT group_concat(message_attachments.filename, ' ')
+			FROM message_attachments
+			WHERE message_attachments.message_id = old.message_id
+		), '')
+		WHERE rowid = (SELECT rowid FROM messages WHERE id = old.message_id);
+	END`,
+	`CREATE TRIGGER message_search_attachment_after_update
+	AFTER UPDATE OF message_id, filename ON message_attachments
+	BEGIN
+		UPDATE message_search
+		SET attachment_names = coalesce((
+			SELECT group_concat(message_attachments.filename, ' ')
+			FROM message_attachments
+			WHERE message_attachments.message_id = old.message_id
+		), '')
+		WHERE rowid = (SELECT rowid FROM messages WHERE id = old.message_id);
+
+		UPDATE message_search
+		SET attachment_names = coalesce((
+			SELECT group_concat(message_attachments.filename, ' ')
+			FROM message_attachments
+			WHERE message_attachments.message_id = new.message_id
+		), '')
+		WHERE rowid = (SELECT rowid FROM messages WHERE id = new.message_id);
+	END`,
+] as const;
+
+const STORAGE_LIFECYCLE_SCHEMA_STATEMENTS = [
+	`CREATE TRIGGER messages_set_trashed_at_after_insert
+	AFTER INSERT ON messages
+	WHEN new.status = 'trash' AND new.trashed_at IS NULL
+	BEGIN
+		UPDATE messages SET trashed_at = unixepoch() WHERE id = new.id;
+	END`,
+	`CREATE TRIGGER messages_set_trashed_at_after_status_update
+	AFTER UPDATE OF status ON messages
+	BEGIN
+		UPDATE messages
+		SET trashed_at = CASE
+			WHEN new.status = 'trash' AND old.status <> 'trash' THEN unixepoch()
+			WHEN new.status <> 'trash' THEN NULL
+			ELSE trashed_at
+		END
+		WHERE id = new.id;
+	END`,
+] as const;
+
+const ACCOUNT_LIFECYCLE_SCHEMA_STATEMENTS = [
+	`CREATE TRIGGER users_keep_active_administrator
+	BEFORE UPDATE OF role, disabled, archived_at, activation_status ON users
+	WHEN old.role = 'admin'
+		AND old.disabled = 0
+		AND old.archived_at IS NULL
+		AND old.activation_status = 'active'
+		AND NOT (
+			new.role = 'admin'
+			AND new.disabled = 0
+			AND new.archived_at IS NULL
+			AND new.activation_status = 'active'
+		)
+		AND NOT EXISTS (
+			SELECT 1 FROM users
+			WHERE id <> old.id
+				AND role = 'admin'
+				AND disabled = 0
+				AND archived_at IS NULL
+				AND activation_status = 'active'
+		)
+	BEGIN
+		SELECT RAISE(ABORT, 'cannot remove the last active administrator');
 	END`,
 ] as const;
 
 const INITIAL_SCHEMA_SQL = `
-CREATE TABLE IF NOT EXISTS users (id text PRIMARY KEY NOT NULL, email text NOT NULL UNIQUE, reset_email text, reset_email_verified_at integer, forwarding_email text, password_hash text NOT NULL, name text NOT NULL, avatar_key text, role text DEFAULT 'user' NOT NULL, activation_status text DEFAULT 'active' NOT NULL, activated_at integer, invitation_sent_at integer, invitation_expires_at integer, mfa_secret_encrypted text, mfa_enabled_at integer, mfa_recovery_code_hashes text DEFAULT '[]' NOT NULL, mfa_last_used_counter integer, disabled integer DEFAULT false NOT NULL, send_rate_limit_per_minute integer DEFAULT 20 NOT NULL, daily_send_limit integer DEFAULT 500 NOT NULL, can_manage_mailboxes integer DEFAULT false NOT NULL, created_by_user_id text REFERENCES users(id) ON DELETE set null, created_at integer NOT NULL);
+CREATE TABLE IF NOT EXISTS users (id text PRIMARY KEY NOT NULL, email text NOT NULL UNIQUE, reset_email text, reset_email_verified_at integer, forwarding_email text, password_hash text NOT NULL, name text NOT NULL, avatar_key text, role text DEFAULT 'user' NOT NULL, activation_status text DEFAULT 'active' NOT NULL, activated_at integer, invitation_sent_at integer, invitation_expires_at integer, mfa_secret_encrypted text, mfa_enabled_at integer, mfa_recovery_code_hashes text DEFAULT '[]' NOT NULL, mfa_last_used_counter integer, mfa_policy_covered_at integer, mfa_policy_exempt_until integer, mfa_policy_exemption_reason text, mfa_policy_exempted_by_user_id text REFERENCES users(id) ON DELETE set null, disabled integer DEFAULT false NOT NULL, archived_at integer, send_rate_limit_per_minute integer DEFAULT 20 NOT NULL, daily_send_limit integer DEFAULT 500 NOT NULL, can_manage_mailboxes integer DEFAULT false NOT NULL, created_by_user_id text REFERENCES users(id) ON DELETE set null, created_at integer NOT NULL);
+CREATE INDEX IF NOT EXISTS users_archived_role_idx ON users(archived_at, role, disabled);
 CREATE INDEX IF NOT EXISTS users_created_by_idx ON users(created_by_user_id);
+CREATE INDEX IF NOT EXISTS users_mfa_policy_coverage_idx ON users(activation_status, disabled, role, mfa_policy_covered_at);
+CREATE TABLE IF NOT EXISTS mfa_policy_settings (id text PRIMARY KEY NOT NULL, mode text DEFAULT 'optional' NOT NULL, grace_period_days integer DEFAULT 7 NOT NULL, updated_by_user_id text REFERENCES users(id) ON DELETE set null, updated_at integer NOT NULL);
+INSERT OR IGNORE INTO mfa_policy_settings (id, mode, grace_period_days, updated_at) VALUES ('default', 'optional', 7, unixepoch());
 CREATE TABLE IF NOT EXISTS domains (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, hostname text NOT NULL, zone_id text NOT NULL, status text DEFAULT 'pending' NOT NULL, routing_status text, sending_subdomain_tag text, sending_enabled integer DEFAULT false NOT NULL, routing_enabled integer DEFAULT false NOT NULL, send_rate_limit_per_minute integer DEFAULT 60 NOT NULL, daily_send_limit integer DEFAULT 2000 NOT NULL, created_at integer NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS domains_hostname_idx ON domains(hostname);
 CREATE INDEX IF NOT EXISTS domains_user_idx ON domains(user_id);
@@ -103,15 +236,26 @@ CREATE UNIQUE INDEX IF NOT EXISTS folders_mailbox_name_idx ON folders(mailbox_id
 CREATE INDEX IF NOT EXISTS folders_user_idx ON folders(user_id);
 CREATE INDEX IF NOT EXISTS folders_mailbox_idx ON folders(mailbox_id);
 CREATE TABLE IF NOT EXISTS api_keys (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, name text NOT NULL, prefix text NOT NULL, key_hash text NOT NULL, scopes text NOT NULL, created_at integer NOT NULL, last_used_at integer);
-CREATE TABLE IF NOT EXISTS messages (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, direction text NOT NULL, provider_message_id text, in_reply_to text, "references" text, reply_to_message_id text REFERENCES messages(id) ON DELETE set null, folder_id text REFERENCES folders(id) ON DELETE set null, from_addr text NOT NULL, to_addr text NOT NULL, subject text, snippet text, text_body text, html_body text, raw_r2_key text, inbound_delivery_key text, status text DEFAULT 'received' NOT NULL, delivery_status text, delivery_detail text, delivery_updated_at integer, security_status text DEFAULT 'clean' NOT NULL, security_reason text, spam_score integer DEFAULT 0 NOT NULL, read integer DEFAULT false NOT NULL, starred integer DEFAULT false NOT NULL, snoozed_until integer, thread_id text, created_at integer NOT NULL);
+CREATE TABLE IF NOT EXISTS messages (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, direction text NOT NULL, provider_message_id text, in_reply_to text, "references" text, reply_to_message_id text REFERENCES messages(id) ON DELETE set null, folder_id text REFERENCES folders(id) ON DELETE set null, from_addr text NOT NULL, to_addr text NOT NULL, cc_addr text DEFAULT '' NOT NULL, delivered_to_addr text, subject text, snippet text, text_body text, html_body text, raw_r2_key text, inbound_delivery_key text, status text DEFAULT 'received' NOT NULL, delivery_status text, delivery_detail text, delivery_updated_at integer, security_status text DEFAULT 'clean' NOT NULL, security_reason text, spam_score integer DEFAULT 0 NOT NULL, read integer DEFAULT false NOT NULL, starred integer DEFAULT false NOT NULL, snoozed_until integer, trashed_at integer, thread_id text, created_at integer NOT NULL);
 CREATE INDEX IF NOT EXISTS messages_user_created_idx ON messages(user_id, created_at);
 CREATE INDEX IF NOT EXISTS messages_mailbox_idx ON messages(mailbox_id);
 CREATE INDEX IF NOT EXISTS messages_mailbox_thread_created_idx ON messages(mailbox_id, thread_id, created_at);
+CREATE INDEX IF NOT EXISTS messages_mailbox_status_created_id_idx ON messages(mailbox_id, status, created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS messages_mailbox_folder_created_id_idx ON messages(mailbox_id, folder_id, created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS messages_mailbox_read_created_id_idx ON messages(mailbox_id, read, created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS messages_mailbox_starred_created_id_idx ON messages(mailbox_id, starred, created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS messages_mailbox_snoozed_created_id_idx ON messages(mailbox_id, snoozed_until, created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS messages_mailbox_thread_key_created_id_idx ON messages(mailbox_id, coalesce(thread_id, id), created_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS messages_mailbox_provider_message_idx ON messages(mailbox_id, provider_message_id);
 CREATE INDEX IF NOT EXISTS messages_folder_idx ON messages(folder_id);
 CREATE UNIQUE INDEX IF NOT EXISTS messages_inbound_delivery_key_idx ON messages(inbound_delivery_key);
+CREATE INDEX IF NOT EXISTS messages_trash_retention_idx ON messages(status, trashed_at);
 CREATE TABLE IF NOT EXISTS message_attachments (id text PRIMARY KEY NOT NULL, message_id text NOT NULL REFERENCES messages(id) ON DELETE cascade, filename text NOT NULL, content_type text NOT NULL, size integer NOT NULL, disposition text DEFAULT 'attachment' NOT NULL, content_id text, security_status text DEFAULT 'safe' NOT NULL, security_reason text, r2_key text NOT NULL UNIQUE, created_at integer NOT NULL);
 CREATE INDEX IF NOT EXISTS message_attachments_message_idx ON message_attachments(message_id);
+CREATE TABLE IF NOT EXISTS storage_deletion_jobs (id text PRIMARY KEY NOT NULL, message_id text NOT NULL UNIQUE, actor_user_id text REFERENCES users(id) ON DELETE set null, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, reason text NOT NULL CHECK (reason IN ('user', 'draft', 'retention')), status text DEFAULT 'pending' NOT NULL CHECK (status IN ('pending', 'processing', 'failed', 'completed')), object_keys text DEFAULT '[]' NOT NULL, attempt_count integer DEFAULT 0 NOT NULL, next_attempt_at integer, last_error text, created_at integer NOT NULL, updated_at integer NOT NULL, completed_at integer);
+CREATE INDEX IF NOT EXISTS storage_deletion_jobs_due_idx ON storage_deletion_jobs(status, next_attempt_at, created_at);
+CREATE INDEX IF NOT EXISTS storage_deletion_jobs_completed_idx ON storage_deletion_jobs(completed_at);
+CREATE TABLE IF NOT EXISTS storage_lifecycle_state (prefix text PRIMARY KEY NOT NULL, cursor text, last_scanned_at integer, updated_at integer NOT NULL);
 CREATE TABLE IF NOT EXISTS outbound_jobs (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, message_id text REFERENCES messages(id) ON DELETE set null, domain_id text REFERENCES domains(id) ON DELETE set null, status text DEFAULT 'queued' NOT NULL, payload text NOT NULL, idempotency_key text, request_hash text, delivery_started_at integer, attempt_count integer DEFAULT 0 NOT NULL, error text, scheduled_at integer, send_not_before integer, canceled_at integer, created_at integer NOT NULL, updated_at integer NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS outbound_jobs_user_idempotency_key_idx ON outbound_jobs(user_id, idempotency_key);
 CREATE INDEX IF NOT EXISTS outbound_jobs_user_created_idx ON outbound_jobs(user_id, created_at);
@@ -164,6 +308,12 @@ INSERT OR IGNORE INTO backup_settings (id, enabled, schedule_type, retention_ena
 CREATE TABLE IF NOT EXISTS backups (id text PRIMARY KEY NOT NULL, status text DEFAULT 'queued' NOT NULL, trigger text NOT NULL, r2_key text, filename text, size integer, error text, created_by_user_id text REFERENCES users(id) ON DELETE set null, created_at integer NOT NULL, started_at integer, completed_at integer);
 CREATE INDEX IF NOT EXISTS backups_created_idx ON backups(created_at);
 CREATE INDEX IF NOT EXISTS backups_status_idx ON backups(status);
+CREATE TABLE IF NOT EXISTS operational_settings (id text PRIMARY KEY NOT NULL, queue_backlog_warning integer DEFAULT 100 NOT NULL CHECK (queue_backlog_warning >= 1), queue_oldest_minutes_warning integer DEFAULT 15 NOT NULL CHECK (queue_oldest_minutes_warning >= 1), delivery_failed_24h_warning integer DEFAULT 1 NOT NULL CHECK (delivery_failed_24h_warning >= 1), delivery_unknown_24h_warning integer DEFAULT 1 NOT NULL CHECK (delivery_unknown_24h_warning >= 1), webhook_failed_24h_warning integer DEFAULT 1 NOT NULL CHECK (webhook_failed_24h_warning >= 1), reminder_failed_24h_warning integer DEFAULT 1 NOT NULL CHECK (reminder_failed_24h_warning >= 1), dead_letter_unresolved_warning integer DEFAULT 1 NOT NULL CHECK (dead_letter_unresolved_warning >= 1), backup_stale_hours integer DEFAULT 0 NOT NULL CHECK (backup_stale_hours >= 0), d1_growth_percent_warning integer DEFAULT 25 NOT NULL CHECK (d1_growth_percent_warning >= 1), r2_growth_percent_warning integer DEFAULT 25 NOT NULL CHECK (r2_growth_percent_warning >= 1), updated_at integer NOT NULL);
+INSERT OR IGNORE INTO operational_settings (id, updated_at) VALUES ('default', unixepoch());
+CREATE TABLE IF NOT EXISTS operational_snapshots (id text PRIMARY KEY NOT NULL, captured_at integer NOT NULL, d1_bytes integer NOT NULL CHECK (d1_bytes >= 0), r2_object_count integer NOT NULL CHECK (r2_object_count >= 0), r2_bytes integer NOT NULL CHECK (r2_bytes >= 0), r2_scan_complete integer DEFAULT true NOT NULL, inbound_backlog_count integer, inbound_backlog_bytes integer, inbound_oldest_at integer, outbound_backlog_count integer, outbound_backlog_bytes integer, outbound_oldest_at integer, webhook_backlog_count integer, webhook_backlog_bytes integer, webhook_oldest_at integer);
+CREATE INDEX IF NOT EXISTS operational_snapshots_captured_idx ON operational_snapshots(captured_at DESC);
+CREATE TABLE IF NOT EXISTS restore_drill_records (id text PRIMARY KEY NOT NULL, backup_id text REFERENCES backups(id) ON DELETE set null, environment text NOT NULL CHECK (environment IN ('staging', 'production')), source text NOT NULL CHECK (source IN ('staging-script', 'manual')), verified_by_user_id text REFERENCES users(id) ON DELETE set null, verified_at integer NOT NULL, d1_verified integer DEFAULT false NOT NULL, r2_verified integer DEFAULT false NOT NULL, rollback_verified integer DEFAULT false NOT NULL, sessions_invalidated integer DEFAULT false NOT NULL, cleanup_verified integer DEFAULT false NOT NULL);
+CREATE INDEX IF NOT EXISTS restore_drill_records_verified_idx ON restore_drill_records(verified_at DESC);
 CREATE TABLE IF NOT EXISTS app_settings (id text PRIMARY KEY NOT NULL, app_name text DEFAULT 'CC Mail' NOT NULL, company_name text DEFAULT '' NOT NULL, icon_key text, updated_at integer NOT NULL);
 INSERT OR IGNORE INTO app_settings (id, app_name, updated_at) VALUES ('default', 'CC Mail', unixepoch());
 CREATE TABLE IF NOT EXISTS d1_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL);
@@ -191,6 +341,18 @@ export async function migrateCleanDatabase(db: D1Database): Promise<boolean> {
 		db.prepare("INSERT OR IGNORE INTO d1_migrations (name) VALUES (?)").bind(name),
 	);
 	const searchSchemaStatements = SEARCH_SCHEMA_STATEMENTS.map((statement) => db.prepare(statement));
-	await db.batch([...schemaStatements, ...searchSchemaStatements, ...migrationStatements]);
+	const storageLifecycleStatements = STORAGE_LIFECYCLE_SCHEMA_STATEMENTS.map((statement) =>
+		db.prepare(statement),
+	);
+	const accountLifecycleStatements = ACCOUNT_LIFECYCLE_SCHEMA_STATEMENTS.map((statement) =>
+		db.prepare(statement),
+	);
+	await db.batch([
+		...schemaStatements,
+		...searchSchemaStatements,
+		...storageLifecycleStatements,
+		...accountLifecycleStatements,
+		...migrationStatements,
+	]);
 	return true;
 }

@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { apiKeys, users } from "@/db/schema";
 import { verifyApiKey, parseScopes } from "@/lib/api-keys";
+import { evaluateUserMfaPolicy, isMfaPolicyRestricted } from "@/lib/auth/mfa-policy";
 
 export type ApiAuthResult = {
 	userId: string;
@@ -24,7 +25,14 @@ export async function authenticateApiKey(
 	for (const candidate of candidates) {
 		if (!verifyApiKey(key, candidate.keyHash)) continue;
 		const [user] = await db.select().from(users).where(eq(users.id, candidate.userId)).limit(1);
-		if (!user || user.disabled) continue;
+		if (
+			!user ||
+			user.disabled ||
+			user.activationStatus !== "active" ||
+			user.archivedAt ||
+			isMfaPolicyRestricted(await evaluateUserMfaPolicy(env, user))
+		)
+			continue;
 
 		await db.update(apiKeys).set({ lastUsedAt: new Date() }).where(eq(apiKeys.id, candidate.id));
 

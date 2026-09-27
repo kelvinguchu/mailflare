@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/db";
-import { requireUser } from "@/lib/auth/cookies";
+import { getCurrentUser } from "@/lib/auth/cookies";
 import { getEnv } from "@/lib/cloudflare";
 import {
 	isSignatureImageFile,
@@ -19,7 +19,8 @@ const MAX_SIGNATURE_ASSET_REQUEST_SIZE = MAX_SIGNATURE_ASSET_SIZE + 64 * 1024;
 export async function GET(request: Request, { params }: SignatureAssetsRouteParams) {
 	const { id } = await params;
 	const env = getEnv();
-	const user = await requireUser(env, request);
+	const user = await getCurrentUser(env, request);
+	if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	const access = await getMailboxAccessLevel(getDb(env), user, id);
 	if (!access?.canRead) return NextResponse.json({ error: "Mailbox not found" }, { status: 404 });
 	return NextResponse.json({ assets: await listSignatureAssets(env, id) });
@@ -28,7 +29,8 @@ export async function GET(request: Request, { params }: SignatureAssetsRoutePara
 export async function POST(request: Request, { params }: SignatureAssetsRouteParams) {
 	const { id } = await params;
 	const env = getEnv();
-	const user = await requireUser(env, request);
+	const user = await getCurrentUser(env, request);
+	if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	const access = await getMailboxAccessLevel(getDb(env), user, id);
 	if (!access?.canManage) {
 		return NextResponse.json({ error: "Mailbox not found" }, { status: 404 });

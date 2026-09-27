@@ -15,6 +15,8 @@ export interface RealtimeMessageListItem {
 	subject: string | null;
 	threadId: string | null;
 	toAddr: string;
+	ccAddr: string;
+	deliveredToAddr: string;
 	toContactName: null;
 	userId: string;
 }

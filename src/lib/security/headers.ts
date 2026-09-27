@@ -1,3 +1,5 @@
+import { ROBOTS_DIRECTIVE } from "./indexing";
+
 export function getSecurityHeaders(
 	environment: "development" | "production" = process.env.NODE_ENV === "development"
 		? "development"
@@ -26,6 +28,8 @@ export function getSecurityHeaders(
 		{ key: "X-Content-Type-Options", value: "nosniff" },
 		{ key: "X-Frame-Options", value: "SAMEORIGIN" },
 		{ key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+		// Indexing control for this internal application, not access control.
+		{ key: "X-Robots-Tag", value: ROBOTS_DIRECTIVE },
 		{
 			key: "Permissions-Policy",
 			value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",

@@ -12,6 +12,8 @@ import {
 	Users,
 	Webhook,
 	ShieldBan,
+	ShieldCheck,
+	Gauge,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NavItem } from "./components-nav";
@@ -37,6 +39,8 @@ const sections = [
 		id: "administration",
 		label: "Administration",
 		links: [
+			{ href: "/operations", label: "Operations", icon: Gauge },
+			{ href: "/security", label: "Security", icon: ShieldCheck },
 			{ href: "/accounts", label: "Accounts", icon: Users },
 			{ href: "/sender-policies", label: "Sender policies", icon: ShieldBan },
 			{ href: "/activity", label: "Activity", icon: Activity },
@@ -59,7 +63,7 @@ export function AdminNav({ className }: { className?: string }) {
 	const { minimal } = useSidebar();
 
 	return (
-		<nav className={cn("flex min-h-full flex-col gap-1", className)}>
+		<nav id="primary-navigation" className={cn("flex min-h-full flex-col gap-1", className)}>
 			<SidebarHeader href="/inbox" />
 			<div className={cn("space-y-4", minimal && "space-y-2")}>
 				{sections.map((section) => {

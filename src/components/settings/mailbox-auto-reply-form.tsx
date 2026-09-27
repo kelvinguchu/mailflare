@@ -76,8 +76,12 @@ export function MailboxAutoReplyForm() {
 
 	return (
 		<form onSubmit={onSubmit} className="space-y-4">
-			<label className="flex items-start gap-3 rounded-xl bg-neutral-50 p-4">
+			<label
+				htmlFor="mailbox-auto-reply-enabled"
+				className="flex items-start gap-3 rounded-xl bg-neutral-50 p-4"
+			>
 				<Checkbox
+					id="mailbox-auto-reply-enabled"
 					checked={settings.enabled}
 					onChange={(event) => setSettings({ ...settings, enabled: event.target.checked })}
 					disabled={!canManage || saving}

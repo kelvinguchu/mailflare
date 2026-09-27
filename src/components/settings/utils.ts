@@ -6,7 +6,10 @@ import type {
 	ForwardingEmailResponse,
 	MailboxAutoReplyResponse,
 	MailboxAutoReplySettings,
+	MailboxSignatureValue,
 	MailboxSignatureResponse,
+	SignatureAsset,
+	SignatureAssetsResponse,
 } from "./types";
 import type { AccountSettingsResponse, ChangePasswordResponse } from "./types";
 import type { SessionManagementResponse } from "./types";
@@ -69,19 +72,76 @@ export async function updateForwardingEmail(forwardingEmail: string): Promise<st
 
 export async function updateMailboxSignature(
 	mailboxId: string,
-	signature: string,
-): Promise<string> {
+	value:
+		| { mode: "rich"; signatureHtml: string | null; signatureText: string | null }
+		| { mode: "plain"; signature: string },
+): Promise<MailboxSignatureValue> {
 	const res = await authFetch(`/api/mailboxes/${mailboxId}`, {
 		method: "PATCH",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ signature }),
+		body: JSON.stringify(
+			value.mode === "rich"
+				? { signatureHtml: value.signatureHtml, signatureText: value.signatureText }
+				: { signature: value.signature },
+		),
 	});
 	const data = (await res.json()) as MailboxSignatureResponse;
 	if (!res.ok || !data.mailbox) {
 		throw new Error(typeof data.error === "string" ? data.error : "Failed to update signature");
 	}
 	clearMailboxesCache();
-	return data.mailbox.signature ?? "";
+	return {
+		signature: data.mailbox.signature ?? null,
+		signatureText: data.mailbox.signatureText ?? data.mailbox.signature ?? null,
+		signatureHtml: data.mailbox.signatureHtml ?? null,
+		signatureVersion: data.mailbox.signatureVersion ?? 0,
+	};
+}
+
+export async function listSignatureAssets(mailboxId: string): Promise<SignatureAsset[]> {
+	const res = await authFetch(`/api/mailboxes/${mailboxId}/signature/assets`, {
+		cache: "no-store",
+	});
+	const data = (await res.json()) as SignatureAssetsResponse;
+	if (!res.ok || !data.assets) {
+		throw new Error(
+			typeof data.error === "string" ? data.error : "Failed to load signature images",
+		);
+	}
+	return data.assets;
+}
+
+export async function uploadSignatureAsset(
+	mailboxId: string,
+	file: File,
+	altText: string,
+): Promise<SignatureAsset> {
+	const body = new FormData();
+	body.set("file", file);
+	body.set("altText", altText);
+	const res = await authFetch(`/api/mailboxes/${mailboxId}/signature/assets`, {
+		method: "POST",
+		body,
+	});
+	const data = (await res.json()) as SignatureAssetsResponse;
+	if (!res.ok || !data.asset) {
+		throw new Error(
+			typeof data.error === "string" ? data.error : "Failed to upload signature image",
+		);
+	}
+	return data.asset;
+}
+
+export async function deleteSignatureAsset(mailboxId: string, assetId: string): Promise<void> {
+	const res = await authFetch(`/api/mailboxes/${mailboxId}/signature/assets/${assetId}`, {
+		method: "DELETE",
+	});
+	const data = (await res.json().catch(() => ({}))) as { error?: unknown };
+	if (!res.ok) {
+		throw new Error(
+			typeof data.error === "string" ? data.error : "Failed to delete signature image",
+		);
+	}
 }
 
 export async function updateMailboxAutoReply(

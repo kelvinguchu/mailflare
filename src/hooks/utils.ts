@@ -67,9 +67,18 @@ export function getMessageQueryParams(
 		: filters;
 	if (parsedFilters?.query?.trim()) params.set("q", parsedFilters.query.trim());
 	if (parsedFilters?.title?.trim()) params.set("title", parsedFilters.title.trim());
+	if (parsedFilters?.sender?.trim()) params.set("from", parsedFilters.sender.trim());
+	if (parsedFilters?.recipient?.trim()) params.set("to", parsedFilters.recipient.trim());
+	if (parsedFilters?.hasAttachments !== undefined) {
+		params.set("hasAttachments", String(parsedFilters.hasAttachments));
+	}
+	if (parsedFilters?.after) params.set("after", parsedFilters.after);
+	if (parsedFilters?.before) params.set("before", parsedFilters.before);
 	if (parsedFilters?.read && parsedFilters.read !== "all") params.set("read", parsedFilters.read);
-	if (filters?.limit) params.set("limit", String(filters.limit));
-	if (filters?.offset) params.set("offset", String(filters.offset));
+	if (parsedFilters?.limit) params.set("limit", String(parsedFilters.limit));
+	if (parsedFilters?.offset) params.set("offset", String(parsedFilters.offset));
+	if (parsedFilters?.pagination) params.set("pagination", parsedFilters.pagination);
+	if (parsedFilters?.cursor) params.set("cursor", parsedFilters.cursor);
 
 	return params;
 }
@@ -133,6 +142,43 @@ export async function fetchMessageCounts(
 
 	messageCountsRequests.set(key, request);
 	return request;
+}
+
+/**
+ * Marks messages (and whole conversations) read in every cached list, so a list that mounts
+ * from cache — like the split view opened by clicking a row — doesn't show them as unread.
+ */
+export function markReadInMessageListCache(target: {
+	messageIds?: string[];
+	threadIds?: string[];
+}): void {
+	const messageIds = new Set(target.messageIds ?? []);
+	const threadIds = new Set(target.threadIds ?? []);
+	for (const [key, response] of messageListCache) {
+		if (!response.messages) continue;
+		let changed = false;
+		const messages = response.messages.map((message) => {
+			const matches =
+				messageIds.has(message.id) ||
+				(message.thread ? threadIds.has(message.thread.id) : false) ||
+				(message.threadId ? threadIds.has(message.threadId) : false);
+			if (!matches || (message.read && !message.thread?.unreadCount)) return message;
+			changed = true;
+			return {
+				...message,
+				read: true,
+				thread: message.thread && {
+					...message.thread,
+					unreadCount: 0,
+					participants: message.thread.participants.map((participant) => ({
+						...participant,
+						unread: false,
+					})),
+				},
+			};
+		});
+		if (changed) messageListCache.set(key, { ...response, messages });
+	}
 }
 
 export async function fetchMessageList(

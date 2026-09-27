@@ -40,6 +40,7 @@ import {
 	saveBackupSettings,
 	startBackup,
 } from "./utils";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 const SCHEDULE_TYPE_LABELS = {
 	daily: "Daily",
@@ -101,57 +102,55 @@ export default function BackupsPage() {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex items-start justify-between gap-4">
-				<div>
-					<h1 className="text-3xl font-medium text-neutral-900">Database Backups</h1>
-					<p className="mt-1 text-sm text-neutral-500">
-						Export database records through the D1 binding and store them in the configured R2
-						bucket.
-					</p>
-				</div>
-				<div className="flex items-center gap-2">
-					<Input
-						ref={restoreInput}
-						type="file"
-						accept="application/json,.json"
-						className="hidden"
-						onChange={(event) => {
-							const file = event.target.files?.[0];
-							event.target.value = "";
-							if (!file) return;
-							if (file.size > MAX_DATABASE_RESTORE_BYTES) {
-								window.alert(
-									`Backup files must be ${MAX_DATABASE_RESTORE_BYTES / (1024 * 1024)} MiB or smaller.`,
-								);
-								return;
-							}
-							if (
-								!window.confirm(
-									"Restore this backup? CC Mail will first save a recovery copy, replace the database in one transaction, and sign out every user.",
-								)
-							)
-								return;
-							restore.mutate(file);
-						}}
-					/>
-					<Button
-						type="button"
-						variant="outline"
-						disabled={restore.isPending}
-						onClick={() => restoreInput.current?.click()}
-					>
-						<Upload className="h-4 w-4" />
-						{restore.isPending ? "Restoring..." : "Restore"}
-					</Button>
-					<Button
-						onClick={() => runBackup.mutate()}
-						disabled={runBackup.isPending || !backupConfigured}
-					>
-						<Play className="h-4 w-4" />
-						{runBackup.isPending ? "Starting..." : "Back up now"}
-					</Button>
-				</div>
-			</div>
+			<AdminPageHeader
+				title="Backups"
+				actions={
+					<>
+						<div className="flex items-center gap-2">
+							<Input
+								ref={restoreInput}
+								type="file"
+								accept="application/json,.json"
+								className="hidden"
+								onChange={(event) => {
+									const file = event.target.files?.[0];
+									event.target.value = "";
+									if (!file) return;
+									if (file.size > MAX_DATABASE_RESTORE_BYTES) {
+										window.alert(
+											`Backup files must be ${MAX_DATABASE_RESTORE_BYTES / (1024 * 1024)} MiB or smaller.`,
+										);
+										return;
+									}
+									if (
+										!window.confirm(
+											"Restore this backup? CC Mail will first save a recovery copy, replace the database in one transaction, and sign out every user.",
+										)
+									)
+										return;
+									restore.mutate(file);
+								}}
+							/>
+							<Button
+								type="button"
+								variant="outline"
+								disabled={restore.isPending}
+								onClick={() => restoreInput.current?.click()}
+							>
+								<Upload className="h-4 w-4" />
+								{restore.isPending ? "Restoring..." : "Restore"}
+							</Button>
+							<Button
+								onClick={() => runBackup.mutate()}
+								disabled={runBackup.isPending || !backupConfigured}
+							>
+								<Play className="h-4 w-4" />
+								{runBackup.isPending ? "Starting..." : "Back up now"}
+							</Button>
+						</div>
+					</>
+				}
+			/>
 
 			{error && (
 				<p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

@@ -15,7 +15,7 @@ export function BulkMessageSelectionPane({
 	const [pending, setPending] = useState(false);
 	const hasUnreadSelection = selectedMessages.some((message) => !message.read);
 
-	async function runAction(action: BulkMessageAction) {
+	async function runAction(action: BulkMessageAction, folderId?: string) {
 		if (selectedMessages.length === 0) return;
 
 		setPending(true);
@@ -25,6 +25,7 @@ export function BulkMessageSelectionPane({
 				action,
 				true,
 				scope,
+				folderId,
 			);
 			onClearSelection();
 		} finally {

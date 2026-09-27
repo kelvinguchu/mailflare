@@ -3,11 +3,29 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import type { SidebarProviderProps, SidebarState } from "./sidebar-state-types";
 
-const SidebarContext = createContext<SidebarState>({ minimal: false, toggle: () => undefined });
+const SidebarContext = createContext<SidebarState>({
+	minimal: false,
+	narrow: false,
+	toggle: () => undefined,
+});
 
 export function SidebarProvider({ children, expandedWidth = 240 }: SidebarProviderProps) {
-	const [minimal, setMinimal] = useState(false);
+	const [desktopMinimal, setDesktopMinimal] = useState(false);
+	const [narrow, setNarrow] = useState(false);
+	const [narrowExpanded, setNarrowExpanded] = useState(false);
 	const [storageKey, setStorageKey] = useState<string | null>(null);
+	const minimal = narrow ? !narrowExpanded : desktopMinimal;
+
+	useEffect(() => {
+		const query = window.matchMedia("(max-width: 767px)");
+		const update = () => {
+			setNarrow(query.matches);
+			if (!query.matches) setNarrowExpanded(false);
+		};
+		update();
+		query.addEventListener("change", update);
+		return () => query.removeEventListener("change", update);
+	}, []);
 
 	useEffect(() => {
 		void fetch("/api/auth/me", { cache: "no-store" })
@@ -16,12 +34,16 @@ export function SidebarProvider({ children, expandedWidth = 240 }: SidebarProvid
 				if (!data.user?.id) return;
 				const key = `mailflare-sidebar-minimal:${data.user.id}`;
 				setStorageKey(key);
-				setMinimal(localStorage.getItem(key) === "true");
+				setDesktopMinimal(localStorage.getItem(key) === "true");
 			});
 	}, []);
 
 	function toggle() {
-		setMinimal((current) => {
+		if (narrow) {
+			setNarrowExpanded((current) => !current);
+			return;
+		}
+		setDesktopMinimal((current) => {
 			const next = !current;
 			if (storageKey) localStorage.setItem(storageKey, String(next));
 			return next;
@@ -29,7 +51,7 @@ export function SidebarProvider({ children, expandedWidth = 240 }: SidebarProvid
 	}
 
 	return (
-		<SidebarContext.Provider value={{ minimal, toggle }}>
+		<SidebarContext.Provider value={{ minimal, narrow, toggle }}>
 			<div
 				className="h-full"
 				style={{ "--sidebar-width": `${minimal ? 72 : expandedWidth}px` } as React.CSSProperties}

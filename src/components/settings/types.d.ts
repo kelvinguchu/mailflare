@@ -53,6 +53,34 @@ export type MailboxSignatureResponse = {
 	error?: unknown;
 };
 
+export type MailboxSignatureValue = {
+	signature: string | null;
+	signatureText: string | null;
+	signatureHtml: string | null;
+	signatureVersion: number;
+};
+
+export type SignatureAsset = {
+	id: string;
+	mailboxId: string;
+	contentId: string;
+	src: string;
+	previewUrl: string;
+	filename: string;
+	type: string;
+	size: number;
+	width: number;
+	height: number;
+	altText: string;
+	createdAt: string;
+};
+
+export type SignatureAssetsResponse = {
+	assets?: SignatureAsset[];
+	asset?: SignatureAsset;
+	error?: unknown;
+};
+
 export type MailboxAutoReplySettings = {
 	enabled: boolean;
 	subject: string;
@@ -122,3 +150,20 @@ export type CurrentMailboxFormResponse = {
 	};
 	error?: unknown;
 };
+
+export type MfaPolicyState = "not_required" | "compliant" | "grace" | "exempt" | "restricted";
+
+export type MfaStatus = {
+	enabled: boolean;
+	recoveryCodesRemaining: number;
+	policy: {
+		state: MfaPolicyState;
+		required: boolean;
+		deadline: string | null;
+		exemptUntil: string | null;
+	};
+};
+
+export type MfaSetupDetails = { secret: string; otpauthUri: string };
+
+export type MfaRequestContext = "begin" | "verify" | "protected" | "status";

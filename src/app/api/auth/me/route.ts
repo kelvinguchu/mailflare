@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/cookies";
+import { getCurrentSessionUser } from "@/lib/auth/cookies";
+import { evaluateMfaPolicy, getMfaPolicy } from "@/lib/auth/mfa-policy";
 import { getEnv } from "@/lib/cloudflare";
 import { hasPrimaryDomain, userHasMailboxes } from "@/lib/user";
 
 export async function GET(request: Request) {
 	const env = getEnv();
-	const user = await getCurrentUser(env, request);
+	const user = await getCurrentSessionUser(env, request);
 	if (!user) {
 		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	}
@@ -20,6 +21,8 @@ export async function GET(request: Request) {
 	} catch {
 		// Authentication remains valid when optional mailbox/setup metadata is unavailable.
 	}
+	const mfaPolicy = await getMfaPolicy(env);
+	const mfaPolicyStatus = evaluateMfaPolicy(user, mfaPolicy);
 	return NextResponse.json({
 		user: {
 			id: user.id,
@@ -32,6 +35,14 @@ export async function GET(request: Request) {
 			mfaEnabled: !!user.mfaEnabledAt,
 			canManageMailboxes: user.canManageMailboxes,
 			hasAvatar: !!user.avatarKey,
+		},
+		mfaPolicy: {
+			mode: mfaPolicy.mode,
+			gracePeriodDays: mfaPolicy.gracePeriodDays,
+			state: mfaPolicyStatus.state,
+			required: mfaPolicyStatus.required,
+			deadline: mfaPolicyStatus.deadline?.toISOString() ?? null,
+			exemptUntil: mfaPolicyStatus.exemptUntil?.toISOString() ?? null,
 		},
 		hasMailboxes,
 		isSetup,

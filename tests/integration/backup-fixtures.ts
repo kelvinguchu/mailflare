@@ -33,6 +33,13 @@ export async function seedEveryBackupTable(): Promise<void> {
 			),
 		db
 			.prepare(
+				`INSERT INTO mfa_policy_settings
+				(id, mode, grace_period_days, updated_by_user_id, updated_at)
+				VALUES ('default', 'administrators', 7, 'user_backup', ?)`,
+			)
+			.bind(timestamp),
+		db
+			.prepare(
 				`INSERT INTO account_recovery_tokens
 			(id, user_id, purpose, token_hash, email, expires_at, created_at)
 			VALUES ('recovery_backup', 'user_backup', 'password_reset', 'recovery-token-hash',
@@ -103,10 +110,12 @@ export async function seedEveryBackupTable(): Promise<void> {
 			.prepare(
 				`INSERT INTO messages
 			(id, user_id, mailbox_id, direction, provider_message_id, folder_id, from_addr, to_addr,
+			 cc_addr, delivered_to_addr,
 			 subject, snippet, text_body, html_body, raw_r2_key, inbound_delivery_key, status, read,
 			 starred, snoozed_until, thread_id, created_at)
 			VALUES ('message_backup', 'user_backup', 'mailbox_backup', 'inbound', 'provider-id', 'folder_backup',
-			 'sender@example.net', 'backup@example.test', 'Subject', 'Snippet', 'Text', '<p>Text</p>',
+			 'sender@example.net', 'backup@example.test', 'copy@example.net', 'backup@example.test',
+			 'Subject', 'Snippet', 'Text', '<p>Text</p>',
 			 'raw/messages/message.eml', ?, 'received', 1, 1, ?, 'thread_backup', ?)`,
 			)
 			.bind("a".repeat(64), timestamp + 3600, timestamp),
@@ -118,6 +127,15 @@ export async function seedEveryBackupTable(): Promise<void> {
 			 'attachment', NULL, 'attachments/message/attachment.txt', ?)`,
 			)
 			.bind(timestamp),
+		db
+			.prepare(
+				`INSERT INTO storage_deletion_jobs
+			(id, message_id, actor_user_id, mailbox_id, reason, status, object_keys, attempt_count,
+			 created_at, updated_at, completed_at)
+			VALUES ('deletion_backup', 'deleted_message_backup', 'user_backup', 'mailbox_backup',
+			 'user', 'completed', '[]', 1, ?, ?, ?)`,
+			)
+			.bind(timestamp, timestamp, timestamp),
 		db
 			.prepare(
 				`INSERT INTO outbound_jobs
@@ -241,11 +259,43 @@ export async function seedEveryBackupTable(): Promise<void> {
 			.bind(timestamp, timestamp, timestamp),
 		db
 			.prepare(
+				`INSERT INTO operational_settings
+			 (id, queue_backlog_warning, queue_oldest_minutes_warning,
+			  delivery_failed_24h_warning, delivery_unknown_24h_warning,
+			  webhook_failed_24h_warning, reminder_failed_24h_warning,
+			  dead_letter_unresolved_warning, backup_stale_hours,
+			  d1_growth_percent_warning, r2_growth_percent_warning, updated_at)
+			 VALUES ('default', 50, 10, 2, 2, 3, 3, 2, 48, 20, 30, ?)`,
+			)
+			.bind(timestamp),
+		db
+			.prepare(
+				`INSERT INTO operational_snapshots
+			 (id, captured_at, d1_bytes, r2_object_count, r2_bytes, r2_scan_complete)
+			 VALUES ('snapshot_backup', ?, 65536, 6, 1024, 1)`,
+			)
+			.bind(timestamp),
+		db
+			.prepare(
+				`INSERT INTO restore_drill_records
+			 (id, backup_id, environment, source, verified_by_user_id, verified_at,
+			  d1_verified, r2_verified, rollback_verified, sessions_invalidated, cleanup_verified)
+			 VALUES ('drill_backup', 'backup_history', 'staging', 'manual', 'user_backup', ?, 1, 1, 1, 1, 1)`,
+			)
+			.bind(timestamp),
+		db
+			.prepare(
 				`INSERT INTO app_settings
 			(id, app_name, company_name, icon_key, updated_at)
 			VALUES ('app_backup', 'CC Mail Test', 'Test Company', 'branding/app/icon.png', ?)`,
 			)
 			.bind(timestamp),
+		db
+			.prepare(
+				`INSERT INTO storage_lifecycle_state (prefix, cursor, last_scanned_at, updated_at)
+			 VALUES ('attachments/', 'fixture-cursor', ?, ?)`,
+			)
+			.bind(timestamp, timestamp),
 	]);
 
 	await Promise.all(

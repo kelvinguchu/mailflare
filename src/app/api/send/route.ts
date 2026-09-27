@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import { getEnv } from "@/lib/cloudflare";
-import { requireUser } from "@/lib/auth/cookies";
+import { getCurrentUser } from "@/lib/auth/cookies";
 import { sendEmailSchema } from "@/lib/validators";
 import { queueEmail } from "@/lib/email/send";
 import { parseSendRequest } from "./utils";
@@ -12,7 +12,8 @@ import { parseUndoSendDelay } from "@/lib/email/undo-send";
 
 export async function POST(request: Request) {
 	const env = getEnv();
-	const user = await requireUser(env, request);
+	const user = await getCurrentUser(env, request);
+	if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	let input;
 	try {
 		input = await parseSendRequest(request);

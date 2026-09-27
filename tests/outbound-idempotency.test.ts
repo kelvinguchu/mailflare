@@ -11,6 +11,7 @@ function request(overrides?: Partial<Parameters<typeof createOutboundRequestHash
 	return {
 		from: "CaliberCode <info@calibercode.io>",
 		to: "person@example.com",
+		cc: "copy@example.com",
 		subject: "Hello",
 		text: "Message body",
 		mailboxId: "mailbox_1",
@@ -64,6 +65,24 @@ describe("outbound request idempotency", () => {
 		const first = await createOutboundRequestHash(request({ replyToMessageId: "msg_parent_1" }));
 		const second = await createOutboundRequestHash(request({ replyToMessageId: "msg_parent_2" }));
 		expect(second).not.toBe(first);
+	});
+
+	it("includes the normalized To and Cc set in the request identity", async () => {
+		const original = await createOutboundRequestHash(
+			request({ to: "Maya <maya@example.com>, ops@example.com", cc: "copy@example.com" }),
+		);
+		const normalizedReplay = await createOutboundRequestHash(
+			request({
+				to: '"Maya" <MAYA@example.com>, ops@example.com',
+				cc: "copy@example.com, maya@example.com",
+			}),
+		);
+		const changedCc = await createOutboundRequestHash(
+			request({ to: "Maya <maya@example.com>, ops@example.com", cc: "other@example.com" }),
+		);
+
+		expect(normalizedReplay).toBe(original);
+		expect(changedCc).not.toBe(original);
 	});
 
 	it("scopes stored request keys to the authenticated account", async () => {

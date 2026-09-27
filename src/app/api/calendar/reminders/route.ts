@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth/cookies";
+import { getCurrentUser } from "@/lib/auth/cookies";
 import { getEnv } from "@/lib/cloudflare";
 import { createCalendarReminder, listCalendarReminders } from "@/lib/calendar/reminders";
 import type { CalendarReminderInput, CalendarReminderStatus } from "@/lib/calendar/types";
@@ -7,7 +7,8 @@ import { CalendarInputError, calendarInstant } from "@/lib/calendar/validation";
 
 export async function GET(request: Request) {
 	const env = getEnv();
-	const user = await requireUser(env, request);
+	const user = await getCurrentUser(env, request);
+	if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	try {
 		const url = new URL(request.url);
 		const start = optionalRangeDate(url.searchParams.get("start"), "a reminder range start");
@@ -34,7 +35,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
 	const env = getEnv();
-	const user = await requireUser(env, request);
+	const user = await getCurrentUser(env, request);
+	if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	try {
 		const input = (await request.json()) as CalendarReminderInput;
 		const reminder = await createCalendarReminder(env, user, input);

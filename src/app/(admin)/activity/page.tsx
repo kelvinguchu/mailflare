@@ -5,6 +5,7 @@ import { LogIn, LogOut } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchActivity, formatActivityDate, getActivityLabel, getActivityMetadata } from "./utils";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 export default function ActivityPage() {
 	const activity = useQuery({
@@ -14,12 +15,7 @@ export default function ActivityPage() {
 
 	return (
 		<div className="space-y-6">
-			<div>
-				<h1 className="text-3xl font-medium text-neutral-900">Activity</h1>
-				<p className="mt-1 text-sm text-neutral-500">
-					Login and logout activity across user accounts.
-				</p>
-			</div>
+			<AdminPageHeader title="Activity" />
 
 			<section className="overflow-x-auto rounded-3xl bg-white">
 				<table className="w-full min-w-[760px] table-fixed text-left">

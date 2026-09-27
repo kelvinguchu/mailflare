@@ -1,33 +1,85 @@
 "use client";
 
 import { createElement, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
 	Archive,
+	ArrowLeft,
 	Ban,
 	BellOff,
+	FolderInput,
 	Mail,
 	MailOpen,
 	MoreVertical,
-	Reply,
 	ShieldAlert,
 	Trash2,
 } from "lucide-react";
-import { useCompose } from "@/components/compose/compose-context";
-import { Button } from "@/components/ui/button";
+import { MoveToFolderDialog } from "@/components/messages/move-to-folder-dialog";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { BulkMessageAction } from "@/app/api/messages/bulk/types";
+import { cn } from "@/lib/utils";
 import type { MessageActionsProps } from "./types";
 import {
-	confirmTrashWithoutUnsubscribe,
 	blockMessageContact,
-	createReplyDraft,
+	confirmTrashWithoutUnsubscribe,
 	createTrashSenderRule,
 	getMessageActionRedirect,
+	getMessageBackHref,
 	getMoveMessageActions,
 	openUnsubscribeUrl,
 	runSingleMessageAction,
 } from "./utils";
+
+/** Actions that take the conversation out of view send the reader back to the list, as in Gmail. */
+const LEAVES_VIEW: ReadonlySet<BulkMessageAction> = new Set([
+	"archive",
+	"spam",
+	"trash",
+	"inbox",
+	"unread",
+]);
+
+function ToolbarButton({
+	label,
+	disabled,
+	onClick,
+	children,
+}: Readonly<{
+	label: string;
+	disabled?: boolean;
+	onClick: () => void;
+	children: React.ReactNode;
+}>) {
+	return (
+		<Tooltip label={label}>
+			<Button
+				type="button"
+				variant="ghost"
+				size="icon-sm"
+				aria-label={label}
+				disabled={disabled}
+				onClick={onClick}
+				className="rounded-full text-neutral-600"
+			>
+				{children}
+			</Button>
+		</Tooltip>
+	);
+}
+
+function Divider() {
+	return <span aria-hidden="true" className="mx-1 h-4 w-px bg-neutral-200" />;
+}
 
 export function MessageActions({
 	messageId,
@@ -37,223 +89,192 @@ export function MessageActions({
 	status,
 	read,
 	unsubscribeUrl,
-	subject,
-	bodyText,
-	ownAddress,
-	onReply,
+	backHref,
 }: MessageActionsProps) {
 	const router = useRouter();
-	const { openDraftComposer } = useCompose();
 	const [pendingAction, setPendingAction] = useState<
-		BulkMessageAction | "unsubscribe" | "reply" | "block" | null
+		BulkMessageAction | "unsubscribe" | "block" | null
 	>(null);
 	const [error, setError] = useState<string | null>(null);
-	const [moreOpen, setMoreOpen] = useState(false);
+	const [folderDialogOpen, setFolderDialogOpen] = useState(false);
+	const listHref = backHref ?? getMessageBackHref(direction, status);
 
 	async function runAction(action: BulkMessageAction) {
-		setMoreOpen(false);
 		setPendingAction(action);
 		setError(null);
 		try {
 			await runSingleMessageAction(messageId, action);
-			const redirect = getMessageActionRedirect(action, direction);
+			const redirect = LEAVES_VIEW.has(action)
+				? (backHref ?? getMessageActionRedirect(action, direction))
+				: null;
 			if (redirect) router.push(redirect);
 			router.refresh();
 		} catch {
-			setError("Could not update message");
+			setError("Couldn’t update this conversation");
 		} finally {
 			setPendingAction(null);
 		}
 	}
 
+	async function moveToFolder(folderId: string) {
+		await runSingleMessageAction(messageId, "folder", "thread", folderId);
+		router.push(backHref ?? `/folders/${folderId}`);
+		router.refresh();
+	}
+
 	async function onUnsubscribe() {
-		setMoreOpen(false);
 		setError(null);
 		if (unsubscribeUrl) {
 			openUnsubscribeUrl(unsubscribeUrl);
 			return;
 		}
-
 		if (!confirmTrashWithoutUnsubscribe()) return;
-		setPendingAction("unsubscribe");
 		if (!mailboxId) {
-			setError("Could not create trash rule");
-			setPendingAction(null);
+			setError("Couldn’t create the trash rule");
 			return;
 		}
-
+		setPendingAction("unsubscribe");
 		try {
 			await createTrashSenderRule({ mailboxId, senderAddress });
 			await runAction("trash");
 		} catch {
-			setError("Could not create trash rule");
-			setPendingAction(null);
-		}
-	}
-
-	async function handleReply() {
-		if (onReply) {
-			onReply();
-			return;
-		}
-		setPendingAction("reply");
-		setError(null);
-		try {
-			const draftId = await createReplyDraft({
-				messageId,
-				mailboxId,
-				senderAddress,
-				ownAddress,
-				subject,
-				bodyText,
-			});
-			openDraftComposer(draftId);
-		} catch (replyError) {
-			setError(replyError instanceof Error ? replyError.message : "Could not start reply");
-		} finally {
+			setError("Couldn’t create the trash rule");
 			setPendingAction(null);
 		}
 	}
 
 	async function onBlockContact() {
-		setMoreOpen(false);
 		setError(null);
 		if (!mailboxId) {
-			setError("Could not block contact");
+			setError("Couldn’t block this contact");
 			return;
 		}
-
 		setPendingAction("block");
 		try {
 			await blockMessageContact({ mailboxId, senderAddress });
 			await runSingleMessageAction(messageId, "trash", "message");
-			router.push("/trash");
+			router.push(backHref ?? "/trash");
 			router.refresh();
 		} catch (blockError) {
-			setError(blockError instanceof Error ? blockError.message : "Could not block contact");
+			setError(blockError instanceof Error ? blockError.message : "Couldn’t block this contact");
 		} finally {
 			setPendingAction(null);
 		}
 	}
 
 	const disabled = pendingAction !== null;
-	const markAction: BulkMessageAction = read ? "unread" : "read";
-	const moveActions = getMoveMessageActions(status, direction);
+	const inbound = direction === "inbound";
+	const otherMoves = getMoveMessageActions(status, direction).filter(
+		(item) => item.action === "inbox",
+	);
 
 	return (
-		<div className="flex items-center gap-3 text-neutral-600">
-			{error && <span className="text-xs text-red-600">{error}</span>}
-			<div className="flex items-center gap-2">
-				<Tooltip label="Reply">
-					<Button
-						type="button"
-						variant="ghost"
-						size="sm"
-						aria-label="Reply"
-						disabled={disabled}
-						onClick={handleReply}
-					>
-						<Reply className="h-5 w-5" />
-					</Button>
-				</Tooltip>
-				<Tooltip label="Archive">
-					<Button
-						variant="ghost"
-						size="sm"
-						aria-label="Archive"
-						disabled={disabled || status === "archived"}
-						onClick={() => runAction("archive")}
-					>
-						<Archive className="h-5 w-5" />
-					</Button>
-				</Tooltip>
-				<Tooltip label="Report spam">
-					<Button
-						variant="ghost"
-						size="sm"
-						aria-label="Report spam"
-						disabled={disabled || status === "spam" || direction !== "inbound"}
-						onClick={() => runAction("spam")}
-					>
-						<ShieldAlert className="h-5 w-5" />
-					</Button>
-				</Tooltip>
-				<Tooltip label="Delete">
-					<Button
-						variant="ghost"
-						size="sm"
-						aria-label="Move to trash"
-						disabled={disabled || status === "trash"}
-						onClick={() => runAction("trash")}
-					>
-						<Trash2 className="h-5 w-5" />
-					</Button>
-				</Tooltip>
-				<Tooltip label={read ? "Mark as unread" : "Mark as read"}>
-					<Button
-						variant="ghost"
-						size="sm"
-						aria-label={read ? "Mark as unread" : "Mark as read"}
-						disabled={disabled}
-						onClick={() => runAction(markAction)}
-					>
-						{read ? <Mail className="h-5 w-5" /> : <MailOpen className="h-5 w-5" />}
-					</Button>
-				</Tooltip>
-				<div className="relative">
-					<Tooltip label="More actions">
+		<div className="flex min-w-0 items-center">
+			<Tooltip label="Back">
+				<Link
+					href={listHref}
+					aria-label="Back"
+					className={cn(
+						buttonVariants({ variant: "ghost", size: "icon-sm" }),
+						"rounded-full text-neutral-600",
+					)}
+				>
+					<ArrowLeft className="size-4" />
+				</Link>
+			</Tooltip>
+			<Divider />
+			<ToolbarButton
+				label="Archive"
+				disabled={disabled || status === "archived"}
+				onClick={() => void runAction("archive")}
+			>
+				<Archive className="size-4" />
+			</ToolbarButton>
+			<ToolbarButton
+				label="Report spam"
+				disabled={disabled || status === "spam" || !inbound}
+				onClick={() => void runAction("spam")}
+			>
+				<ShieldAlert className="size-4" />
+			</ToolbarButton>
+			<ToolbarButton
+				label="Delete"
+				disabled={disabled || status === "trash"}
+				onClick={() => void runAction("trash")}
+			>
+				<Trash2 className="size-4" />
+			</ToolbarButton>
+			<Divider />
+			<ToolbarButton
+				label={read ? "Mark as unread" : "Mark as read"}
+				disabled={disabled}
+				onClick={() => void runAction(read ? "unread" : "read")}
+			>
+				{read ? <Mail className="size-4" /> : <MailOpen className="size-4" />}
+			</ToolbarButton>
+			{mailboxId && (
+				<ToolbarButton
+					label="Move to folder"
+					disabled={disabled}
+					onClick={() => setFolderDialogOpen(true)}
+				>
+					<FolderInput className="size-4" />
+				</ToolbarButton>
+			)}
+			<DropdownMenu>
+				<DropdownMenuTrigger
+					disabled={disabled}
+					aria-label="More actions"
+					render={
 						<Button
 							type="button"
 							variant="ghost"
-							size="sm"
-							aria-label="More actions"
-							aria-expanded={moreOpen}
-							disabled={disabled}
-							onClick={() => setMoreOpen((open) => !open)}
-						>
-							<MoreVertical className="h-5 w-5" />
-						</Button>
-					</Tooltip>
-					{moreOpen && (
-						<div className="absolute right-0 z-20 mt-2 w-54 rounded-xl border border-neutral-200 bg-white p-2 shadow-lg">
-							{direction === "inbound" && (
-								<>
-									<button
-										type="button"
-										className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:text-neutral-400"
-										disabled={!unsubscribeUrl && status === "trash"}
-										onClick={() => void onUnsubscribe()}
-									>
-										<BellOff className="h-4 w-4 shrink-0" />
-										Unsubscribe
-									</button>
-									<button
-										type="button"
-										className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100"
-										onClick={() => void onBlockContact()}
-									>
-										<Ban className="h-4 w-4" />
-										Block contact
-									</button>
-									<hr className="my-1 border-neutral-100" />
-								</>
-							)}
-							<p className="mt-1 px-3 pb-1 pt-2 text-sm font-medium text-neutral-500">Move to</p>
-							{moveActions.map((item) => (
-								<button
-									key={item.action}
-									type="button"
-									className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100"
-									onClick={() => void runAction(item.action)}
-								>
-									{createElement(item.icon, { size: 16 })}
-									{item.label}
-								</button>
-							))}
-						</div>
+							size="icon-sm"
+							className="rounded-full text-neutral-600"
+						/>
+					}
+				>
+					<MoreVertical className="size-4" />
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align="start" className="w-52">
+					{otherMoves.map((item) => (
+						<DropdownMenuItem key={item.action} onClick={() => void runAction(item.action)}>
+							{createElement(item.icon, { className: "size-4" })}
+							Move to {item.label}
+						</DropdownMenuItem>
+					))}
+					{inbound && (
+						<>
+							{otherMoves.length > 0 && <DropdownMenuSeparator />}
+							<DropdownMenuItem
+								disabled={!unsubscribeUrl && status === "trash"}
+								onClick={() => void onUnsubscribe()}
+							>
+								<BellOff className="size-4" />
+								Unsubscribe
+							</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => void onBlockContact()}>
+								<Ban className="size-4" />
+								Block sender
+							</DropdownMenuItem>
+						</>
 					)}
-				</div>
-			</div>
+					{!inbound && otherMoves.length === 0 && (
+						<DropdownMenuLabel className="font-normal">No more actions</DropdownMenuLabel>
+					)}
+				</DropdownMenuContent>
+			</DropdownMenu>
+			{error && (
+				<span role="alert" className="ml-2 truncate text-xs text-red-600">
+					{error}
+				</span>
+			)}
+			<MoveToFolderDialog
+				open={folderDialogOpen}
+				onOpenChange={setFolderDialogOpen}
+				mailboxId={mailboxId}
+				onMove={(folder) => moveToFolder(folder.id)}
+			/>
 		</div>
 	);
 }

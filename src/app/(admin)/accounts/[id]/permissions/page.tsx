@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { ManagedAccount } from "../types";
 import { fetchManagedAccount, saveManagedAccount } from "../utils";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 export default function AccountPermissionsPage() {
 	const { id } = useParams<{ id: string }>();
@@ -37,10 +38,7 @@ export default function AccountPermissionsPage() {
 
 	return (
 		<div className="space-y-6">
-			<div>
-				<h1 className="text-3xl font-medium text-neutral-900">Permissions</h1>
-				<p className="mt-2 text-sm text-neutral-500">Control what this account can manage.</p>
-			</div>
+			<AdminPageHeader title={account?.name ?? "Account"} />
 			<div className="overflow-hidden rounded-3xl bg-white">
 				<table className="w-full text-left">
 					<thead className="border-b border-neutral-100 bg-neutral-50 text-xs font-semibold uppercase tracking-wide text-neutral-500">

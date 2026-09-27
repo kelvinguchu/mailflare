@@ -9,6 +9,7 @@ import { MailboxSignatureForm } from "./mailbox-signature-form";
 import { ProfileForm } from "./profile-form";
 import { ProfileAvatarForm } from "./profile-avatar-form";
 import { SessionManagement } from "./session-management";
+import { UndoSendSettings } from "./undo-send-settings";
 import { MfaSettings } from "./mfa-settings";
 import { Reauthentication } from "./reauthentication";
 import type { AccountSettingsResponse } from "./types";
@@ -94,20 +95,17 @@ export function AccountSettings() {
 				</CardContent>
 			</Card>
 
-			{user.role === "admin" && (
-				<Card className="rounded-3xl border-0 bg-white px-6">
-					<CardHeader>
-						<CardTitle>Administrator security</CardTitle>
-						<CardDescription>
-							Require an authenticator code at sign-in and confirm identity before high-risk
-							actions.
-						</CardDescription>
-					</CardHeader>
-					<CardContent className="pb-6">
-						<MfaSettings />
-					</CardContent>
-				</Card>
-			)}
+			<Card className="rounded-3xl border-0 bg-white px-6">
+				<CardHeader>
+					<CardTitle>Sign-in security</CardTitle>
+					<CardDescription>
+						Use an authenticator code at sign-in and keep one-time recovery codes safe.
+					</CardDescription>
+				</CardHeader>
+				<CardContent className="pb-6">
+					<MfaSettings />
+				</CardContent>
+			</Card>
 
 			<Card className="rounded-3xl border-0 bg-white px-6">
 				<CardHeader>
@@ -124,12 +122,21 @@ export function AccountSettings() {
 			<Card className="rounded-3xl border-0 bg-white px-6">
 				<CardHeader>
 					<CardTitle>Email signature</CardTitle>
-					<CardDescription>
-						Configure the signature for the inbox currently selected above.
-					</CardDescription>
 				</CardHeader>
 				<CardContent className="pb-6">
 					<MailboxSignatureForm />
+				</CardContent>
+			</Card>
+
+			<Card className="rounded-3xl border-0 bg-white px-6">
+				<CardHeader>
+					<CardTitle>Undo send</CardTitle>
+					<CardDescription>
+						How long you have to cancel a message after pressing Send.
+					</CardDescription>
+				</CardHeader>
+				<CardContent className="pb-6">
+					<UndoSendSettings />
 				</CardContent>
 			</Card>
 

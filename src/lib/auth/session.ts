@@ -2,6 +2,7 @@ import { and, eq, gt, lte, ne, sql } from "drizzle-orm";
 import { newId } from "@/lib/ids";
 import { getDb } from "@/db";
 import { sessions, users } from "@/db/schema";
+import { evaluateUserMfaPolicy, isMfaPolicyRestricted } from "./mfa-policy";
 export { SESSION_COOKIE } from "./constants";
 const SESSION_DAYS = 30;
 export const RECENT_AUTHENTICATION_MINUTES = 15;
@@ -57,6 +58,15 @@ export async function getUserFromSession(
 	if (!session) return null;
 	const [user] = await db.select().from(users).where(eq(users.id, session.userId)).limit(1);
 	return user ?? null;
+}
+
+export async function getPolicyAuthorizedUserFromSession(
+	env: CloudflareEnv,
+	token: string | undefined,
+): Promise<typeof users.$inferSelect | null> {
+	const user = await getUserFromSession(env, token);
+	if (!user || user.disabled || user.activationStatus !== "active") return null;
+	return isMfaPolicyRestricted(await evaluateUserMfaPolicy(env, user)) ? null : user;
 }
 
 export async function deleteSession(env: CloudflareEnv, token: string): Promise<void> {

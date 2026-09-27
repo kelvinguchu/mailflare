@@ -76,14 +76,16 @@ export async function processInboundMessage(
 	const snippet = buildSnippet(parsed.text, parsed.html);
 	const deliveredAddress =
 		getEmailAddress(payload.to) || `${decision.mailbox.localPart}@${decision.mailbox.hostname}`;
-	const toAddr = formatEmailAddress(
+	const deliveredToAddr = formatEmailAddress(
 		deliveredAddress,
 		decision.mailbox.displayName ?? decision.mailbox.localPart,
 	);
+	const toAddr = parsed.toAddr ?? deliveredToAddr;
+	const ccAddr = parsed.ccAddr ?? "";
 	const fromAddr = parsed.fromAddr ?? payload.from;
 	const destination = await resolveInboxRuleDestination(db, {
 		mailboxId: decision.mailbox.mailboxId,
-		toAddress: toAddr,
+		toAddress: deliveredToAddr,
 		fromAddress: fromAddr,
 		subject: parsed.subject,
 		content: [parsed.text, parsed.html, snippet].filter(Boolean).join(" "),
@@ -130,6 +132,8 @@ export async function processInboundMessage(
 			replyToMessageId: threading.replyToMessageId,
 			fromAddr,
 			toAddr,
+			ccAddr,
+			deliveredToAddr,
 			subject: parsed.subject,
 			snippet,
 			textBody: parsed.text,
@@ -171,6 +175,8 @@ export async function processInboundMessage(
 				providerMessageId: parsed.messageId,
 				fromAddr,
 				toAddr,
+				ccAddr,
+				deliveredToAddr,
 				fromContactName: contact?.displayName ?? null,
 				toContactName: null,
 				subject: parsed.subject,
@@ -217,6 +223,7 @@ export async function processInboundMessage(
 			messageId,
 			from: fromAddr,
 			to: toAddr,
+			cc: ccAddr,
 			subject: parsed.subject,
 		});
 	} catch (error) {

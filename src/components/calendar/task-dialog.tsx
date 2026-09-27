@@ -295,7 +295,6 @@ function TaskEditor({
 							value={values.title}
 							maxLength={200}
 							rows={1}
-							autoFocus={!task}
 							disabled={!permissions.canEdit}
 							onChange={(event) => set("title", event.target.value.replace(/\n/g, " "))}
 							onKeyDown={(event) => {

@@ -1,11 +1,20 @@
 import { cookies } from "next/headers";
-import { SESSION_COOKIE, getUserFromSession } from "@/lib/auth/session";
+import {
+	SESSION_COOKIE,
+	getPolicyAuthorizedUserFromSession,
+	getUserFromSession,
+} from "@/lib/auth/session";
 
-export async function getCurrentUser(env: CloudflareEnv, _request?: Request) {
+export async function getCurrentSessionUser(env: CloudflareEnv, _request?: Request) {
 	const jar = await cookies();
 	const token = jar.get(SESSION_COOKIE)?.value;
 	const user = await getUserFromSession(env, token);
 	return user?.disabled || user?.activationStatus !== "active" ? null : user;
+}
+
+export async function getCurrentUser(env: CloudflareEnv, _request?: Request) {
+	const jar = await cookies();
+	return getPolicyAuthorizedUserFromSession(env, jar.get(SESSION_COOKIE)?.value);
 }
 
 export async function requireUser(env: CloudflareEnv, request?: Request) {

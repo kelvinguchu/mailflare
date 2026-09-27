@@ -1,4 +1,4 @@
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
 	contacts,
@@ -31,14 +31,15 @@ import {
 	normalizeIdempotencyKey,
 } from "@/lib/email/outbound-idempotency";
 import { claimOutboundDelivery } from "@/lib/email/outbound-claim";
-import { getEmailAddress } from "@/lib/email/address";
 import { buildOutboundThreading, normalizeProviderMessageId } from "@/lib/email/threading";
 import { renderMailboxSignatureForSend } from "@/lib/email/signatures";
+import { normalizeRecipients, type NormalizedRecipient } from "@/lib/email/recipients";
 
 export type SendEmailInput = {
 	userId: string;
 	from: string;
 	to: string;
+	cc?: string;
 	subject: string;
 	html?: string;
 	text?: string;
@@ -81,6 +82,7 @@ export async function queueEmail(
 	const db = getDb(env);
 	const idempotencyKey = normalizeIdempotencyKey(options?.idempotencyKey);
 	const sender = await getAuthorizedSenderAddress(env, input);
+	const recipients = normalizeRecipients({ to: input.to, cc: input.cc });
 	const rendered = input.includeSignature
 		? await renderMailboxSignatureForSend(env, sender.mailboxId, {
 				html: input.html,
@@ -93,6 +95,8 @@ export async function queueEmail(
 	const requestHash = await createOutboundRequestHash({
 		...input,
 		from: sender.fromAddr,
+		to: recipients.toHeader,
+		cc: recipients.ccHeader,
 		mailboxId: sender.mailboxId,
 		html: rendered.html,
 		text: rendered.text,
@@ -102,14 +106,16 @@ export async function queueEmail(
 	if (existing) {
 		return acceptExistingOutboundJob(env, existing, requestHash, idempotencyKey);
 	}
-	const recipient = getEmailAddress(input.to).toLowerCase();
+	const recipientAddresses = [...recipients.to, ...recipients.cc].map(
+		(recipient) => recipient.address,
+	);
 	const [suppressed] = await db
 		.select({ id: contacts.id })
 		.from(contacts)
 		.where(
 			and(
 				eq(contacts.userId, input.userId),
-				eq(contacts.email, recipient),
+				inArray(contacts.email, recipientAddresses),
 				eq(contacts.blocked, true),
 			),
 		)
@@ -119,11 +125,15 @@ export async function queueEmail(
 		throw new Error("Recipient is suppressed");
 	}
 
-	await upsertContactFromAddress(env, {
-		userId: input.userId,
-		address: input.to,
-		source: "outbound",
-	});
+	await Promise.all(
+		[...recipients.to, ...recipients.cc].map((recipient) =>
+			upsertContactFromAddress(env, {
+				userId: input.userId,
+				address: recipient.formatted,
+				source: "outbound",
+			}),
+		),
+	);
 	const messageId = newId("msg");
 	const snippet = buildSnippet(rendered.text ?? null, rendered.html ?? null);
 	const threading = await buildOutboundThreading(db, {
@@ -154,7 +164,8 @@ export async function queueEmail(
 			replyToMessageId: threading.replyToMessageId,
 			threadId: threading.threadId,
 			fromAddr: sender.fromAddr,
-			toAddr: input.to,
+			toAddr: recipients.toHeader,
+			ccAddr: recipients.ccHeader,
 			subject: input.subject,
 			snippet,
 			textBody: rendered.text ?? null,
@@ -254,7 +265,7 @@ export async function processOutboundQueue(
 		await recordFinalOutboundFailure(env, job.id, message, readinessError);
 		await auditRejectedSend(
 			env,
-			{ userId: job.userId, to: message.toAddr },
+			{ userId: job.userId, to: message.toAddr, cc: message.ccAddr },
 			message.mailboxId,
 			readinessError,
 		);
@@ -277,6 +288,14 @@ export async function processOutboundQueue(
 		return;
 	}
 
+	let recipients;
+	try {
+		recipients = normalizeRecipients({ to: message.toAddr, cc: message.ccAddr });
+	} catch {
+		await recordFinalOutboundFailure(env, job.id, message, "E_INVALID_RECIPIENT_SET");
+		return;
+	}
+
 	const claimed = await claimOutboundDelivery(env.DB, job.id);
 	if (!claimed) {
 		const [current] = await db
@@ -292,7 +311,8 @@ export async function processOutboundQueue(
 	try {
 		response = await env.EMAIL.send({
 			from: message.fromAddr,
-			to: message.toAddr,
+			to: recipients.to.map(toEmailServiceRecipient),
+			...(recipients.cc.length > 0 ? { cc: recipients.cc.map(toEmailServiceRecipient) } : {}),
 			subject: message.subject ?? "",
 			headers: storedPayload.headers,
 			html: message.htmlBody ?? undefined,
@@ -329,13 +349,14 @@ export async function processOutboundQueue(
 			providerMessageId:
 				normalizeProviderMessageId(response.messageId) ?? message.providerMessageId,
 			to: message.toAddr,
+			cc: message.ccAddr,
 		}),
 		createAuditLog(env, {
 			actorUserId: message.userId,
 			mailboxId: message.mailboxId,
 			messageId: message.id,
 			action: "email.send",
-			metadata: { to: message.toAddr, subject: message.subject },
+			metadata: { to: message.toAddr, cc: message.ccAddr, subject: message.subject },
 		}),
 	]);
 	if (sideEffects.some((result) => result.status === "rejected")) {
@@ -523,15 +544,28 @@ async function getQueuedSenderReadinessError(
 
 async function auditRejectedSend(
 	env: CloudflareEnv,
-	input: Pick<SendEmailInput, "userId" | "to">,
+	input: Pick<SendEmailInput, "userId" | "to" | "cc">,
 	mailboxId: string | null,
 	reason: string,
 ): Promise<void> {
+	let recipients: NormalizedRecipient[] = [];
+	try {
+		const normalized = normalizeRecipients({ to: input.to, cc: input.cc });
+		recipients = [...normalized.to, ...normalized.cc];
+	} catch {
+		// Auditing must not hide the original rejection when stored data is malformed.
+	}
 	await createAuditLog(env, {
 		actorUserId: input.userId,
 		mailboxId,
 		action: "email.send_rejected",
-		metadata: { recipientDomain: getEmailAddress(input.to).split("@")[1] ?? "unknown", reason },
+		metadata: {
+			recipientDomains: Array.from(
+				new Set(recipients.map((recipient) => recipient.address.split("@")[1] ?? "unknown")),
+			),
+			recipientCount: recipients.length,
+			reason,
+		},
 	});
 }
 
@@ -578,6 +612,10 @@ function toEmailServiceAttachment(attachment: AttachmentContent) {
 				content: attachment.content,
 				disposition: "attachment" as const,
 			};
+}
+
+function toEmailServiceRecipient(recipient: NormalizedRecipient) {
+	return recipient.name ? { name: recipient.name, email: recipient.address } : recipient.address;
 }
 
 function parseStoredOutboundPayload(payload: string): StoredOutboundPayload {
@@ -668,11 +706,14 @@ async function recordFinalOutboundFailure(
 	const changed = await markOutboundFailed(env, jobId, message.id, description);
 	if (!changed) return;
 	if (description === "E_RECIPIENT_SUPPRESSED") {
-		const recipient = getEmailAddress(message.toAddr).toLowerCase();
-		await getDb(env)
-			.update(contacts)
-			.set({ blocked: true })
-			.where(and(eq(contacts.userId, message.userId), eq(contacts.email, recipient)));
+		const recipients = normalizeRecipients({ to: message.toAddr, cc: message.ccAddr });
+		if (recipients.to.length + recipients.cc.length === 1) {
+			const [recipient] = [...recipients.to, ...recipients.cc];
+			await getDb(env)
+				.update(contacts)
+				.set({ blocked: true })
+				.where(and(eq(contacts.userId, message.userId), eq(contacts.email, recipient.address)));
+		}
 	}
 	const webhookResult = await Promise.allSettled([
 		dispatchWebhooks(env, message.userId, "message.failed", {

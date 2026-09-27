@@ -20,6 +20,8 @@ const inboxMessage: RealtimeMessageListItem = {
 	providerMessageId: "provider-1",
 	fromAddr: "sender@example.com",
 	toAddr: "inbox@example.com",
+	ccAddr: "copy@example.com",
+	deliveredToAddr: "inbox@example.com",
 	fromContactName: "Sender",
 	toContactName: null,
 	subject: "Hello",

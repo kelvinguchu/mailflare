@@ -13,6 +13,7 @@ import {
 	formatFailureDate,
 	replayDeliveryFailure,
 } from "./utils";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 export default function DeliveryFailuresPage() {
 	const queryClient = useQueryClient();
@@ -29,24 +30,22 @@ export default function DeliveryFailuresPage() {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex items-start justify-between gap-4">
-				<div>
-					<h1 className="text-3xl font-medium text-neutral-900">Delivery failures</h1>
-					<p className="mt-1 text-sm text-neutral-500">
-						Inspect mail that exhausted automatic queue retries. Message contents are never shown
-						here.
-					</p>
-				</div>
-				<Button
-					type="button"
-					variant="outline"
-					onClick={() => void failures.refetch()}
-					disabled={failures.isFetching}
-				>
-					<RefreshCw className={`h-4 w-4 ${failures.isFetching ? "animate-spin" : ""}`} />
-					Refresh
-				</Button>
-			</div>
+			<AdminPageHeader
+				title="Delivery failures"
+				actions={
+					<>
+						<Button
+							type="button"
+							variant="outline"
+							onClick={() => void failures.refetch()}
+							disabled={failures.isFetching}
+						>
+							<RefreshCw className={`h-4 w-4 ${failures.isFetching ? "animate-spin" : ""}`} />
+							Refresh
+						</Button>
+					</>
+				}
+			/>
 
 			{(failures.data?.unresolvedCount ?? 0) > 0 ? (
 				<Card className="rounded-3xl border border-red-200 bg-red-50 p-6">

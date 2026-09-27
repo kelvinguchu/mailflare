@@ -1,11 +1,10 @@
-import { and, eq, inArray } from "drizzle-orm";
-import type { SQL } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getDb } from "@/db";
-import { messages } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/cookies";
 import { getEnv } from "@/lib/cloudflare";
-import { buildMessageCounts } from "./utils";
+import { buildMessageCountsFromAggregateRows } from "./utils";
+import { queryMessageCountAggregates } from "./query";
+import type { MessageCountScope } from "./query";
 import { getMailboxAccessLevel, listAccessibleMailboxIds } from "@/lib/mailboxes/access";
 
 export async function GET(request: Request) {
@@ -19,37 +18,24 @@ export async function GET(request: Request) {
 	const mailboxId = url.searchParams.get("mailboxId");
 	const threadView = url.searchParams.get("view") === "threads";
 	const db = getDb(env);
-	const conditions: SQL[] = [];
+	let scope: MessageCountScope;
 
 	if (mailboxId) {
 		const access = await getMailboxAccessLevel(db, user, mailboxId);
 		if (!access?.canRead) {
 			return NextResponse.json({ error: "Mailbox not found" }, { status: 404 });
 		}
-		conditions.push(eq(messages.mailboxId, mailboxId));
+		scope = { mailboxId };
 	} else {
 		const accessibleMailboxIds = await listAccessibleMailboxIds(db, user);
 		if (accessibleMailboxIds.length > 0) {
-			conditions.push(inArray(messages.mailboxId, accessibleMailboxIds));
+			scope = { accessibleMailboxIds };
 		} else {
-			conditions.push(eq(messages.userId, user.id));
+			scope = { userId: user.id };
 		}
 	}
 
-	const rows = await db
-		.select({
-			id: messages.id,
-			mailboxId: messages.mailboxId,
-			folderId: messages.folderId,
-			direction: messages.direction,
-			status: messages.status,
-			read: messages.read,
-			starred: messages.starred,
-			snoozedUntil: messages.snoozedUntil,
-			threadId: messages.threadId,
-		})
-		.from(messages)
-		.where(and(...conditions));
+	const rows = await queryMessageCountAggregates(env.DB, scope, threadView);
 
-	return NextResponse.json({ counts: buildMessageCounts(rows, threadView) });
+	return NextResponse.json({ counts: buildMessageCountsFromAggregateRows(rows) });
 }

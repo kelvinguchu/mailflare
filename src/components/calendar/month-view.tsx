@@ -43,7 +43,7 @@ function MonthDayItemButton({
 				type="button"
 				onClick={() => onSelectTask(item.task)}
 				className={cn(
-					"relative flex w-full min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-left text-xs hover:bg-neutral-100",
+					"relative flex w-full min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-left text-xs hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary/40",
 					TASK_ITEM_TONES[getTaskTone(item.task)],
 				)}
 			>
@@ -61,7 +61,7 @@ function MonthDayItemButton({
 			<button
 				type="button"
 				onClick={() => onSelectEvent(item.event)}
-				className="relative w-full min-w-0 truncate rounded-md bg-primary/90 px-1.5 py-0.5 text-left text-xs font-medium text-primary-foreground hover:bg-primary"
+				className="relative w-full min-w-0 truncate rounded-md bg-primary/90 px-1.5 py-0.5 text-left text-xs font-medium text-primary-foreground hover:bg-primary focus-visible:ring-2 focus-visible:ring-primary/60"
 			>
 				{item.event.title}
 			</button>
@@ -71,7 +71,7 @@ function MonthDayItemButton({
 		<button
 			type="button"
 			onClick={() => onSelectEvent(item.event)}
-			className="relative flex w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left text-xs text-neutral-800 hover:bg-neutral-100"
+			className="relative flex w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left text-xs text-neutral-800 hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary/40"
 		>
 			<span className="size-1.5 shrink-0 rounded-full bg-primary" />
 			<span className="shrink-0 text-neutral-500 tabular-nums">
@@ -165,7 +165,7 @@ export function MonthView({
 								onClick={() => onOpenDay(day)}
 								aria-label={day.toLocaleDateString(undefined, { dateStyle: "full" })}
 								className={cn(
-									"relative mx-auto mb-0.5 flex h-7 min-w-7 items-center justify-center rounded-full px-1 text-xs font-medium transition-colors",
+									"relative mx-auto mb-0.5 flex h-7 min-w-7 items-center justify-center rounded-full px-1 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary/40",
 									dayNumberClass(key === today, inMonth),
 								)}
 							>
@@ -187,7 +187,7 @@ export function MonthView({
 								<button
 									type="button"
 									onClick={() => onOpenDay(day)}
-									className="relative w-full rounded-md px-1.5 py-0.5 text-left text-xs font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
+									className="relative w-full rounded-md px-1.5 py-0.5 text-left text-xs font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 focus-visible:ring-2 focus-visible:ring-primary/40"
 								>
 									{hidden} more
 								</button>

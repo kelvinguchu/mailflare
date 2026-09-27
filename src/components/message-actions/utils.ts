@@ -22,11 +22,12 @@ export async function runSingleMessageAction(
 	messageId: string,
 	action: BulkMessageAction,
 	scope: BulkMessageScope = "thread",
+	folderId?: string,
 ) {
 	const response = await authFetch("/api/messages/bulk", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ messageIds: [messageId], action, scope }),
+		body: JSON.stringify({ messageIds: [messageId], action, scope, folderId }),
 	});
 
 	if (!response.ok) {

@@ -64,6 +64,7 @@ async function importMessageToMailbox(
 	const placement = getImportMessagePlacement(input.destination);
 	const fromAddr = parsed.fromAddr ?? "unknown";
 	const toAddr = parsed.toAddr ?? "";
+	const ccAddr = parsed.ccAddr ?? "";
 	const createdAt = parsed.date ?? new Date();
 	const providerMessageId =
 		parsed.messageId ??
@@ -105,6 +106,7 @@ async function importMessageToMailbox(
 		replyToMessageId: threading.replyToMessageId,
 		fromAddr,
 		toAddr,
+		ccAddr,
 		subject: parsed.subject,
 		snippet: buildSnippet(parsed.text, parsed.html),
 		textBody: parsed.text,

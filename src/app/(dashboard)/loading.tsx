@@ -1,3 +1,3 @@
-import { ListPageSkeleton } from "@/components/page-skeletons";
+import { RouteLoading } from "@/components/route-loading";
 
-export default ListPageSkeleton;
+export default RouteLoading;

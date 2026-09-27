@@ -1,8 +1,4 @@
-"use client";
-
-import { spamFolderConfig } from "@/components/messages/message-folder-configs";
-import { MessageFolderPage } from "@/components/messages/message-folder-page";
-
-export default function SpamPage() {
-	return <MessageFolderPage config={spamFolderConfig} />;
+/** The folder layout renders the message list, so it can stay mounted while a message is open. */
+export default function FolderListPage() {
+	return null;
 }

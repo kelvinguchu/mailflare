@@ -23,10 +23,13 @@ import {
 	WebhookRetryError,
 } from "@/lib/email/webhooks";
 import { getMailboxAccessLevel, listAccessibleMailboxes } from "@/lib/mailboxes/access";
-import { listMessageThreads } from "@/app/api/messages/route";
-import { applyMessageBulkAction } from "@/app/api/messages/bulk/route";
-import { and, eq } from "drizzle-orm";
+import { applyMessageBulkAction } from "@/app/api/messages/bulk/service";
+import { listMessageThreads } from "@/app/api/messages/thread-list";
+import { queryMessageCountAggregates } from "@/app/api/messages/counts/query";
+import { buildMessageCountsFromAggregateRows } from "@/app/api/messages/counts/utils";
+import { and, eq, lte } from "drizzle-orm";
 import { messages } from "@/db/schema";
+import { decodeMessagePageCursor } from "@/lib/messages/pagination";
 import {
 	createMailEnv,
 	fixtureIds,
@@ -300,6 +303,101 @@ describe("mail path with isolated Workers bindings", () => {
 			read: false,
 			thread: { id: "thr_list_one", messageCount: 2, unreadCount: 1 },
 		});
+
+		const snapshotAt = new Date(1_787_900_300 * 1_000);
+		const firstCursorPage = await listMessageThreads({
+			env: createMailEnv(),
+			matchingWhere: and(
+				eq(messages.mailboxId, fixtureIds.sharedMailbox),
+				eq(messages.status, "received"),
+			),
+			accessWhere: eq(messages.mailboxId, fixtureIds.sharedMailbox),
+			accessibleMailboxes,
+			includeTrash: false,
+			includeSpam: false,
+			limit: 1,
+			offset: 0,
+			pagination: { snapshotAt },
+		});
+		const firstCursorData = (await firstCursorPage.json()) as {
+			total: number;
+			nextCursor: string;
+			messages: Array<{ thread: { id: string } }>;
+		};
+		expect(firstCursorData.total).toBe(2);
+		expect(firstCursorData.messages[0]?.thread.id).toBe("thr_list_one");
+
+		await integrationEnv.DB.prepare(
+			`INSERT INTO messages
+			(id, user_id, mailbox_id, direction, from_addr, to_addr, subject, status,
+			 thread_id, read, created_at)
+			VALUES ('msg_arrived_between_pages', ?, ?, 'inbound', 'new@example.net',
+			 'support@primary.test', 'New arrival', 'received', 'thr_new_arrival', 0, ?)`,
+		)
+			.bind(fixtureIds.owner, fixtureIds.sharedMailbox, 1_787_900_400)
+			.run();
+		const decodedCursor = decodeMessagePageCursor(firstCursorData.nextCursor, "threads");
+		const secondCursorPage = await listMessageThreads({
+			env: createMailEnv(),
+			matchingWhere: and(
+				eq(messages.mailboxId, fixtureIds.sharedMailbox),
+				eq(messages.status, "received"),
+				lte(messages.createdAt, decodedCursor.snapshotAt),
+			),
+			accessWhere: eq(messages.mailboxId, fixtureIds.sharedMailbox),
+			accessibleMailboxes,
+			includeTrash: false,
+			includeSpam: false,
+			limit: 1,
+			offset: 0,
+			pagination: decodedCursor,
+		});
+		const secondCursorData = (await secondCursorPage.json()) as {
+			messages: Array<{ thread: { id: string } }>;
+		};
+		expect(secondCursorData.messages.map((message) => message.thread.id)).toEqual(["thr_list_two"]);
+	});
+
+	it("aggregates message counts in D1 without returning every message row", async () => {
+		await seedMailboxWorld();
+		await integrationEnv.DB.batch([
+			integrationEnv.DB.prepare(
+				`INSERT INTO messages
+				(id, user_id, mailbox_id, direction, from_addr, to_addr, status, thread_id,
+				 read, starred, created_at)
+				VALUES ('msg_count_1', ?, ?, 'inbound', 'maya@example.net', 'support@primary.test',
+				 'received', 'thr_count', 0, 1, 1787900000)`,
+			).bind(fixtureIds.owner, fixtureIds.sharedMailbox),
+			integrationEnv.DB.prepare(
+				`INSERT INTO messages
+				(id, user_id, mailbox_id, direction, from_addr, to_addr, status, thread_id,
+				 read, starred, created_at)
+				VALUES ('msg_count_2', ?, ?, 'inbound', 'maya@example.net', 'support@primary.test',
+				 'received', 'thr_count', 0, 0, 1787900010)`,
+			).bind(fixtureIds.owner, fixtureIds.sharedMailbox),
+		]);
+
+		const messageCounts = buildMessageCountsFromAggregateRows(
+			await queryMessageCountAggregates(
+				integrationEnv.DB,
+				{ mailboxId: fixtureIds.sharedMailbox },
+				false,
+			),
+		);
+		const threadCounts = buildMessageCountsFromAggregateRows(
+			await queryMessageCountAggregates(
+				integrationEnv.DB,
+				{ mailboxId: fixtureIds.sharedMailbox },
+				true,
+			),
+		);
+
+		expect(messageCounts.folders.inbox).toEqual({ total: 2, unread: 2 });
+		expect(messageCounts.folders.starred).toEqual({ total: 1, unread: 1 });
+		expect(threadCounts.folders.inbox).toEqual({ total: 2, unread: 1 });
+		expect(threadCounts.mailboxes).toEqual([
+			{ mailboxId: fixtureIds.sharedMailbox, total: 2, unread: 1, inbox: 2 },
+		]);
 	});
 
 	it("applies thread actions without archiving outbound replies", async () => {
@@ -388,6 +486,8 @@ describe("mail path with isolated Workers bindings", () => {
 			providerMessageId: null,
 			fromAddr: "sender@example.net",
 			toAddr: "support@primary.test",
+			ccAddr: "copy@example.net",
+			deliveredToAddr: "support@primary.test",
 			subject: "Hello",
 			snippet: "Hello",
 			textBody: "Hello",
@@ -428,6 +528,16 @@ describe("mail path with isolated Workers bindings", () => {
 			prefix: `attachments/inbound/${deliveryKey}/`,
 		});
 		expect(messageCount?.count).toBe(1);
+		const storedMessage = await integrationEnv.DB.prepare(
+			"SELECT to_addr, cc_addr, delivered_to_addr FROM messages WHERE id = ?",
+		)
+			.bind(messageId)
+			.first<{ to_addr: string; cc_addr: string; delivered_to_addr: string }>();
+		expect(storedMessage).toEqual({
+			to_addr: "support@primary.test",
+			cc_addr: "copy@example.net",
+			delivered_to_addr: "support@primary.test",
+		});
 		expect(attachmentCount?.count).toBe(1);
 		expect(storedObjects.objects).toHaveLength(1);
 	});
@@ -509,7 +619,8 @@ describe("mail path with isolated Workers bindings", () => {
 			userId: fixtureIds.owner,
 			mailboxId: fixtureIds.sharedMailbox,
 			from: "support@primary.test",
-			to: "recipient@example.net",
+			to: "Recipient <recipient@example.net>, second@example.net",
+			cc: "copy@example.net, RECIPIENT@example.net",
 			subject: "Queued",
 			text: "Once",
 		};
@@ -539,6 +650,21 @@ describe("mail path with isolated Workers bindings", () => {
 		expect(counts).toEqual({ messages: 1, jobs: 1 });
 		expect(job).toEqual({ status: "sent", attempt_count: 2, error: null });
 		expect(providerSend).toHaveBeenCalledTimes(2);
+		expect(providerSend).toHaveBeenLastCalledWith(
+			expect.objectContaining({
+				to: [{ name: "Recipient", email: "recipient@example.net" }, "second@example.net"],
+				cc: ["copy@example.net"],
+			}),
+		);
+		const storedRecipients = await integrationEnv.DB.prepare(
+			"SELECT to_addr, cc_addr FROM messages WHERE id = ?",
+		)
+			.bind(first.messageId)
+			.first<{ to_addr: string; cc_addr: string }>();
+		expect(storedRecipients).toEqual({
+			to_addr: '"Recipient" <recipient@example.net>, second@example.net',
+			cc_addr: "copy@example.net",
+		});
 	});
 
 	it("cancels throughout the advertised Undo Send window without calling the provider", async () => {

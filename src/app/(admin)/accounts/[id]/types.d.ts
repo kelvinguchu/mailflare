@@ -16,6 +16,11 @@ export type ManagedAccount = {
 	activeSessionCount: number;
 	forwardingEmail: string | null;
 	hasAvatar: boolean;
+	mfaEnabled: boolean;
+	mfaPolicyCoveredAt: string | null;
+	mfaPolicyExemptUntil: string | null;
+	mfaPolicyExemptionReason: string | null;
+	mfaPolicyExceptionActive: boolean;
 };
 
 export type ManagedMailbox = {

@@ -82,10 +82,20 @@ export function MessageAttachmentViewer({
 							/>
 						)}
 						{previewKind === "audio" && (
-							<audio src={previewUrl} controls className="w-[min(560px,90%)]" />
+							<audio
+								src={previewUrl}
+								controls
+								aria-label={`Audio preview of ${attachment.filename}`}
+								className="w-[min(560px,90%)]"
+							/>
 						)}
 						{previewKind === "video" && (
-							<video src={previewUrl} controls className="max-h-full max-w-full" />
+							<video
+								src={previewUrl}
+								controls
+								aria-label={`Video preview of ${attachment.filename}`}
+								className="max-h-full max-w-full"
+							/>
 						)}
 						{previewKind === "text" &&
 							(textError || textContent ? (

@@ -214,7 +214,15 @@
 				"directory": ".open-next/assets",
 			},
 			"images": { "binding": "IMAGES" },
-			"services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "mailflare" }],
+			"services": [
+				{ "binding": "WORKER_SELF_REFERENCE", "service": "mailflare" },
+				// Lets Mohamed reschedule CaliberCode advisory bookings from the calendar.
+				{
+					"binding": "CALIBERCODE_SCHEDULE",
+					"service": "cagabiyo-cms",
+					"entrypoint": "AdvisoryScheduleService",
+				},
+			],
 			"durable_objects": {
 				"bindings": [{ "name": "REALTIME", "class_name": "RealtimeHub" }],
 			},

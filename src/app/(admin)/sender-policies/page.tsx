@@ -5,6 +5,7 @@ import { authFetch } from "@/lib/auth/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 type Policy = {
 	id: string;
@@ -57,12 +58,7 @@ export default function SenderPoliciesPage() {
 
 	return (
 		<div className="space-y-6">
-			<div>
-				<h1 className="text-3xl font-medium">Sender policies</h1>
-				<p className="mt-1 text-sm text-neutral-500">
-					Global allow and block policies are evaluated before inbound content is made available.
-				</p>
-			</div>
+			<AdminPageHeader title="Sender policies" />
 			<section className="space-y-4 rounded-3xl bg-white p-6">
 				<div className="grid gap-4 sm:grid-cols-3">
 					<label className="space-y-2">
@@ -87,14 +83,15 @@ export default function SenderPoliciesPage() {
 							<option value="allow">Allow (spam signals only)</option>
 						</select>
 					</label>
-					<label className="space-y-2">
-						<Label>Address or domain</Label>
+					<div className="space-y-2">
+						<Label htmlFor="sender-policy-pattern">Address or domain</Label>
 						<Input
+							id="sender-policy-pattern"
 							value={pattern}
 							onChange={(event) => setPattern(event.target.value)}
 							placeholder={patternType === "address" ? "sender@example.com" : "example.com"}
 						/>
-					</label>
+					</div>
 				</div>
 				<Button onClick={() => void add()} disabled={!pattern.trim()}>
 					Add policy

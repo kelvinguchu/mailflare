@@ -1,118 +1,56 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
-import { useIsFetching } from "@tanstack/react-query";
 import { useBranding } from "@/components/branding-provider";
-import { PageLoadingContext } from "@/components/page-loading";
 import type { LoadingTransitionProps } from "./loading-transition-types";
 
-const MINIMUM_LOADING_TIME = 600;
-const COMPLETION_TIME = 220;
-const MAXIMUM_DATA_WAIT = 10_000;
-
+/**
+ * Covers the app only until the protected-session decision is known. Once the shell is shown it
+ * stays shown: route data, refetches, polling, and mutations present their own local progress.
+ */
 export function LoadingTransition({ children, ready }: LoadingTransitionProps) {
 	const branding = useBranding();
-	const startedAt = useRef(0);
-	const [progress, setProgress] = useState(8);
-	const [loaderVisible, setLoaderVisible] = useState(true);
-	const [contentVisible, setContentVisible] = useState(false);
 	const [iconUrl, setIconUrl] = useState(branding.iconUrl);
-	const [pageMounted, setPageMounted] = useState(false);
-	const [pendingLoads, setPendingLoads] = useState(0);
-	const [dataWaitExpired, setDataWaitExpired] = useState(false);
-	const loadingIds = useRef(new Set<string>());
-	const fetchingQueries = useIsFetching();
+	const [revealed, setRevealed] = useState(ready);
 
 	useEffect(() => {
-		startedAt.current = Date.now();
-	}, []);
-
-	const reportLoading = useCallback((id: string, loading: boolean) => {
-		if (loading) loadingIds.current.add(id);
-		else loadingIds.current.delete(id);
-		setPendingLoads(loadingIds.current.size);
-	}, []);
-	const loadingContext = useMemo(() => ({ reportLoading }), [reportLoading]);
-	const canComplete =
-		ready && pageMounted && (dataWaitExpired || (pendingLoads === 0 && fetchingQueries === 0));
+		if (ready) setRevealed(true);
+	}, [ready]);
 
 	useEffect(() => {
 		setIconUrl(branding.iconUrl);
 	}, [branding.iconUrl]);
 
-	useEffect(() => {
-		if (canComplete) return;
-		const timer = window.setInterval(() => {
-			setProgress((current) => Math.min(92, current + Math.max(1, (92 - current) * 0.08)));
-		}, 90);
-		return () => window.clearInterval(timer);
-	}, [canComplete]);
-
-	useEffect(() => {
-		if (!ready) return;
-		const timer = window.setTimeout(() => setPageMounted(true), 50);
-		return () => window.clearTimeout(timer);
-	}, [ready]);
-
-	useEffect(() => {
-		if (!ready) return;
-		const timer = window.setTimeout(() => setDataWaitExpired(true), MAXIMUM_DATA_WAIT);
-		return () => window.clearTimeout(timer);
-	}, [ready]);
-
-	useEffect(() => {
-		if (!canComplete) return;
-		const remaining = Math.max(0, MINIMUM_LOADING_TIME - (Date.now() - startedAt.current));
-		const completeTimer = window.setTimeout(() => setProgress(100), remaining);
-		const revealTimer = window.setTimeout(() => {
-			setLoaderVisible(false);
-			setContentVisible(true);
-		}, remaining + COMPLETION_TIME);
-		return () => {
-			window.clearTimeout(completeTimer);
-			window.clearTimeout(revealTimer);
-		};
-	}, [canComplete]);
+	const showContent = ready || revealed;
 
 	return (
-		<PageLoadingContext.Provider value={loadingContext}>
-			<div className="relative min-h-dvh bg-[#f6f8fc]">
-				{ready && (
-					<div
-						className={`min-h-dvh transition-opacity duration-300 ${contentVisible ? "opacity-100" : "opacity-0"}`}
-					>
-						{children}
-					</div>
-				)}
+		<div className="relative min-h-dvh bg-[#f6f8fc]">
+			{showContent && <div className="min-h-dvh">{children}</div>}
+			{!showContent && (
 				<div
-					aria-label="Loading"
+					role="status"
 					aria-live="polite"
-					className={`fixed inset-0 z-[100] flex items-center justify-center bg-[#f6f8fc] transition-opacity duration-300 ${
-						loaderVisible ? "opacity-100" : "pointer-events-none opacity-0"
-					}`}
+					data-slot="bootstrap-overlay"
+					className="fixed inset-0 z-100 flex items-center justify-center bg-[#f6f8fc]"
 				>
-					<div className="flex w-64 flex-col items-center gap-6">
+					<span className="sr-only">Loading {branding.appName}</span>
+					<div className="flex w-64 flex-col items-center gap-6" aria-hidden="true">
 						<Image
 							src={iconUrl}
 							onError={() => setIconUrl("/cc-mail-logo.png")}
-							alt={`${branding.appName} icon`}
+							alt=""
 							width={144}
 							height={80}
 							unoptimized
 							className="h-20 w-36 object-contain"
 						/>
-						<div className="w-full">
-							<div className="h-1.5 overflow-hidden rounded-full bg-primary/12">
-								<div
-									className="h-full rounded-full bg-primary transition-[width] duration-200 ease-out"
-									style={{ width: `${progress}%` }}
-								/>
-							</div>
+						<div className="h-1.5 w-full overflow-hidden rounded-full bg-primary/12">
+							<div className="h-full w-2/5 animate-pulse rounded-full bg-primary motion-reduce:animate-none" />
 						</div>
 					</div>
 				</div>
-			</div>
-		</PageLoadingContext.Provider>
+			)}
+		</div>
 	);
 }

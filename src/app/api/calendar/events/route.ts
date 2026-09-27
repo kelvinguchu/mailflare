@@ -14,7 +14,7 @@ import {
 	calendarTitle,
 	rejectCalendarRecurrence,
 } from "@/lib/calendar/validation";
-import { requireUser } from "@/lib/auth/cookies";
+import { getCurrentUser } from "@/lib/auth/cookies";
 import { getEnv } from "@/lib/cloudflare";
 import { getEmailAddress } from "@/lib/email/address";
 import {
@@ -27,7 +27,8 @@ import { newId } from "@/lib/ids";
 
 export async function GET(request: Request) {
 	const env = getEnv();
-	const user = await requireUser(env, request);
+	const user = await getCurrentUser(env, request);
+	if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	try {
 		const url = new URL(request.url);
 		const start = rangeDate(url.searchParams.get("start"), new Date(), "a calendar range start");
@@ -60,7 +61,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
 	const env = getEnv();
-	const user = await requireUser(env, request);
+	const user = await getCurrentUser(env, request);
+	if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	try {
 		const idempotencyKey = normalizeIdempotencyKey(request.headers.get("Idempotency-Key"));
 		const input = (await request.json()) as CalendarEventInput;

@@ -17,6 +17,8 @@ function hasRealtimeMessageShape(value: object | null): value is RealtimeMessage
 		(message.providerMessageId === null || typeof message.providerMessageId === "string") &&
 		typeof message.fromAddr === "string" &&
 		typeof message.toAddr === "string" &&
+		(message.ccAddr === undefined || typeof message.ccAddr === "string") &&
+		(message.deliveredToAddr === undefined || typeof message.deliveredToAddr === "string") &&
 		(message.fromContactName === null || typeof message.fromContactName === "string") &&
 		message.toContactName === null &&
 		(message.subject === null || typeof message.subject === "string") &&
@@ -57,6 +59,8 @@ export function parseNewMessageNotification(value: object | null): NewMessageNot
 				providerMessageId: message.providerMessageId,
 				fromAddr: message.fromAddr,
 				toAddr: message.toAddr,
+				ccAddr: message.ccAddr ?? "",
+				deliveredToAddr: message.deliveredToAddr ?? message.toAddr,
 				fromContactName: message.fromContactName,
 				toContactName: null,
 				subject: message.subject,

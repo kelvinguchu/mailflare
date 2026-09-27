@@ -20,6 +20,7 @@ import {
 	fetchManagedMailboxes,
 	removeManagedMailbox,
 } from "../utils";
+import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 export default function AccountMailboxesPage() {
 	const { id } = useParams<{ id: string }>();
@@ -77,12 +78,7 @@ export default function AccountMailboxesPage() {
 
 	return (
 		<div className="space-y-6">
-			<div>
-				<h1 className="text-3xl font-medium text-neutral-900">Mailboxes</h1>
-				<p className="mt-2 text-sm text-neutral-500">
-					Manage inboxes owned by {account?.name ?? "this account"}.
-				</p>
-			</div>
+			<AdminPageHeader title={account?.name ?? "Account"} />
 			<section className="space-y-4 rounded-3xl bg-white p-6">
 				<div className="space-y-2">
 					{mailboxes.map((mailbox) => (

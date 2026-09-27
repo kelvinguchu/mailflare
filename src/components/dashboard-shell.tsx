@@ -14,6 +14,11 @@ const adminPrefixes = [
 	"/audit-logs",
 	"/webhooks",
 	"/branding",
+	"/operations",
+	"/security",
+	"/accounts",
+	"/delivery-failures",
+	"/backups",
 ];
 
 export function DashboardShellNav() {

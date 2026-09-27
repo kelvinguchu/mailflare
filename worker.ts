@@ -13,7 +13,7 @@ import {
 	isOutboundQueueMessage,
 	isWebhookQueueMessage,
 } from "./worker-utils";
-import { getUserFromSession } from "./src/lib/auth/session";
+import { getPolicyAuthorizedUserFromSession } from "./src/lib/auth/session";
 import { getSessionTokenFromRequest } from "./src/lib/realtime/utils";
 import {
 	getAccountForwardingDestination,
@@ -25,16 +25,15 @@ import {
 	captureFinalOutboundFailure,
 } from "./src/lib/queues/dead-letters";
 import { getDeadLetterSource } from "./src/lib/queues/dead-letter-policy";
-import {
-	deleteExpiredWebhookDeliveries,
-	processWebhookQueue,
-	WebhookRetryError,
-} from "./src/lib/email/webhooks";
+import { processWebhookQueue, WebhookRetryError } from "./src/lib/email/webhooks";
 import { deleteExpiredAccountRecoveryTokens } from "./src/lib/auth/recovery";
 import { deleteExpiredSessions } from "./src/lib/auth/session";
 import { dispatchDueCalendarReminders } from "./src/lib/calendar/reminders";
+import { runStorageLifecycleMaintenance } from "./src/lib/storage/lifecycle";
+import { captureOperationalSnapshot } from "./src/lib/operations/health";
 export { RealtimeHub } from "./src/lib/realtime/hub";
 export { DatabaseBackupWorkflow } from "./src/lib/backups/workflow";
+export { CalendarSyncService } from "./src/lib/calendar/calibercode-sync";
 
 export default {
 	async fetch(request: Request, env: CloudflareEnv, ctx: ExecutionContext) {
@@ -44,8 +43,11 @@ export default {
 				return new Response("Expected WebSocket upgrade", { status: 426 });
 			}
 
-			const user = await getUserFromSession(env, getSessionTokenFromRequest(request));
-			if (!user || user.disabled || user.activationStatus !== "active") {
+			const user = await getPolicyAuthorizedUserFromSession(
+				env,
+				getSessionTokenFromRequest(request),
+			);
+			if (!user) {
 				return new Response("Unauthorized", { status: 401 });
 			}
 
@@ -101,11 +103,12 @@ export default {
 		}
 		await runScheduledBackup(env, scheduledAt);
 		try {
-			await deleteExpiredWebhookDeliveries(env, scheduledAt);
+			const result = await runStorageLifecycleMaintenance(env, scheduledAt);
+			console.log(JSON.stringify({ event: "storage_lifecycle_processed", ...result }));
 		} catch (error) {
 			console.error(
 				JSON.stringify({
-					event: "webhook_retention_cleanup_failed",
+					event: "storage_lifecycle_failed",
 					error: error instanceof Error ? error.message : "Unknown cleanup error",
 				}),
 			);
@@ -127,6 +130,25 @@ export default {
 				JSON.stringify({
 					event: "expired_session_cleanup_failed",
 					error: error instanceof Error ? error.message : "Unknown cleanup error",
+				}),
+			);
+		}
+		try {
+			const snapshot = await captureOperationalSnapshot(env, scheduledAt);
+			console.log(
+				JSON.stringify({
+					event: "operational_snapshot_captured",
+					d1Bytes: snapshot.d1Bytes,
+					r2Bytes: snapshot.r2Bytes,
+					r2ObjectCount: snapshot.r2ObjectCount,
+					r2ScanComplete: snapshot.r2ScanComplete,
+				}),
+			);
+		} catch (error) {
+			console.error(
+				JSON.stringify({
+					event: "operational_snapshot_failed",
+					error: error instanceof Error ? error.message : "Unknown operational snapshot error",
 				}),
 			);
 		}

@@ -1,10 +1,4 @@
 import { Skeleton, SkeletonRows } from "@/components/ui/skeleton";
-import { LoadingTransition } from "@/components/loading-transition";
-
-export function PageSkeleton() {
-	return <LoadingTransition ready />;
-}
-
 export function ListPageSkeleton() {
 	return (
 		<div className="h-full min-h-0">

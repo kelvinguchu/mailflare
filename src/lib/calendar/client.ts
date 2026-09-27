@@ -147,6 +147,17 @@ export async function saveCalendarEvent(
 	return data.event;
 }
 
+/** Moves a CaliberCode advisory booking; the CMS emails the client the new time. */
+export async function rescheduleCalendarEvent(
+	eventId: string,
+	input: { startsAt: string; endsAt: string },
+) {
+	return calendarRequest<{ event: CalendarEventRecord; when: string }>(
+		`/api/calendar/events/${eventId}/reschedule`,
+		{ method: "POST", body: input },
+	);
+}
+
 export async function deleteCalendarEvent(eventId: string, idempotencyKey: string) {
 	await calendarRequest(`/api/calendar/events/${eventId}`, { method: "DELETE", idempotencyKey });
 }

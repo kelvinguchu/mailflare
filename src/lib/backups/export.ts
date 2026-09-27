@@ -15,6 +15,10 @@ import {
 	LEGACY_V5_BACKUP_TABLES,
 	LEGACY_V6_BACKUP_TABLES,
 	LEGACY_V7_BACKUP_TABLES,
+	LEGACY_V8_BACKUP_TABLES,
+	LEGACY_V9_BACKUP_TABLES,
+	LEGACY_V10_BACKUP_TABLES,
+	LEGACY_V11_BACKUP_TABLES,
 } from "./format";
 import { normalizeDatabaseBackupR2, validateDatabaseBackupObjectCoverage } from "./objects";
 import { mergeLegacyMessageBodies } from "./utils";
@@ -64,6 +68,10 @@ export function normalizeDatabaseBackupDocument(value: unknown): NormalizedDatab
 		value.version !== 5 &&
 		value.version !== 6 &&
 		value.version !== 7 &&
+		value.version !== 8 &&
+		value.version !== 9 &&
+		value.version !== 10 &&
+		value.version !== 11 &&
 		value.version !== DATABASE_BACKUP_VERSION
 	)
 		throw invalidBackupError();
@@ -84,7 +92,15 @@ export function normalizeDatabaseBackupDocument(value: unknown): NormalizedDatab
 							? LEGACY_V6_BACKUP_TABLES
 							: value.version === 7
 								? LEGACY_V7_BACKUP_TABLES
-								: BACKUP_TABLES;
+								: value.version === 8
+									? LEGACY_V8_BACKUP_TABLES
+									: value.version === 9
+										? LEGACY_V9_BACKUP_TABLES
+										: value.version === 10
+											? LEGACY_V10_BACKUP_TABLES
+											: value.version === 11
+												? LEGACY_V11_BACKUP_TABLES
+												: BACKUP_TABLES;
 	const requiredTableSet = new Set<string>(requiredTables);
 	for (const table of requiredTables) validateTableRows(table, sourceTables[table]);
 

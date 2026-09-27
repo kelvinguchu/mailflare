@@ -64,7 +64,11 @@ Staging has no automatic cron by design. Its scheduled handler can be invoked ex
 
 All APIs require an active authenticated account. Events remain owner-scoped; tasks are visible only to their creator and current assignee. Referenced events, tasks, and mailboxes must be accessible to the acting account. Each participant owns the reminders they create on a shared task. Email reminders additionally require send-on-behalf permission and a permitted sender address.
 
-Tasks, reminders, and delivery history are application backup tables. They are included in backup format version 7 and are restored in foreign-key order. Deleting a task or event cascades to its reminders; deleting an account cascades all of its calendar data.
+Tasks, reminders, and delivery history are application backup tables. They are included in backup format version 7 and are restored in foreign-key order. Deleting a task or event cascades to its reminders. Account archival requires an active successor when calendar data or open assignments exist, transfers owned records and open assignments to that successor, and only then permits the separate permanent-deletion step.
+
+## CaliberCode integration
+
+CaliberCode's CMS mirrors paid advisory bookings and published, scheduled event dates through a private `CalendarSyncService` Worker entrypoint. The source IDs are `cc_advisory_<id>` and `cc_event_<id>`; these appear in the ordinary calendar UI but are read-only there. Changes and cancellations must originate in Payload. Entries belong to the active Mailflare user `mohamed@calibercode.io`; if that account does not exist, the CMS retries on its next five-minute cron. Native in-app reminders are scheduled 24 hours before start. Separate email reminders are queued in the CMS for Mohamed (advisory) and `contact@calibercode.io` (events).
 
 ## Platform references
 

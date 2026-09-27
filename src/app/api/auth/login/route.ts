@@ -14,6 +14,7 @@ import { verifyTurnstileToken } from "@/lib/auth/turnstile";
 import { readJsonBody } from "@/lib/http/request";
 import { RequestBodyTooLargeError } from "@/lib/http/errors";
 import { recordAuthActivity } from "@/lib/auth/activity";
+import { evaluateUserMfaPolicy } from "@/lib/auth/mfa-policy";
 
 export async function POST(request: Request) {
 	const env = getEnv();
@@ -60,7 +61,11 @@ export async function POST(request: Request) {
 		);
 	}
 
+	const policy = await evaluateUserMfaPolicy(env, user);
 	const token = await createSession(env, user.id);
 	await recordAuthActivity(env, { action: "auth.login", userId: user.id, request });
-	return createAuthenticatedResponse(token, "/inbox");
+	return createAuthenticatedResponse(
+		token,
+		policy.state === "restricted" ? "/enroll-mfa" : "/inbox",
+	);
 }

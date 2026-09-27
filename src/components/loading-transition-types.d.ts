@@ -4,7 +4,3 @@ export type LoadingTransitionProps = {
 	children?: ReactNode;
 	ready: boolean;
 };
-
-export type PageLoadingContextValue = {
-	reportLoading(id: string, loading: boolean): void;
-};

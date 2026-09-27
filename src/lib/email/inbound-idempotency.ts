@@ -12,6 +12,8 @@ export type InboundMessageWrite = {
 	replyToMessageId?: string | null;
 	fromAddr: string;
 	toAddr: string;
+	ccAddr?: string;
+	deliveredToAddr?: string;
 	subject: string | null;
 	snippet: string;
 	textBody: string | null;
@@ -78,9 +80,9 @@ export async function commitInboundMessage(
 				`INSERT INTO messages (
 			id, user_id, mailbox_id, direction, provider_message_id, in_reply_to, "references",
 			reply_to_message_id, folder_id,
-			from_addr, to_addr, subject, snippet, text_body, html_body, raw_r2_key,
+			from_addr, to_addr, cc_addr, delivered_to_addr, subject, snippet, text_body, html_body, raw_r2_key,
 			status, thread_id, inbound_delivery_key, security_status, security_reason, spam_score, created_at
-		) VALUES (?, ?, ?, 'inbound', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, 'inbound', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			)
 			.bind(
 				message.id,
@@ -93,6 +95,8 @@ export async function commitInboundMessage(
 				message.folderId,
 				message.fromAddr,
 				message.toAddr,
+				message.ccAddr ?? "",
+				message.deliveredToAddr ?? message.toAddr,
 				message.subject,
 				message.snippet,
 				message.textBody,

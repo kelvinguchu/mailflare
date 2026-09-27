@@ -36,7 +36,9 @@ export function sendWithUndo({ snapshot, draftId, restore }: SendWithUndoOptions
 				body: buildSendFormData({
 					attachments: snapshot.attachments,
 					from: snapshot.from,
+					includeSignature: snapshot.includeSignature ?? true,
 					to: snapshot.to,
+					cc: snapshot.cc,
 					subject: snapshot.subject,
 					text: snapshot.text,
 					mailboxId: snapshot.mailboxId ?? undefined,

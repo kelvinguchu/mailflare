@@ -70,7 +70,7 @@ export function TimeGridView({
 						key={keys[index]}
 						type="button"
 						onClick={() => onOpenDay(day)}
-						className="flex flex-col items-center gap-0.5 py-2 hover:bg-neutral-50"
+						className="flex flex-col items-center gap-0.5 py-2 hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40"
 					>
 						<span
 							className={cn(
@@ -110,7 +110,7 @@ export function TimeGridView({
 									key={event.id}
 									type="button"
 									onClick={() => onSelectEvent(event)}
-									className="w-full truncate rounded-md bg-primary/90 px-1.5 py-0.5 text-left text-xs font-medium text-primary-foreground hover:bg-primary"
+									className="w-full truncate rounded-md bg-primary/90 px-1.5 py-0.5 text-left text-xs font-medium text-primary-foreground hover:bg-primary focus-visible:ring-2 focus-visible:ring-primary/60"
 								>
 									{event.title}
 								</button>
@@ -121,7 +121,7 @@ export function TimeGridView({
 									type="button"
 									onClick={() => onSelectTask(task)}
 									className={cn(
-										"flex w-full min-w-0 items-center gap-1 rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 text-left text-xs hover:bg-neutral-50",
+										"flex w-full min-w-0 items-center gap-1 rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 text-left text-xs hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-primary/40",
 										TASK_CHIP_TONES[getTaskTone(task, now)],
 									)}
 								>
@@ -194,7 +194,7 @@ export function TimeGridView({
 											key={item.id}
 											type="button"
 											onClick={() => onSelectEvent(item)}
-											className="absolute overflow-hidden rounded-md border border-white bg-primary/12 px-1.5 py-0.5 text-left text-xs text-primary shadow-[inset_3px_0_0_var(--color-primary)] hover:bg-primary/20"
+											className="absolute overflow-hidden rounded-md border border-white bg-primary/12 px-1.5 py-0.5 text-left text-xs text-primary shadow-[inset_3px_0_0_var(--color-primary)] hover:bg-primary/20 focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-primary/60"
 											style={{
 												top: (startMinute / 60) * HOUR_HEIGHT,
 												height,

@@ -1,7 +1,7 @@
 import PostalMime from "postal-mime";
 import { formatPostalAddress, formatPostalAddressList } from "@/lib/email/address";
 import { normalizeAttachmentContent } from "@/lib/email/attachments";
-import { getLatestEmailContent, htmlToReadableText } from "@/lib/email/reply-content-utils";
+import { getMessagePreviewText, htmlToReadableText } from "@/lib/email/reply-content-utils";
 import type { AttachmentContent } from "@/lib/email/attachment-types";
 import { normalizeProviderMessageId, parseMessageReferences } from "@/lib/email/threading";
 
@@ -14,6 +14,7 @@ export type ParsedEmail = {
 	references: string[];
 	fromAddr: string | null;
 	toAddr: string | null;
+	ccAddr: string | null;
 	date: Date | null;
 	attachments: AttachmentContent[];
 };
@@ -30,6 +31,7 @@ export async function parseRawMime(raw: ArrayBuffer): Promise<ParsedEmail> {
 		references: parseMessageReferences(email.references),
 		fromAddr: formatPostalAddress(email.from, null),
 		toAddr: formatPostalAddressList(email.to, null),
+		ccAddr: formatPostalAddressList(email.cc, null),
 		date: date && !Number.isNaN(date.getTime()) ? date : null,
 		attachments: email.attachments.map((attachment, index) => ({
 			filename: attachment.filename ?? `attachment-${index + 1}`,
@@ -42,6 +44,6 @@ export async function parseRawMime(raw: ArrayBuffer): Promise<ParsedEmail> {
 }
 
 export function buildSnippet(text: string | null, html: string | null, max = 200): string {
-	const source = getLatestEmailContent(text?.trim() || htmlToReadableText(html));
-	return source.replace(/\s+/g, " ").trim().slice(0, max);
+	// Quoted history and its "On … wrote:" header never belong in a list preview.
+	return getMessagePreviewText(text?.trim() || htmlToReadableText(html)).slice(0, max);
 }

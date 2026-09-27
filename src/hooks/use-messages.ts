@@ -29,6 +29,7 @@ export function useMessages(
 	const [total, setTotal] = useState(0);
 	const [limit, setLimit] = useState(filters?.limit ?? 25);
 	const [offset, setOffset] = useState(filters?.offset ?? 0);
+	const [nextCursor, setNextCursor] = useState<string>();
 	const [highlightedMessageIds, setHighlightedMessageIds] = useState<Set<string>>(new Set());
 	const messageIdsRef = useRef<Set<string>>(new Set());
 	const threadMessageIdsRef = useRef<Map<string, string>>(new Map());
@@ -38,6 +39,8 @@ export function useMessages(
 	const filterQuery = filters?.query;
 	const filterRead = filters?.read;
 	const filterTitle = filters?.title;
+	const filterPagination = filters?.pagination;
+	const filterCursor = filters?.cursor;
 
 	const unreadCount = messages.filter((m) => m.direction === "inbound" && !m.read).length;
 	const updateMessages = useCallback((update: SetStateAction<Message[]>) => {
@@ -73,15 +76,18 @@ export function useMessages(
 						query: filterQuery,
 						read: filterRead,
 						title: filterTitle,
+						pagination: filterPagination,
+						cursor: filterCursor,
 					},
 					folderId,
 				);
 				const data = await fetchMessageList(params, force, requestController.signal);
 				if (!cancelled && !requestController.signal.aborted) {
 					updateMessages(data.messages ?? []);
-					setTotal(data.total ?? 0);
+					if (data.total !== undefined) setTotal(data.total);
 					setLimit(data.limit ?? filterLimit ?? 25);
 					setOffset(data.offset ?? filterOffset ?? 0);
+					setNextCursor(data.nextCursor);
 				}
 			} catch (error) {
 				if (!cancelled && !requestController.signal.aborted) throw error;
@@ -102,6 +108,7 @@ export function useMessages(
 		function onRealtimeMessage(receivedEvent: Event) {
 			const event = (receivedEvent as CustomEvent<NewMessageEvent>).detail;
 			if (!event?.message) return;
+			if (filterCursor) return;
 			const params = getMessageQueryParams(
 				folder,
 				mailboxId,
@@ -111,6 +118,8 @@ export function useMessages(
 					query: filterQuery,
 					read: filterRead,
 					title: filterTitle,
+					pagination: filterPagination,
+					cursor: filterCursor,
 				},
 				folderId,
 			);
@@ -174,6 +183,10 @@ export function useMessages(
 				return [event.message, ...current].slice(0, filterLimit ?? 25);
 			});
 			if (!alreadyPresent && !existingThreadMessageId) setTotal((current) => current + 1);
+			if (filterPagination === "cursor") {
+				setNextCursor(undefined);
+				void loadMessages(true);
+			}
 
 			setHighlightedMessageIds((current) => new Set(current).add(event.message.id));
 			const existingTimer = highlightTimers.get(event.message.id);
@@ -213,7 +226,9 @@ export function useMessages(
 	}, [
 		enabled,
 		filterLimit,
+		filterCursor,
 		filterOffset,
+		filterPagination,
 		filterQuery,
 		filterRead,
 		filterTitle,
@@ -230,6 +245,7 @@ export function useMessages(
 		total,
 		limit,
 		offset,
+		nextCursor,
 		highlightedMessageIds,
 		realtimeListRef,
 		updateMessages,
