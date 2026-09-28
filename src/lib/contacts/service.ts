@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { contacts, routingRules } from "@/db/schema";
 import { normalizeEmailAddress } from "@/lib/email/address";
@@ -20,7 +20,12 @@ export async function upsertContactFromAddress(env: CloudflareEnv, input: Contac
 
 	if (existing) {
 		const nextDisplayName = getNextDisplayName(existing.displayName, existing.source, displayName);
-		const nextSource = existing.source === "manual" ? "manual" : input.source;
+		const nextSource =
+			existing.source === "manual"
+				? "manual"
+				: existing.source === "outbound" || input.source === "outbound"
+					? "outbound"
+					: "inbound";
 
 		await db
 			.update(contacts)
@@ -45,6 +50,37 @@ export async function upsertContactFromAddress(env: CloudflareEnv, input: Contac
 
 	const [created] = await db.select().from(contacts).where(eq(contacts.id, id)).limit(1);
 	return created ?? null;
+}
+
+export async function getRecipientSuggestions(env: CloudflareEnv, userId: string, query: string) {
+	const search = query.trim().toLowerCase();
+	const db = getDb(env);
+	const matches = search
+		? or(
+				sql`instr(${contacts.email}, ${search}) > 0`,
+				sql`instr(lower(coalesce(${contacts.displayName}, '')), ${search}) > 0`,
+			)
+		: undefined;
+	return db
+		.select({ email: contacts.email, displayName: contacts.displayName })
+		.from(contacts)
+		.where(
+			and(
+				eq(contacts.userId, userId),
+				eq(contacts.blocked, false),
+				inArray(contacts.source, ["manual", "outbound"]),
+				matches,
+			),
+		)
+		.orderBy(
+			search
+				? sql`CASE WHEN substr(${contacts.email}, 1, length(${search})) = ${search} THEN 0
+					WHEN instr(${contacts.email}, ${search}) > 0 THEN 1 ELSE 2 END`
+				: desc(contacts.lastSeenAt),
+			desc(contacts.lastSeenAt),
+			contacts.email,
+		)
+		.limit(10);
 }
 
 export async function getContactDisplayNameMap(

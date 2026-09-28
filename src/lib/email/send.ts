@@ -125,15 +125,6 @@ export async function queueEmail(
 		throw new Error("Recipient is suppressed");
 	}
 
-	await Promise.all(
-		[...recipients.to, ...recipients.cc].map((recipient) =>
-			upsertContactFromAddress(env, {
-				userId: input.userId,
-				address: recipient.formatted,
-				source: "outbound",
-			}),
-		),
-	);
 	const messageId = newId("msg");
 	const snippet = buildSnippet(rendered.text ?? null, rendered.html ?? null);
 	const threading = await buildOutboundThreading(db, {
@@ -201,6 +192,19 @@ export async function queueEmail(
 	}
 
 	await enqueueOutboundJob(env, jobId, sendNotBefore);
+	// Recipient memory is best-effort and must never turn an accepted send into an error.
+	const remembered = await Promise.allSettled(
+		[...recipients.to, ...recipients.cc].map((recipient) =>
+			upsertContactFromAddress(env, {
+				userId: input.userId,
+				address: recipient.formatted,
+				source: "outbound",
+			}),
+		),
+	);
+	if (remembered.some((result) => result.status === "rejected")) {
+		console.error("Recipient memory update failed", { messageId });
+	}
 
 	return {
 		jobId,
