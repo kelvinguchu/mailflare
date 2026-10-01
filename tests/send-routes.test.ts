@@ -65,6 +65,27 @@ describe("send route authentication", () => {
 		);
 	});
 
+	it("returns 400 when the outbound body is empty", async () => {
+		mocks.getCurrentUser.mockResolvedValue({ id: "user_1" });
+		mocks.queueEmail.mockRejectedValue(new Error("Email body is required"));
+		const response = await sendMessage(
+			new Request("https://mail.example/api/send", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					from: "me@example.com",
+					to: "you@example.com",
+					subject: "Test",
+					text: "",
+					mailboxId: "mailbox_1",
+				}),
+			}),
+		);
+
+		expect(response.status).toBe(400);
+		expect(await response.json()).toEqual({ error: "Email body is required" });
+	});
+
 	it("returns 401 before looking up an unauthenticated cancellation", async () => {
 		const response = await cancelSend(
 			new Request("https://mail.example/api/send/job_1/cancel", { method: "POST" }),

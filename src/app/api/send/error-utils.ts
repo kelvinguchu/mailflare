@@ -1,5 +1,6 @@
 export function getSendErrorStatus(message: string): number {
 	if (message === "Mailbox is required") return 400;
+	if (message === "Email body is required") return 400;
 	if (message.includes("send rate limit") || message.includes("daily send limit")) return 429;
 	if (message === "Recipient is suppressed") return 422;
 	if (message.startsWith("Idempotency-Key must contain")) return 400;

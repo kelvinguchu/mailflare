@@ -69,6 +69,7 @@ export function ComposeForm({
 	const draftSave = useRef<Promise<string | null> | null>(null);
 	const attachmentInput = useRef<HTMLInputElement | null>(null);
 	const recipientInput = useRef<HTMLInputElement | null>(null);
+	const bodyInput = useRef<HTMLTextAreaElement | null>(null);
 	const ccInput = useRef<HTMLInputElement | null>(null);
 	const focusedRecipient = useRef(false);
 	// Resending an unchanged message reuses its Idempotency-Key; any edit starts a new send.
@@ -227,6 +228,11 @@ export function ComposeForm({
 				error instanceof RecipientValidationError ? error.message : "Add valid recipients",
 			);
 			recipientInput.current?.focus();
+			return;
+		}
+		if (!text.trim()) {
+			showComposeError("Write a message before sending.");
+			bodyInput.current?.focus();
 			return;
 		}
 		const message = {
@@ -414,6 +420,7 @@ export function ComposeForm({
 					Body
 				</Label>
 				<Textarea
+					ref={bodyInput}
 					id={`${mode}-text`}
 					name="body"
 					autoComplete="off"

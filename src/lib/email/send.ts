@@ -79,6 +79,9 @@ export async function queueEmail(
 	input: SendEmailInput,
 	options?: { idempotencyKey?: string | null; undoDelaySeconds?: number },
 ): Promise<QueuedEmail> {
+	if (!input.text?.trim() && !input.html?.trim()) {
+		throw new Error("Email body is required");
+	}
 	const db = getDb(env);
 	const idempotencyKey = normalizeIdempotencyKey(options?.idempotencyKey);
 	const sender = await getAuthorizedSenderAddress(env, input);
