@@ -3,6 +3,7 @@ import { getDb } from "@/db";
 import { accountRecoveryTokens, auditLogs, sessions, users } from "@/db/schema";
 import { newId } from "@/lib/ids";
 import { createAuditLog } from "@/lib/mailboxes/audit";
+import { renderAuthEmail } from "./auth-email-template";
 import { hashPassword } from "./password";
 import { disconnectUserRealtime, hashSessionToken } from "./session";
 
@@ -17,6 +18,7 @@ export type PendingAuthEmail = {
 	userId: string;
 	purpose: RecoveryPurpose;
 	to: string;
+	accountEmail: string;
 	token: string;
 };
 
@@ -56,6 +58,7 @@ export async function preparePasswordReset(
 		userId: user.id,
 		purpose: "password_reset",
 		email: user.resetEmail,
+		accountEmail: user.email,
 		ttlMs: PASSWORD_RESET_TTL_MS,
 	});
 	await recordRecoveryAudit(env, {
@@ -79,6 +82,7 @@ export async function prepareRecoveryEmailVerification(
 		userId,
 		purpose: "recovery_email_verification",
 		email: user.resetEmail,
+		accountEmail: user.email,
 		ttlMs: RECOVERY_EMAIL_VERIFICATION_TTL_MS,
 	});
 	await recordRecoveryAudit(env, {
@@ -126,6 +130,7 @@ export async function prepareAccountActivation(
 		userId,
 		purpose: "account_activation",
 		email: user.resetEmail,
+		accountEmail: user.email,
 		ttlMs: ACCOUNT_ACTIVATION_TTL_MS,
 	});
 	const updated = await db
@@ -164,29 +169,19 @@ export async function deliverAuthEmail(
 					: "/verify-recovery-email";
 		const link = new URL(route, origin);
 		link.searchParams.set("token", pending.token);
-		const content = {
-			password_reset: {
-				subject: "Continue your CC Mail account recovery",
-				action: "Continue account recovery",
-				expiry: "30 minutes",
-			},
-			recovery_email_verification: {
-				subject: "Verify your CC Mail recovery email",
-				action: "Verify recovery email",
-				expiry: "24 hours",
-			},
-			account_activation: {
-				subject: "Activate your CC Mail account",
-				action: "Activate account",
-				expiry: "72 hours",
-			},
-		}[pending.purpose];
+		const email = renderAuthEmail({
+			purpose: pending.purpose,
+			link: link.toString(),
+			origin,
+			accountEmail: pending.accountEmail,
+			recipient: pending.to,
+		});
 		await env.EMAIL.send({
-			from: env.AUTH_EMAIL_FROM,
+			from: { email: env.AUTH_EMAIL_FROM, name: "CC Mail" },
 			to: pending.to,
-			subject: content.subject,
-			text: `${content.action}: ${link.toString()}\n\nThis link expires in ${content.expiry}. If you did not expect it, you can ignore this email.`,
-			html: `<p>${content.action}:</p><p><a href="${link.toString()}">${content.action}</a></p><p>This link expires in ${content.expiry}. If you did not expect it, you can ignore this email.</p>`,
+			subject: email.subject,
+			text: email.text,
+			html: email.html,
 		});
 	} catch (error) {
 		try {
@@ -427,7 +422,13 @@ function generateRecoveryToken(): string {
 
 async function replaceRecoveryToken(
 	env: CloudflareEnv,
-	input: { userId: string; purpose: RecoveryPurpose; email: string; ttlMs: number },
+	input: {
+		userId: string;
+		purpose: RecoveryPurpose;
+		email: string;
+		accountEmail: string;
+		ttlMs: number;
+	},
 ): Promise<PendingAuthEmail> {
 	const token = generateRecoveryToken();
 	const tokenId = newId("art");
@@ -451,7 +452,14 @@ async function replaceRecoveryToken(
 			expiresAt: new Date(Date.now() + input.ttlMs),
 		}),
 	]);
-	return { tokenId, userId: input.userId, purpose: input.purpose, to: input.email, token };
+	return {
+		tokenId,
+		userId: input.userId,
+		purpose: input.purpose,
+		to: input.email,
+		accountEmail: input.accountEmail,
+		token,
+	};
 }
 
 async function claimRecoveryToken(
