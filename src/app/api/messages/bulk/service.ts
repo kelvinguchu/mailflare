@@ -13,6 +13,26 @@ export async function applyMessageBulkAction(
 	threadScope: boolean,
 	folderId?: string,
 ): Promise<string[]> {
+	const restoredIds: string[] = [];
+	if (action === "inbox") {
+		const outbound = targets.filter(
+			(item) => item.direction === "outbound" && item.status === "trash",
+		);
+		restoredIds.push(...outbound.map((item) => item.id));
+		for (const item of outbound)
+			await db
+				.update(messages)
+				.set({
+					status: item.deletionOriginalStatus ?? "sent",
+					folderId: item.deletionOriginalFolderId,
+				})
+				.where(inArray(messages.id, [item.id]));
+		if (!threadScope && outbound.length) {
+			const remaining = targets.filter((item) => !outbound.includes(item));
+			if (remaining.length) await applyMessageBulkAction(db, remaining, action, false, folderId);
+			return targets.map((item) => item.id);
+		}
+	}
 	if (!threadScope) {
 		const ids = targets.map((message) => message.id);
 		const status = getStatusForBulkAction(action);
@@ -51,7 +71,7 @@ export async function applyMessageBulkAction(
 
 	const movable = action === "trash" ? targets : inbound;
 	const ids = movable.map((message) => message.id);
-	if (ids.length === 0) return [];
+	if (ids.length === 0) return restoredIds;
 	await db
 		.update(messages)
 		.set({
@@ -59,5 +79,5 @@ export async function applyMessageBulkAction(
 			folderId: action === "folder" ? (folderId ?? null) : null,
 		})
 		.where(inArray(messages.id, ids));
-	return ids;
+	return [...restoredIds, ...ids];
 }

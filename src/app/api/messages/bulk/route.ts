@@ -1,3 +1,5 @@
+import { requestPermanentMessageDeletion } from "@/lib/storage/lifecycle";
+import { recordDeletionEvent } from "@/lib/team-inboxes/retention";
 import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getDb } from "@/db";
@@ -49,7 +51,7 @@ export async function POST(request: Request) {
 	const selected = await db.select().from(messages).where(inArray(messages.id, messageIds));
 	const accessCache = new Map<string, Awaited<ReturnType<typeof getMailboxAccessLevel>>>();
 	const canUpdate = async (message: MessageRow): Promise<boolean> => {
-		if (!message.mailboxId) return false;
+		if (!message.mailboxId || message.employeeHiddenAt || message.consumedByMessageId) return false;
 		let access = accessCache.get(message.mailboxId);
 		if (access === undefined) {
 			access = await getMailboxAccessLevel(db, user, message.mailboxId);
@@ -90,6 +92,14 @@ export async function POST(request: Request) {
 			(message) => message.mailboxId === destinationFolder.mailboxId,
 		);
 	}
+	if (payload.action === "trash" && readableSelected.every((item) => item.status === "trash")) {
+		let affected = 0;
+		for (const item of targetMessages.filter((item) => item.status === "trash")) {
+			const result = await requestPermanentMessageDeletion(env, user, item.id);
+			if (result.outcome === "accepted") affected++;
+		}
+		return NextResponse.json({ ok: true, affected }, { status: affected ? 200 : 409 });
+	}
 	const affectedIds = await applyMessageBulkAction(
 		db,
 		targetMessages,
@@ -101,6 +111,12 @@ export async function POST(request: Request) {
 		return NextResponse.json({ error: "No accessible messages" }, { status: 404 });
 	}
 
+	for (const message of targetMessages.filter((item) => affectedIds.includes(item.id))) {
+		if (payload.action === "trash" && message.status !== "trash")
+			await recordDeletionEvent(env, message, "trashed", user);
+		else if (message.status === "trash" && ["inbox", "archive", "folder"].includes(payload.action))
+			await recordDeletionEvent(env, message, "restored", user);
+	}
 	const auditMessages =
 		payload.scope === "thread"
 			? Array.from(

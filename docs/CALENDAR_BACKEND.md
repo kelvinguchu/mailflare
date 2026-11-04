@@ -70,6 +70,8 @@ Tasks, reminders, and delivery history are application backup tables. They are i
 
 CaliberCode's CMS mirrors paid advisory bookings and published, scheduled event dates through a private `CalendarSyncService` Worker entrypoint. The source IDs are `cc_advisory_<id>` and `cc_event_<id>`; these appear in the ordinary calendar UI but are read-only there. Changes and cancellations must originate in Payload. Entries belong to the active Mailflare user `mohamed@calibercode.io`; if that account does not exist, the CMS retries on its next five-minute cron. Native in-app reminders are scheduled 24 hours before start. Separate email reminders are queued in the CMS for Mohamed (advisory) and `contact@calibercode.io` (events).
 
+A paid advisory session can be rescheduled from its event dialog. Advisors may move one to 08:00 or 09:00, which the public booking page does not offer (it books from 10:00, Monday to Saturday, with Saturday closing at 13:00). Other early appointments can be added as ordinary events at any hour; since the public cannot book before 10:00, they never clash with a paid booking.
+
 ## Platform references
 
 - [Cloudflare Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/)

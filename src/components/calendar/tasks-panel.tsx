@@ -2,7 +2,15 @@
 
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Circle, CircleCheck, Flag, ListChecks, Plus, SlidersHorizontal } from "lucide-react";
+import {
+	Circle,
+	CircleCheck,
+	Flag,
+	ListChecks,
+	Plus,
+	Repeat,
+	SlidersHorizontal,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
 	Select,
@@ -16,6 +24,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useCurrentAccount } from "@/hooks/use-current-account";
 import { calendarKeys, listCalendarTasks } from "@/lib/calendar/client";
+import { describeRecurrenceRule } from "@/lib/calendar/recurrence";
 import type { CalendarTaskRecord, CalendarTaskScope } from "@/lib/calendar/types";
 import { browserTimezone, formatDateTime } from "@/lib/calendar/wall-clock";
 import { cn } from "@/lib/utils";
@@ -305,6 +314,7 @@ function TaskRow({
 	const dueState = getTaskDueState(task, now);
 	const dueText = getDueText(task, now);
 	const showPriority = !completed && (task.priority === "high" || task.priority === "medium");
+	const repeats = completed ? null : describeRecurrenceRule(task.recurrenceRule);
 
 	return (
 		<li
@@ -342,9 +352,15 @@ function TaskRow({
 				>
 					{task.title}
 				</span>
-				{(dueText || showPriority || relation) && (
+				{(dueText || showPriority || repeats || relation) && (
 					<span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-neutral-500">
 						{dueText && <span className={cn("shrink-0", DUE_TONES[dueState])}>{dueText}</span>}
+						{repeats && (
+							<span className="flex shrink-0 items-center text-neutral-400" title={repeats}>
+								<Repeat className="size-3" aria-hidden="true" />
+								<span className="sr-only">Repeats: {repeats}</span>
+							</span>
+						)}
 						{showPriority && (
 							<span className={cn("flex shrink-0 items-center", PRIORITY_STYLES[task.priority])}>
 								<Flag className="size-3" aria-hidden="true" />
@@ -353,7 +369,7 @@ function TaskRow({
 						)}
 						{relation && (
 							<span className="min-w-0 truncate" title={relation}>
-								{dueText || showPriority ? `· ${relation}` : relation}
+								{dueText || showPriority || repeats ? `· ${relation}` : relation}
 							</span>
 						)}
 					</span>

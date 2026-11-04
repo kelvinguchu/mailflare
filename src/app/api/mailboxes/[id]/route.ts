@@ -167,7 +167,7 @@ export async function DELETE(request: Request, { params }: MailboxRouteParams) {
 		.select({ r2Key: signatureAssets.r2Key })
 		.from(signatureAssets)
 		.where(eq(signatureAssets.mailboxId, id));
-	await db.delete(mailboxes).where(eq(mailboxes.id, id));
+	await db.update(mailboxes).set({ disabled: true }).where(eq(mailboxes.id, id));
 	const cleanup = await Promise.allSettled(assets.map((asset) => env.BUCKET.delete(asset.r2Key)));
 	if (cleanup.some((result) => result.status === "rejected")) {
 		console.error("Failed to remove one or more orphaned mailbox signature images", {

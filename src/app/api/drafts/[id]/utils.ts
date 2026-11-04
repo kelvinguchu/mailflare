@@ -1,4 +1,5 @@
-import { eq } from "drizzle-orm";
+import { employeeVisible } from "@/lib/team-inboxes/retention";
+import { and, eq } from "drizzle-orm";
 import type { getDb } from "@/db";
 import { messages } from "@/db/schema";
 
@@ -12,6 +13,8 @@ export function selectDraftWithBody(db: Db, userId: string, draftId: string) {
 			mailboxId: messages.mailboxId,
 			fromAddr: messages.fromAddr,
 			toAddr: messages.toAddr,
+			ccAddr: messages.ccAddr,
+			revision: messages.draftRevision,
 			subject: messages.subject,
 			status: messages.status,
 			replyToMessageId: messages.replyToMessageId,
@@ -19,7 +22,7 @@ export function selectDraftWithBody(db: Db, userId: string, draftId: string) {
 			htmlBody: messages.htmlBody,
 		})
 		.from(messages)
-		.where(eq(messages.id, draftId))
+		.where(and(employeeVisible(), eq(messages.id, draftId)))
 		.limit(1)
 		.then(([draft]) =>
 			draft && draft.userId === userId && draft.status === "draft" ? draft : null,

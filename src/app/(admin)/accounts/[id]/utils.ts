@@ -30,7 +30,7 @@ export async function updateAccount(
 }
 
 export async function fetchDomains(): Promise<DomainOption[]> {
-	const res = await authFetch("/api/domains");
+	const res = await authFetch("/api/accounts/domains");
 	const json = (await res.json()) as { domains?: DomainOption[]; error?: string };
 	if (!res.ok) throw new Error(json.error ?? "Failed to load domains");
 	return json.domains ?? [];
@@ -142,7 +142,7 @@ export async function updateManagedMailboxName(
 }
 
 export async function fetchManagedDomains(): Promise<ManagedDomain[]> {
-	const response = await authFetch("/api/domains");
+	const response = await authFetch("/api/accounts/domains");
 	const data = (await response.json()) as { domains?: ManagedDomain[]; error?: string };
 	if (!response.ok) throw new Error(data.error ?? "Unable to load domains");
 	return data.domains ?? [];

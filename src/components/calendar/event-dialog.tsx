@@ -6,6 +6,7 @@ import {
 	AlignLeft,
 	CalendarClock,
 	CalendarDays,
+	CalendarX2,
 	Globe,
 	MapPin,
 	Pencil,
@@ -33,6 +34,7 @@ import {
 	deleteCalendarEvent,
 	parseEventAttendees,
 	saveCalendarEvent,
+	unblockBookingTime,
 } from "@/lib/calendar/client";
 import type { CalendarEventInput, CalendarEventRecord } from "@/lib/calendar/types";
 import {
@@ -125,10 +127,25 @@ function EventDetails({
 	const attendees = parseEventAttendees(event);
 	const target = eventReminderTarget(event);
 	const differentZone = !event.allDay && event.timezone !== browserTimezone();
-	const managedByCaliberCode = /^cc_(advisory_\d+|event_[a-z0-9]+)$/i.test(event.id);
+	const managedByCaliberCode = /^cc_(advisory_\d+|block_\d+|event_[a-z0-9]+)$/i.test(event.id);
 	// Paid advisory sessions can be moved; the CMS then emails the client.
 	const reschedulable = /^cc_advisory_\d+$/.test(event.id);
+	// Time blocked from advisory bookings; removing it reopens the booking page.
+	const blockId = /^cc_block_(\d+)$/.exec(event.id)?.[1] ?? null;
 	const [rescheduling, setRescheduling] = useState(false);
+
+	const unblock = useMutation({
+		mutationFn: () => unblockBookingTime(blockId ?? ""),
+		onSuccess: async () => {
+			await queryClient.invalidateQueries({ queryKey: calendarKeys.all });
+			toast.add({
+				title: "Block removed",
+				description: "The booking page offers that time again.",
+				type: "success",
+			});
+			onDeleted();
+		},
+	});
 
 	const remove = useMutation({
 		mutationFn: () => deleteCalendarEvent(event.id, deleteKey.current),
@@ -136,7 +153,10 @@ function EventDetails({
 			await queryClient.invalidateQueries({ queryKey: calendarKeys.all });
 			toast.add({
 				title: "Event deleted",
-				description: attendees.length ? "Guests will receive a cancellation notice." : undefined,
+				description:
+					attendees.length && !event.importUid
+						? "Guests will receive a cancellation notice."
+						: undefined,
 				type: "success",
 			});
 			onDeleted();
@@ -174,6 +194,9 @@ function EventDetails({
 										Invitations sent from {event.organizer}
 									</p>
 								)}
+								{event.importOrganizer && (
+									<p className="text-xs text-neutral-500">Organizer: {event.importOrganizer}</p>
+								)}
 								<ul className="mt-1.5 space-y-0.5">
 									{attendees.map((attendee) => (
 										<li key={attendee} className="truncate">
@@ -190,9 +213,15 @@ function EventDetails({
 						)}
 					</div>
 				)}
-				{managedByCaliberCode ? (
-					<p className="text-xs text-neutral-500">Managed by CaliberCode · reminder 24 hours before</p>
-				) : <ItemReminders target={target} />}
+				{blockId ? (
+					<p className="text-xs text-neutral-500">Blocks CaliberCode advisory bookings</p>
+				) : managedByCaliberCode ? (
+					<p className="text-xs text-neutral-500">
+						Managed by CaliberCode · reminder 24 hours before
+					</p>
+				) : (
+					<ItemReminders target={target} />
+				)}
 				{rescheduling && (
 					<AdvisoryReschedule
 						event={event}
@@ -201,7 +230,21 @@ function EventDetails({
 					/>
 				)}
 				<FormError message={remove.isError ? errorMessage(remove.error) : null} />
+				<FormError message={unblock.isError ? errorMessage(unblock.error) : null} />
 			</DialogBody>
+			{blockId && (
+				<DialogFooter className="items-center">
+					<Button
+						type="button"
+						variant="outline"
+						onClick={() => unblock.mutate()}
+						disabled={unblock.isPending}
+					>
+						<CalendarX2 />
+						{unblock.isPending ? "Removing..." : "Remove block"}
+					</Button>
+				</DialogFooter>
+			)}
 			{reschedulable && !rescheduling && (
 				<DialogFooter className="items-center">
 					<Button type="button" onClick={() => setRescheduling(true)}>
@@ -210,48 +253,50 @@ function EventDetails({
 					</Button>
 				</DialogFooter>
 			)}
-			{!managedByCaliberCode && <DialogFooter className="items-center">
-				{confirmingDelete ? (
-					<>
-						<p className="mr-auto text-sm text-neutral-600">
-							Delete this event?
-							{attendees.length > 0 && " Guests will be sent a cancellation."}
-						</p>
-						<Button
-							type="button"
-							variant="ghost"
-							onClick={() => setConfirmingDelete(false)}
-							disabled={remove.isPending}
-						>
-							Keep
-						</Button>
-						<Button
-							type="button"
-							variant="destructive"
-							onClick={() => remove.mutate()}
-							disabled={remove.isPending}
-						>
-							{remove.isPending ? "Deleting..." : "Delete event"}
-						</Button>
-					</>
-				) : (
-					<>
-						<Button
-							type="button"
-							variant="ghost"
-							className="mr-auto text-red-600 hover:bg-red-50 hover:text-red-700"
-							onClick={() => setConfirmingDelete(true)}
-						>
-							<Trash2 />
-							Delete
-						</Button>
-						<Button type="button" onClick={onEdit}>
-							<Pencil />
-							Edit event
-						</Button>
-					</>
-				)}
-			</DialogFooter>}
+			{!managedByCaliberCode && (
+				<DialogFooter className="items-center">
+					{confirmingDelete ? (
+						<>
+							<p className="mr-auto text-sm text-neutral-600">
+								Delete this event?
+								{attendees.length > 0 && !event.importUid && " Guests will be sent a cancellation."}
+							</p>
+							<Button
+								type="button"
+								variant="ghost"
+								onClick={() => setConfirmingDelete(false)}
+								disabled={remove.isPending}
+							>
+								Keep
+							</Button>
+							<Button
+								type="button"
+								variant="destructive"
+								onClick={() => remove.mutate()}
+								disabled={remove.isPending}
+							>
+								{remove.isPending ? "Deleting..." : "Delete event"}
+							</Button>
+						</>
+					) : (
+						<>
+							<Button
+								type="button"
+								variant="ghost"
+								className="mr-auto text-red-600 hover:bg-red-50 hover:text-red-700"
+								onClick={() => setConfirmingDelete(true)}
+							>
+								<Trash2 />
+								Delete
+							</Button>
+							<Button type="button" onClick={onEdit} disabled={Boolean(event.importUid)}>
+								<Pencil />
+								Edit event
+							</Button>
+						</>
+					)}
+				</DialogFooter>
+			)}
 		</>
 	);
 }

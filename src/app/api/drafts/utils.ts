@@ -18,8 +18,21 @@ export async function getDraftSender(
 }
 
 export function userOwnsDraft(
-	draft: { userId: string; status: string } | undefined,
+	draft:
+		| {
+				userId: string;
+				status: string;
+				employeeHiddenAt?: Date | null;
+				consumedByMessageId?: string | null;
+		  }
+		| undefined,
 	userId: string,
 ): boolean {
-	return !!draft && draft.userId === userId && draft.status === "draft";
+	return (
+		!!draft &&
+		draft.userId === userId &&
+		draft.status === "draft" &&
+		!draft.employeeHiddenAt &&
+		!draft.consumedByMessageId
+	);
 }

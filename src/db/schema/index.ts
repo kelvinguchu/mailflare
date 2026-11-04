@@ -295,6 +295,7 @@ export const messages = sqliteTable(
 			enum: [
 				"scheduled",
 				"queued",
+				"sending",
 				"canceled",
 				"accepted",
 				"delivered",
@@ -314,6 +315,18 @@ export const messages = sqliteTable(
 		starred: integer("starred", { mode: "boolean" }).notNull().default(false),
 		snoozedUntil: integer("snoozed_until", { mode: "timestamp" }),
 		trashedAt: integer("trashed_at", { mode: "timestamp" }),
+		employeeHiddenAt: integer("employee_hidden_at", { mode: "timestamp" }),
+		deletionOriginalStatus: text("deletion_original_status"),
+		deletionOriginalFolderId: text("deletion_original_folder_id"),
+		deletionOriginalFolderName: text("deletion_original_folder_name"),
+		originalUserId: text("original_user_id"),
+		originalUserEmail: text("original_user_email"),
+		originalMailboxId: text("original_mailbox_id"),
+		originalMailboxAddress: text("original_mailbox_address"),
+		originalMailboxType: text("original_mailbox_type"),
+		draftSaveToken: text("draft_save_token"),
+		draftRevision: integer("draft_revision").notNull().default(0),
+		consumedByMessageId: text("consumed_by_message_id"),
 		threadId: text("thread_id"),
 		createdAt: integer("created_at", { mode: "timestamp" })
 			.notNull()
@@ -366,6 +379,21 @@ export const messages = sqliteTable(
 	],
 );
 
+export const messageDeletionEvents = sqliteTable("message_deletion_events", {
+	id: text("id").primaryKey(),
+	messageId: text("message_id")
+		.notNull()
+		.references(() => messages.id, { onDelete: "cascade" }),
+	actorUserId: text("actor_user_id"),
+	actorEmail: text("actor_email"),
+	action: text("action").notNull(),
+	fromStatus: text("from_status"),
+	fromFolderName: text("from_folder_name"),
+	createdAt: integer("created_at", { mode: "timestamp" })
+		.notNull()
+		.$defaultFn(() => new Date()),
+});
+
 export const messageAttachments = sqliteTable(
 	"message_attachments",
 	{
@@ -399,6 +427,7 @@ export const storageDeletionJobs = sqliteTable(
 		messageId: text("message_id").notNull().unique(),
 		actorUserId: text("actor_user_id").references(() => users.id, { onDelete: "set null" }),
 		mailboxId: text("mailbox_id").references(() => mailboxes.id, { onDelete: "set null" }),
+		ownerAuthorizedAt: integer("owner_authorized_at", { mode: "timestamp" }),
 		reason: text("reason", { enum: ["user", "draft", "retention"] }).notNull(),
 		status: text("status", { enum: ["pending", "processing", "failed", "completed"] })
 			.notNull()
@@ -561,6 +590,9 @@ export const calendarEvents = sqliteTable(
 		timezone: text("timezone").notNull().default("UTC"),
 		allDay: integer("all_day", { mode: "boolean" }).notNull().default(false),
 		sequence: integer("sequence").notNull().default(0),
+		importUid: text("import_uid"),
+		importOrganizer: text("import_organizer"),
+		importCancelled: integer("import_cancelled", { mode: "boolean" }).notNull().default(false),
 		idempotencyKey: text("idempotency_key"),
 		requestHash: text("request_hash"),
 		createdAt: integer("created_at", { mode: "timestamp" })
@@ -573,6 +605,7 @@ export const calendarEvents = sqliteTable(
 	(t) => [
 		index("calendar_events_user_starts_idx").on(t.userId, t.startsAt),
 		uniqueIndex("calendar_events_user_idempotency_idx").on(t.userId, t.idempotencyKey),
+		uniqueIndex("calendar_events_import_identity_idx").on(t.userId, t.importUid, t.importOrganizer),
 	],
 );
 
@@ -609,11 +642,19 @@ export const calendarTasks = sqliteTable(
 		updatedAt: integer("updated_at", { mode: "timestamp" })
 			.notNull()
 			.$defaultFn(() => new Date()),
+		/** Canonical RRULE subset; completing an occurrence creates the next one. */
+		recurrenceRule: text("recurrence_rule"),
+		recurrenceSeriesId: text("recurrence_series_id"),
+		recurrenceIndex: integer("recurrence_index"),
 	},
 	(t) => [
 		index("calendar_tasks_user_status_due_idx").on(t.userId, t.status, t.dueAt),
 		index("calendar_tasks_user_due_idx").on(t.userId, t.dueAt),
 		index("calendar_tasks_assignee_status_due_idx").on(t.assigneeUserId, t.status, t.dueAt),
+		uniqueIndex("calendar_tasks_recurrence_occurrence_idx").on(
+			t.recurrenceSeriesId,
+			t.recurrenceIndex,
+		),
 	],
 );
 
@@ -953,6 +994,7 @@ export const schema = {
 	apiKeys,
 	messages,
 	messageAttachments,
+	messageDeletionEvents,
 	storageDeletionJobs,
 	storageLifecycleState,
 	outboundJobs,

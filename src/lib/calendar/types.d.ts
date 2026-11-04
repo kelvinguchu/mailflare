@@ -76,6 +76,9 @@ export type CalendarEventRecord = {
 	timezone: string;
 	allDay: boolean;
 	sequence: number;
+	importUid?: string | null;
+	importOrganizer?: string | null;
+	importCancelled?: boolean;
 	createdAt?: string;
 	updatedAt?: string;
 };
@@ -99,8 +102,18 @@ export type CalendarTaskRecord = {
 	status: CalendarTaskStatus;
 	priority: CalendarPriority;
 	completedAt: string | null;
+	/** Canonical repeat rule; completing this occurrence creates the next one. */
+	recurrenceRule?: string | null;
+	recurrenceSeriesId?: string | null;
+	recurrenceIndex?: number | null;
 	createdAt?: string;
 	updatedAt?: string;
+};
+
+export type CalendarTaskCompletion = {
+	task: CalendarTaskRecord;
+	/** The next occurrence a repeating task created, when one was created. */
+	nextTask: CalendarTaskRecord | null;
 };
 
 export type CalendarReminderRecord = {

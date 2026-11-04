@@ -59,7 +59,8 @@ function useMessageListRowState({
 	message,
 	config,
 	currentAccountName,
-}: Pick<MessageListRowProps, "message" | "config" | "currentAccountName">) {
+	inspection,
+}: Pick<MessageListRowProps, "message" | "config" | "currentAccountName" | "inspection">) {
 	const [read, setRead] = useState(message.read);
 	const [starred, setStarred] = useState(message.starred);
 	useEffect(() => setRead(message.read), [message.read]);
@@ -71,6 +72,11 @@ function useMessageListRowState({
 	const navigation = useMessageNavigation(href, rowMessage);
 
 	function onNavigate(event: MouseEvent<HTMLAnchorElement>) {
+		if (inspection) {
+			event.preventDefault();
+			inspection.onOpen();
+			return;
+		}
 		const opensElsewhere = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
 		if (unread && !opensElsewhere) {
 			setRead(true);
@@ -96,14 +102,15 @@ function useMessageListRowState({
 		rowMessage,
 		unread,
 		inboundRow,
-		draggable: config.folder === "inbox" && inboundRow,
+		inspection,
+		draggable: !inspection && config.folder === "inbox" && inboundRow,
 		party: getMessageParty(rowMessage, config.folder, currentAccountName),
 		href,
 		onNavigate,
 	};
 }
 
-function MessageListRow(props: Readonly<MessageListRowProps>) {
+export function MessageListRow(props: Readonly<MessageListRowProps>) {
 	const row = useMessageListRowState(props);
 	if (props.compact && props.config.folder !== "drafts") {
 		return <CompactMessageListRow {...props} row={row} />;
@@ -136,13 +143,22 @@ function CompactMessageListRow({
 				setMessageDragData(event.dataTransfer, { messageIds: dragMessageIds });
 			}}
 		>
-			<Checkbox
-				checked={selected}
-				onChange={(event) => onSelectedChange(message.id, event.target.checked)}
-				className="mt-0.5 h-4 w-4 rounded border-neutral-300"
-				aria-label={`Select message from ${row.party}`}
-			/>
-			<Link href={row.href} onClick={row.onNavigate} className="min-w-0">
+			{row.inspection ? (
+				<span className="h-4 w-4" aria-hidden="true" />
+			) : (
+				<Checkbox
+					checked={selected}
+					onChange={(event) => onSelectedChange(message.id, event.target.checked)}
+					className="mt-0.5 h-4 w-4 rounded border-neutral-300"
+					aria-label={`Select message from ${row.party}`}
+				/>
+			)}
+			<Link
+				prefetch={row.inspection ? false : undefined}
+				href={row.href}
+				onClick={row.onNavigate}
+				className="min-w-0"
+			>
 				<span className="flex items-baseline justify-between gap-3">
 					<MessageRowParty
 						message={row.rowMessage}
@@ -167,6 +183,9 @@ function CompactMessageListRow({
 				>
 					{message.subject ?? "(no subject)"}
 				</span>
+				{row.inspection?.badges && (
+					<span className="mt-1 block truncate">{row.inspection.badges}</span>
+				)}
 				<span className="block truncate text-xs leading-4 text-neutral-500">
 					{getMessagePreview(row.rowMessage, config.folder)}
 				</span>
@@ -185,7 +204,7 @@ function MessageRowStarCell({
 	row: MessageListRowState;
 }>) {
 	const Icon = config.icon;
-	if (config.folder !== "inbox" || !row.inboundRow) {
+	if (row.inspection || config.folder !== "inbox" || !row.inboundRow) {
 		return <Icon className="h-4 w-4 text-neutral-300" />;
 	}
 	const label = row.starred ? "Starred" : "Not starred";
@@ -233,7 +252,9 @@ function FullMessageListRow({
 		highlighted && HIGHLIGHT_CLASS,
 		row.draggable && DRAGGABLE_CLASS,
 	);
-	const checkbox = (
+	const checkbox = row.inspection ? (
+		<span className="h-4 w-4" aria-hidden="true" />
+	) : (
 		<Checkbox
 			checked={selected}
 			onChange={(event) => onSelectedChange(message.id, event.target.checked)}
@@ -254,6 +275,7 @@ function FullMessageListRow({
 				<span className={row.unread ? "font-bold text-neutral-900" : ""}>
 					{row.rowMessage.subject ?? "(no subject)"}
 				</span>
+				{row.inspection?.badges}
 				<span className="text-neutral-500">
 					{" "}
 					- {getMessagePreview(row.rowMessage, config.folder)}
@@ -262,7 +284,8 @@ function FullMessageListRow({
 			<time
 				dateTime={message.createdAt}
 				className={cn(
-					"min-w-24 whitespace-nowrap text-right text-xs group-hover:opacity-0",
+					"min-w-24 whitespace-nowrap text-right text-xs",
+					!row.inspection && "group-hover:opacity-0",
 					row.unread ? "font-semibold text-neutral-800" : "text-neutral-500",
 				)}
 			>
@@ -271,7 +294,7 @@ function FullMessageListRow({
 		</>
 	);
 
-	if (config.folder === "drafts") {
+	if (config.folder === "drafts" && !row.inspection) {
 		return (
 			<div className={className}>
 				{checkbox}
@@ -305,7 +328,7 @@ function FullMessageListRow({
 	}
 
 	const showRowActions =
-		(config.folder === "inbox" || config.folder === "snoozed") && row.inboundRow;
+		!row.inspection && (config.folder === "inbox" || config.folder === "snoozed") && row.inboundRow;
 
 	return (
 		<div
@@ -318,7 +341,12 @@ function FullMessageListRow({
 			}}
 		>
 			{checkbox}
-			<Link href={row.href} onClick={row.onNavigate} className="contents">
+			<Link
+				prefetch={row.inspection ? false : undefined}
+				href={row.href}
+				onClick={row.onNavigate}
+				className="contents"
+			>
 				{content}
 			</Link>
 			{showRowActions && <MessageListRowActions message={row.rowMessage} onAction={runRowAction} />}

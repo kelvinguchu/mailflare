@@ -17,7 +17,7 @@ import type {
 	CalendarTaskPatchInput,
 	CalendarTaskRecord,
 } from "@/lib/calendar/types";
-import { errorMessage } from "./calendar-utils";
+import { errorMessage, formatTaskDue } from "./calendar-utils";
 import { buildOptimisticTask, taskMatchesListParams } from "./task-utils";
 
 type ListSnapshot = Array<[readonly unknown[], CalendarTaskRecord[] | undefined]>;
@@ -25,6 +25,7 @@ type DetailSnapshot = Array<[readonly unknown[], CalendarTaskRecord | undefined]
 type Snapshot = { lists: ListSnapshot; details: DetailSnapshot };
 
 export const COMPLETED_REMINDER_NOTE = "Pending reminders for this task were cancelled.";
+export const NEXT_OCCURRENCE_NOTE = "It repeats, with its reminders, next due";
 export const REOPENED_REMINDER_NOTE =
 	"Cancelled reminders stay cancelled. Add a new reminder if you still need one.";
 
@@ -95,11 +96,16 @@ export function useTaskCompletionMutation() {
 			restoreTasks(queryClient, snapshot);
 			toast.add({ title: "Task not updated", description: errorMessage(error), type: "error" });
 		},
-		onSuccess: (task, { completed }) => {
+		onSuccess: ({ task, nextTask }, { completed }) => {
 			replaceTask(queryClient, task);
+			const nextDue = nextTask && formatTaskDue(nextTask);
 			toast.add({
 				title: completed ? "Task completed" : "Task reopened",
-				description: completed ? COMPLETED_REMINDER_NOTE : REOPENED_REMINDER_NOTE,
+				description: completed
+					? nextDue
+						? `${NEXT_OCCURRENCE_NOTE} ${nextDue}.`
+						: COMPLETED_REMINDER_NOTE
+					: REOPENED_REMINDER_NOTE,
 				type: "success",
 			});
 		},

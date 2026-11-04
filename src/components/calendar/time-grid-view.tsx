@@ -1,21 +1,34 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Circle, CircleCheck } from "lucide-react";
+import { Circle, CircleCheck, Repeat } from "lucide-react";
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import type { CalendarEventRecord, CalendarTaskRecord } from "@/lib/calendar/types";
 import {
 	MINUTES_PER_DAY,
+	capTimedColumns,
 	dateKey,
 	eventDayKeys,
 	formatTime,
 	isMultiDayTimed,
 	layoutTimedEvents,
+	type TimedOverflow,
 } from "@/lib/calendar/wall-clock";
 import type { CalendarGridProps } from "./calendar-types";
 import { defaultEventStart, getTaskTone, taskDueKey, type TaskTone } from "./calendar-utils";
+import { TASK_SLOT_MINUTES, ownerTint, taskTimedSpan } from "./calendar-grid-utils";
 
 const HOUR_HEIGHT = 48;
 const SLOT_MINUTES = 30;
+/** Side-by-side columns a crowded slot may use on shared calendars before "+N" takes over. */
+const SHARED_MAX_COLUMNS = { day: 5, week: 2 };
+
+type GridEntry = { id: string; startsAt: string; endsAt: string } & (
+	{ kind: "event"; event: CalendarEventRecord } | { kind: "task"; task: CalendarTaskRecord }
+);
+
+type EntryHandlers = Pick<CalendarGridProps, "onSelectEvent" | "onSelectTask" | "owners">;
 
 const TASK_CHIP_TONES: Record<TaskTone, string> = {
 	completed: "text-neutral-400 line-through",
@@ -39,6 +52,7 @@ export function TimeGridView({
 	onSelectTask,
 	onCreateEvent,
 	onOpenDay,
+	owners,
 }: Readonly<CalendarGridProps>) {
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const now = useNow();
@@ -46,6 +60,20 @@ export function TimeGridView({
 	const keys = days.map(dateKey);
 	const bannerEvents = events.filter((event) => event.allDay || isMultiDayTimed(event));
 	const timedEvents = events.filter((event) => !event.allDay && !isMultiDayTimed(event));
+	// Shared calendars place timed tasks in the hour grid, where their times tell people apart.
+	const gridTasks = owners ? tasks.filter((task) => !task.allDay && task.dueAt) : [];
+	const rowTasks = owners ? tasks.filter((task) => task.allDay) : tasks;
+	const entries: GridEntry[] = [
+		...timedEvents.map((event) => ({ ...event, kind: "event" as const, event })),
+		...gridTasks.flatMap((task) => {
+			const span = taskTimedSpan(task);
+			return span ? [{ id: task.id, ...span, kind: "task" as const, task }] : [];
+		}),
+	];
+	const maxColumns = owners
+		? SHARED_MAX_COLUMNS[days.length === 1 ? "day" : "week"]
+		: Number.POSITIVE_INFINITY;
+	const handlers: EntryHandlers = { onSelectEvent, onSelectTask, owners };
 	const columns = `3.5rem repeat(${days.length}, minmax(0, 1fr))`;
 
 	const firstKey = keys[0];
@@ -99,45 +127,62 @@ export function TimeGridView({
 				<div className="px-1 pt-1.5 text-right text-[10px] text-neutral-400">All day</div>
 				{keys.map((key) => {
 					const banners = bannerEvents.filter((event) => eventDayKeys(event).includes(key));
-					const dayTasks = tasks.filter((task) => taskDueKey(task) === key);
+					const dayTasks = rowTasks.filter((task) => taskDueKey(task) === key);
 					return (
 						<div
 							key={key}
 							className="flex min-h-8 min-w-0 flex-col gap-0.5 border-l border-neutral-100 p-1"
 						>
-							{banners.map((event) => (
-								<button
-									key={event.id}
-									type="button"
-									onClick={() => onSelectEvent(event)}
-									className="w-full truncate rounded-md bg-primary/90 px-1.5 py-0.5 text-left text-xs font-medium text-primary-foreground hover:bg-primary focus-visible:ring-2 focus-visible:ring-primary/60"
-								>
-									{event.title}
-								</button>
-							))}
-							{dayTasks.map((task) => (
-								<button
-									key={task.id}
-									type="button"
-									onClick={() => onSelectTask(task)}
-									className={cn(
-										"flex w-full min-w-0 items-center gap-1 rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 text-left text-xs hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-primary/40",
-										TASK_CHIP_TONES[getTaskTone(task, now)],
-									)}
-								>
-									{task.status === "completed" ? (
-										<CircleCheck className="size-3 shrink-0" />
-									) : (
-										<Circle className="size-3 shrink-0" />
-									)}
-									{!task.allDay && task.dueAt && (
-										<span className="shrink-0 tabular-nums text-neutral-500">
-											{formatTime(task.dueAt)}
-										</span>
-									)}
-									<span className="truncate">{task.title}</span>
-								</button>
-							))}
+							{banners.map((event) => {
+								const owner = owners?.event(event);
+								return (
+									<button
+										key={event.id}
+										type="button"
+										onClick={() => onSelectEvent(event)}
+										title={owner ? `${owner.name}: ${event.title}` : undefined}
+										style={owner ? ownerTint(owner.color, true) : undefined}
+										className={cn(
+											"w-full truncate rounded-md px-1.5 py-0.5 text-left text-xs font-medium focus-visible:ring-2 focus-visible:ring-primary/60",
+											owner
+												? "text-neutral-900 hover:brightness-95"
+												: "bg-primary/90 text-primary-foreground hover:bg-primary",
+										)}
+									>
+										{event.title}
+										{owner && <span className="sr-only">, {owner.name}</span>}
+									</button>
+								);
+							})}
+							{dayTasks.map((task) => {
+								const owner = owners?.task(task);
+								const Icon = task.status === "completed" ? CircleCheck : Circle;
+								return (
+									<button
+										key={task.id}
+										type="button"
+										onClick={() => onSelectTask(task)}
+										title={owner ? `${owner.name}: ${task.title}` : undefined}
+										className={cn(
+											"flex w-full min-w-0 items-center gap-1 rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 text-left text-xs hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-primary/40",
+											TASK_CHIP_TONES[getTaskTone(task, now)],
+											owner?.upcoming && "border-dashed opacity-70",
+										)}
+									>
+										<Icon
+											className="size-3 shrink-0"
+											style={owner ? { color: owner.color } : undefined}
+										/>
+										{!task.allDay && task.dueAt && (
+											<span className="shrink-0 tabular-nums text-neutral-500">
+												{formatTime(task.dueAt)}
+											</span>
+										)}
+										<span className="truncate">{task.title}</span>
+										{owner && <span className="sr-only">, {owner.name}</span>}
+									</button>
+								);
+							})}
 						</div>
 					);
 				})}
@@ -157,7 +202,10 @@ export function TimeGridView({
 						))}
 					</div>
 					{days.map((day, index) => {
-						const layout = layoutTimedEvents(timedEvents, day);
+						const { blocks, overflow } = capTimedColumns(
+							layoutTimedEvents(entries, day, owners ? TASK_SLOT_MINUTES : undefined),
+							maxColumns,
+						);
 						const isToday = keys[index] === today;
 						const nowMinute = now.getHours() * 60 + now.getMinutes();
 						return (
@@ -170,50 +218,44 @@ export function TimeGridView({
 								}}
 							>
 								{/* Sits behind the events, so empty time creates an event by pointer or keyboard. */}
-								<button
-									type="button"
-									aria-label={`Create event on ${day.toLocaleDateString(undefined, { dateStyle: "full" })}`}
-									className="absolute inset-0 cursor-default outline-none focus-visible:bg-primary/5 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset"
-									onClick={(event) => {
-										// A keyboard activation has no pointer position (detail is 0).
-										const start =
-											event.detail === 0
-												? defaultEventStart(day)
-												: slotStart(day, event.nativeEvent.offsetY);
-										onCreateEvent({
-											start,
-											end: new Date(start.getTime() + 3_600_000),
-											allDay: false,
-										});
-									}}
-								/>
-								{layout.map(({ item, startMinute, endMinute, column, columns: count }) => {
-									const height = ((endMinute - startMinute) / 60) * HOUR_HEIGHT;
-									return (
-										<button
-											key={item.id}
-											type="button"
-											onClick={() => onSelectEvent(item)}
-											className="absolute overflow-hidden rounded-md border border-white bg-primary/12 px-1.5 py-0.5 text-left text-xs text-primary shadow-[inset_3px_0_0_var(--color-primary)] hover:bg-primary/20 focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-primary/60"
-											style={{
-												top: (startMinute / 60) * HOUR_HEIGHT,
-												height,
-												left: `calc(${(column / count) * 100}% + 2px)`,
-												width: `calc(${100 / count}% - 4px)`,
-											}}
-										>
-											<span className="block truncate font-semibold">{item.title}</span>
-											{height >= 34 && (
-												<span className="block truncate text-primary/80 tabular-nums">
-													{formatTime(item.startsAt)} – {formatTime(item.endsAt)}
-												</span>
-											)}
-											{height >= 56 && item.location && (
-												<span className="block truncate text-primary/70">{item.location}</span>
-											)}
-										</button>
-									);
-								})}
+								{onCreateEvent && (
+									<button
+										type="button"
+										aria-label={`Create event on ${day.toLocaleDateString(undefined, { dateStyle: "full" })}`}
+										className="absolute inset-0 cursor-default outline-none focus-visible:bg-primary/5 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset"
+										onClick={(event) => {
+											// A keyboard activation has no pointer position (detail is 0).
+											const start =
+												event.detail === 0
+													? defaultEventStart(day)
+													: slotStart(day, event.nativeEvent.offsetY);
+											onCreateEvent({
+												start,
+												end: new Date(start.getTime() + 3_600_000),
+												allDay: false,
+											});
+										}}
+									/>
+								)}
+								{blocks.map(({ item, startMinute, endMinute, column, columns: count }) => (
+									<GridBlock
+										key={item.id}
+										entry={item}
+										startMinute={startMinute}
+										endMinute={endMinute}
+										column={column}
+										columns={count}
+										handlers={handlers}
+									/>
+								))}
+								{overflow.map((group) => (
+									<OverflowBlock
+										key={`overflow-${group.startMinute}-${group.items[0].id}`}
+										group={group}
+										day={day}
+										handlers={handlers}
+									/>
+								))}
 								{isToday && (
 									<div
 										className="pointer-events-none absolute inset-x-0 z-10 flex items-center"
@@ -229,6 +271,163 @@ export function TimeGridView({
 				</div>
 			</div>
 		</div>
+	);
+}
+
+function blockPosition(startMinute: number, endMinute: number, column: number, columns: number) {
+	return {
+		top: (startMinute / 60) * HOUR_HEIGHT,
+		height: ((endMinute - startMinute) / 60) * HOUR_HEIGHT,
+		left: `calc(${(column / columns) * 100}% + 2px)`,
+		width: `calc(${100 / columns}% - 4px)`,
+	};
+}
+
+function GridBlock({
+	entry,
+	startMinute,
+	endMinute,
+	column,
+	columns,
+	handlers: { onSelectEvent, onSelectTask, owners },
+}: Readonly<{
+	entry: GridEntry;
+	startMinute: number;
+	endMinute: number;
+	column: number;
+	columns: number;
+	handlers: EntryHandlers;
+}>) {
+	const position = blockPosition(startMinute, endMinute, column, columns);
+	if (entry.kind === "event") {
+		const { event } = entry;
+		const owner = owners?.event(event);
+		const time = `${formatTime(event.startsAt)} – ${formatTime(event.endsAt)}`;
+		return (
+			<button
+				type="button"
+				onClick={() => onSelectEvent(event)}
+				title={owner ? `${owner.name}: ${event.title}, ${time}` : undefined}
+				className={cn(
+					"absolute overflow-hidden rounded-md border border-white px-1.5 py-0.5 text-left text-xs focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-primary/60",
+					owner
+						? "text-neutral-900 hover:z-10 hover:brightness-95"
+						: "bg-primary/12 text-primary shadow-[inset_3px_0_0_var(--color-primary)] hover:bg-primary/20",
+				)}
+				style={{ ...position, ...(owner ? ownerTint(owner.color, true) : {}) }}
+			>
+				<span className="block truncate font-semibold">{event.title}</span>
+				{position.height >= 34 && (
+					<span
+						className={cn(
+							"block truncate tabular-nums",
+							owner ? "text-neutral-600" : "text-primary/80",
+						)}
+					>
+						{time}
+					</span>
+				)}
+				{owner ? (
+					position.height >= 56 ? (
+						<span className="block truncate text-neutral-600">{owner.name}</span>
+					) : (
+						<span className="sr-only">, {owner.name}</span>
+					)
+				) : (
+					position.height >= 56 &&
+					event.location && <span className="block truncate text-primary/70">{event.location}</span>
+				)}
+			</button>
+		);
+	}
+	const { task } = entry;
+	const owner = owners?.task(task);
+	const completed = task.status === "completed";
+	const Icon = completed ? CircleCheck : Circle;
+	return (
+		<button
+			type="button"
+			onClick={() => onSelectTask(task)}
+			title={owner ? `${owner.name}: ${task.title}, due ${formatTime(entry.startsAt)}` : undefined}
+			className={cn(
+				"absolute flex items-center gap-1 overflow-hidden rounded-md border bg-white px-1.5 text-left text-xs text-neutral-900 hover:z-10 hover:brightness-95 focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-primary/60",
+				completed && "text-neutral-500 line-through opacity-70",
+				owner?.upcoming && "border-dashed opacity-75",
+			)}
+			style={{ ...position, ...(owner ? ownerTint(owner.color, true) : {}) }}
+		>
+			<Icon className="size-3 shrink-0" style={owner ? { color: owner.color } : undefined} />
+			<span className="min-w-0 truncate font-medium">{task.title}</span>
+			{owner?.upcoming && (
+				<Repeat aria-label="Upcoming repeat" className="size-3 shrink-0 text-neutral-500" />
+			)}
+			{owner && <span className="sr-only">, {owner.name}</span>}
+		</button>
+	);
+}
+
+function entryOwner(entry: GridEntry, owners: CalendarGridProps["owners"]) {
+	return entry.kind === "event" ? owners?.event(entry.event) : owners?.task(entry.task);
+}
+
+/** The items that don't fit beside the others in a crowded slot, one click away. */
+function OverflowBlock({
+	group,
+	day,
+	handlers,
+}: Readonly<{ group: TimedOverflow<GridEntry>; day: Date; handlers: EntryHandlers }>) {
+	const [open, setOpen] = useState(false);
+	const position = blockPosition(group.startMinute, group.endMinute, group.column, group.columns);
+	const start = new Date(day);
+	start.setHours(0, group.startMinute);
+	return (
+		<Popover open={open} onOpenChange={setOpen}>
+			<PopoverTrigger
+				aria-label={`${group.items.length} more at ${formatTime(start)}`}
+				className="absolute flex items-start justify-center overflow-hidden rounded-md border border-neutral-200 bg-neutral-100 px-1 py-0.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-200 focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-primary/60"
+				style={position}
+			>
+				+{group.items.length}
+			</PopoverTrigger>
+			<PopoverContent align="start" className="w-72 gap-2 p-3">
+				<PopoverTitle className="px-1 text-sm text-neutral-900">
+					{day.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })},
+					from {formatTime(start)}
+				</PopoverTitle>
+				<div className="flex max-h-80 flex-col gap-0.5 overflow-y-auto overscroll-contain">
+					{group.items.map((entry) => {
+						const owner = entryOwner(entry, handlers.owners);
+						const title = entry.kind === "event" ? entry.event.title : entry.task.title;
+						return (
+							<button
+								key={`${entry.kind}-${entry.id}`}
+								type="button"
+								onClick={() => {
+									setOpen(false);
+									if (entry.kind === "event") handlers.onSelectEvent(entry.event);
+									else handlers.onSelectTask(entry.task);
+								}}
+								className="flex w-full min-w-0 items-center gap-2 rounded-md px-1.5 py-1 text-left text-xs hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary/40"
+							>
+								<span
+									className="size-2 shrink-0 rounded-full bg-primary"
+									style={owner ? { backgroundColor: owner.color } : undefined}
+								/>
+								<span className="shrink-0 text-neutral-500 tabular-nums">
+									{formatTime(entry.startsAt)}
+								</span>
+								<span className="min-w-0 flex-1 truncate font-medium text-neutral-900">
+									{title}
+								</span>
+								{owner && (
+									<span className="max-w-24 shrink-0 truncate text-neutral-500">{owner.name}</span>
+								)}
+							</button>
+						);
+					})}
+				</div>
+			</PopoverContent>
+		</Popover>
 	);
 }
 

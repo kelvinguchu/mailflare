@@ -11,6 +11,12 @@ import {
 	isTaskFormDirty,
 	taskMatchesListParams,
 } from "../src/components/calendar/task-utils";
+import {
+	NO_REPEAT,
+	customRepeatFrom,
+	getRepeatPresetOptions,
+	type TaskRepeatValues,
+} from "../src/components/calendar/task-repeat-utils";
 import { getTaskChangeAnnouncement, getTaskChangeToast } from "../src/hooks/message-realtime-utils";
 import type { CalendarTaskRecord } from "../src/lib/calendar/types";
 import type { TaskChangeNotification } from "../src/lib/realtime/types";
@@ -186,6 +192,113 @@ describe("task form", () => {
 		expect(
 			buildTaskPatch({ ...baseline, dueMode: "date", dueDate: "2026-09-18" }, baseline, false),
 		).toEqual({ dueAt: "2026-09-18", allDay: true, timezone: "UTC" });
+	});
+});
+
+describe("task repeat picker", () => {
+	const defaults = { timezone: "UTC", assigneeUserId: "usr_me", now: NOW };
+
+	it("turns presets into rules anchored to the due date", () => {
+		const values = {
+			...getTaskFormValues(null, { ...defaults, title: "Standup notes" }),
+			dueMode: "date" as const,
+			dueDate: "2026-09-16",
+		};
+		const rule = (repeat: Partial<TaskRepeatValues>) =>
+			buildTaskCreateInput({ ...values, repeat: { ...NO_REPEAT, ...repeat } }).recurrenceRule;
+		expect(rule({ preset: "none" })).toBeUndefined();
+		expect(rule({ preset: "daily" })).toBe("FREQ=DAILY");
+		expect(rule({ preset: "weekdays" })).toBe("FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR");
+		expect(rule({ preset: "weekly" })).toBe("FREQ=WEEKLY;BYDAY=WE");
+		expect(rule({ preset: "monthly", end: "count", count: 6 })).toBe(
+			"FREQ=MONTHLY;BYMONTHDAY=16;COUNT=6",
+		);
+		expect(rule({ preset: "yearly", end: "until", until: "2030-09-16" })).toBe(
+			"FREQ=YEARLY;BYMONTH=9;BYMONTHDAY=16;UNTIL=20300916",
+		);
+		expect(rule({ preset: "custom", frequency: "weekly", interval: 2, weekdays: [5, 1] })).toBe(
+			"FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,FR",
+		);
+		expect(() => rule({ preset: "daily", end: "until", until: "" })).toThrow(/end/);
+		expect(
+			buildTaskCreateInput({
+				...values,
+				dueMode: "none",
+				repeat: { ...NO_REPEAT, preset: "daily" },
+			}).recurrenceRule,
+		).toBeUndefined();
+	});
+
+	it("reads saved rules back into the matching preset or a custom rule", () => {
+		const weekly = getTaskFormValues(
+			task({
+				dueAt: "2026-09-16T00:00:00.000Z",
+				allDay: true,
+				recurrenceRule: "FREQ=WEEKLY;BYDAY=WE",
+			}),
+			defaults,
+		);
+		expect(weekly.repeat).toMatchObject({ preset: "weekly", end: "never" });
+		const clamped = getTaskFormValues(
+			task({
+				dueAt: "2026-09-30T00:00:00.000Z",
+				allDay: true,
+				recurrenceRule: "FREQ=MONTHLY;BYMONTHDAY=31;COUNT=12",
+			}),
+			defaults,
+		);
+		expect(clamped.repeat).toMatchObject({
+			preset: "custom",
+			frequency: "monthly",
+			monthDay: 31,
+			end: "count",
+			count: 12,
+		});
+		expect(isTaskFormDirty(clamped, clamped)).toBe(false);
+		expect(getRepeatPresetOptions(weekly).map((option) => option.label)).toContain(
+			"Weekly on Wednesday",
+		);
+	});
+
+	it("updates the rule when a preset's due date moves and drops it with the date", () => {
+		const baseline = getTaskFormValues(
+			task({
+				dueAt: "2026-09-16T00:00:00.000Z",
+				allDay: true,
+				recurrenceRule: "FREQ=WEEKLY;BYDAY=WE",
+			}),
+			defaults,
+		);
+		expect(buildTaskPatch({ ...baseline, dueDate: "2026-09-18" }, baseline, false)).toEqual({
+			dueAt: "2026-09-18",
+			allDay: true,
+			timezone: "UTC",
+			recurrenceRule: "FREQ=WEEKLY;BYDAY=FR",
+		});
+		expect(buildTaskPatch({ ...baseline, dueMode: "none" }, baseline, false)).toMatchObject({
+			dueAt: null,
+			recurrenceRule: null,
+		});
+		expect(
+			buildTaskPatch(
+				{ ...baseline, repeat: { ...baseline.repeat, preset: "none" } },
+				baseline,
+				false,
+			),
+		).toEqual({ recurrenceRule: null });
+		expect(buildTaskPatch({ ...baseline, title: "Renamed" }, baseline, false)).toEqual({
+			title: "Renamed",
+		});
+	});
+
+	it("starts a custom rule from the preset on screen", () => {
+		const due = { dueMode: "date" as const, dueDate: "2026-09-16", dueTime: "", timezone: "UTC" };
+		expect(customRepeatFrom({ ...NO_REPEAT, preset: "weekdays" }, due)).toMatchObject({
+			preset: "custom",
+			frequency: "weekly",
+			weekdays: [1, 2, 3, 4, 5],
+		});
+		expect(customRepeatFrom({ ...NO_REPEAT, preset: "none" }, due).weekdays).toEqual([3]);
 	});
 });
 

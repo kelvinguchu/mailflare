@@ -11,4 +11,5 @@ export interface SendRequestPayload {
 	to: string;
 	cc?: string;
 	replyToMessageId?: string | null;
+	forwardMessageId?: string;
 }

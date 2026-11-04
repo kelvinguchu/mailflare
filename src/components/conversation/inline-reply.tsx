@@ -14,6 +14,7 @@ import { useCompose } from "@/components/compose/compose-context";
 import { AttachmentList } from "@/components/compose/attachment-list";
 import { RecipientField } from "@/components/compose/recipient-field";
 import { sendWithUndo } from "@/components/compose/send-with-undo";
+import { validateMessageBudget } from "@/lib/email/limits";
 import type { ComposeAttachment, ComposeSnapshot } from "@/components/compose/types";
 import { getAttachmentLimitError } from "@/components/compose/utils";
 import { useSelectedMailbox } from "@/components/mailbox-provider";
@@ -134,10 +135,6 @@ export function InlineReply({
 		return { mailbox, address, from: formatEmailAddress(address, mailbox.displayName) };
 	}, [addresses.own, mailbox]);
 
-	const hasSignature = Boolean(
-		mailbox?.signatureHtml || mailbox?.signatureText || mailbox?.signature,
-	);
-
 	function addAttachments(list: FileList | null) {
 		const files = Array.from(list ?? []);
 		if (fileInputRef.current) fileInputRef.current.value = "";
@@ -186,13 +183,14 @@ export function InlineReply({
 					? `${body}${buildReplyQuote(target.fromAddr, sourceText)}`
 					: `${body}${buildForwardText(target, sourceText)}`,
 			attachments,
-			includeSignature: hasSignature ? includeSignature : undefined,
+			includeSignature,
 			mailboxId: sender.mailbox.id,
 			selectedFrom: sender.address,
 			from: sender.from,
 			undoDelaySeconds: String(getUndoSendDelayPreference()),
 			sendKey: crypto.randomUUID(),
 			replyToMessageId: mode === "reply" ? target.id : null,
+			forward: mode === "forward" ? { messageId: target.id, note: body } : null,
 		};
 	}
 
@@ -213,6 +211,15 @@ export function InlineReply({
 		const snapshot = await buildSnapshot();
 		setPreparing(false);
 		if (!snapshot) return;
+		try {
+			validateMessageBudget(
+				snapshot,
+				snapshot.attachments.map(({ file }) => ({ filename: file.name, size: file.size })),
+			);
+		} catch (error) {
+			setError(error instanceof Error ? error.message : "Message is too large");
+			return;
+		}
 		sendWithUndo({ snapshot, draftId: Promise.resolve(null), restore: restoreComposer });
 		onClose();
 	}
@@ -404,6 +411,8 @@ export function InlineReply({
 				)}
 
 				<AttachmentList
+					to={to}
+					cc={cc}
 					attachments={attachments}
 					onRemove={(id) => setAttachments((items) => items.filter((item) => item.id !== id))}
 					className="px-4 pt-2"
@@ -445,24 +454,22 @@ export function InlineReply({
 							<Paperclip className="size-4" />
 						</Button>
 					</Tooltip>
-					{hasSignature && (
-						<Tooltip label={includeSignature ? "Signature included" : "Signature left off"}>
-							<Button
-								type="button"
-								variant="ghost"
-								size="icon-sm"
-								aria-label="Include signature"
-								aria-pressed={includeSignature}
-								onClick={() => setIncludeSignature((value) => !value)}
-								className={cn(
-									"rounded-full",
-									includeSignature ? "bg-primary/10 text-primary" : "text-neutral-600",
-								)}
-							>
-								<PenLine className="size-4" />
-							</Button>
-						</Tooltip>
-					)}
+					<Tooltip label={includeSignature ? "Signature included" : "Signature left off"}>
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon-sm"
+							aria-label="Include signature"
+							aria-pressed={includeSignature}
+							onClick={() => setIncludeSignature((value) => !value)}
+							className={cn(
+								"rounded-full",
+								includeSignature ? "bg-primary/10 text-primary" : "text-neutral-600",
+							)}
+						>
+							<PenLine className="size-4" />
+						</Button>
+					</Tooltip>
 					<span className="flex-1" />
 					<Tooltip label="Discard">
 						<Button

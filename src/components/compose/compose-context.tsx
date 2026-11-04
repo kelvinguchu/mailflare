@@ -3,6 +3,9 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { ComposeSnapshot } from "./types";
+import { listSendRecoveries, removeSendRecovery } from "./send-recovery";
+import { lookupSend } from "./send-transport";
+import { toast } from "@/components/ui/toast";
 
 type ComposeContextValue = {
 	open: boolean;
@@ -31,6 +34,49 @@ export function ComposeProvider({ children }: { children: ReactNode }) {
 	const [restoredSnapshot, setRestoredSnapshot] = useState<ComposeSnapshot | null>(null);
 	const [session, setSession] = useState(0);
 	const returnFocusRef = useRef<HTMLElement | null>(null);
+
+	useEffect(() => {
+		let canceled = false;
+		void listSendRecoveries()
+			.then(async (snapshots) => {
+				for (const snapshot of snapshots) {
+					const outcome = await lookupSend(snapshot.sendKey).catch(() => null);
+					if (canceled) return;
+					if (outcome?.found && !["failed", "canceled"].includes(outcome.data.status ?? "")) {
+						if (outcome.data.status === "sent") await removeSendRecovery(snapshot.sendKey);
+						continue;
+					}
+					const unknown = !outcome || outcome.data.deliveryStatus === "unknown";
+					toast.add({
+						type: "info",
+						title: unknown ? "Send needs a status check" : "Unsent message recovered",
+						timeout: 0,
+						description: unknown
+							? "Open the message in Sent to check its outcome before sending again."
+							: "Your message and files are saved on this device.",
+						actionProps: unknown
+							? undefined
+							: {
+									children: "Open message",
+									onClick: () => {
+										setRestoredSnapshot({
+											...snapshot,
+											sendKey: outcome.found ? crypto.randomUUID() : snapshot.sendKey,
+										});
+										setSession((current) => current + 1);
+										setOpen(true);
+									},
+								},
+					});
+				}
+			})
+			.catch(() => {
+				/* A normal session with no recovery does not need a toast. */
+			});
+		return () => {
+			canceled = true;
+		};
+	}, []);
 
 	useEffect(() => {
 		if (open || !returnFocusRef.current) return;

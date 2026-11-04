@@ -11,10 +11,11 @@ export function MessageAttachmentCard({
 	attachment,
 	messageId,
 	onPreview,
+	inspection = false,
 }: MessageAttachmentCardProps) {
 	const visual = getAttachmentVisual(attachment);
 	const Icon = visual.icon;
-	const previewUrl = getAttachmentFileUrl(messageId, attachment.id, "preview");
+	const previewUrl = getAttachmentFileUrl(messageId, attachment.id, "preview", inspection);
 	const quarantined = attachment.securityStatus === "quarantined";
 
 	return (

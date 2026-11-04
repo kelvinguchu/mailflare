@@ -1,3 +1,4 @@
+import { employeeVisible, recordDeletionEvent } from "@/lib/team-inboxes/retention";
 import { eq, desc, and } from "drizzle-orm";
 import { getDb } from "@/db";
 import { messages, domains, mailboxes } from "@/db/schema";
@@ -12,7 +13,7 @@ export async function listMessagesForUser(
 ) {
 	const db = getDb(env);
 	const limit = options?.limit ?? 50;
-	const conditions = [eq(messages.userId, userId)];
+	const conditions = [employeeVisible()!, eq(messages.userId, userId)];
 	if (options?.direction) {
 		conditions.push(eq(messages.direction, options.direction));
 	}
@@ -73,7 +74,13 @@ export async function getMailboxForUser(env: CloudflareEnv, userId: string, mail
 export async function markMessageAsRead(env: CloudflareEnv, userId: string, messageId: string) {
 	const db = getDb(env);
 	const [message] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
-	if (!message || message.userId !== userId) return false;
+	if (
+		!message ||
+		message.employeeHiddenAt ||
+		message.consumedByMessageId ||
+		message.userId !== userId
+	)
+		return false;
 	await db.update(messages).set({ read: true }).where(eq(messages.id, messageId));
 	return true;
 }
@@ -85,7 +92,7 @@ export async function markMessageAsReadForUser(
 ) {
 	const db = getDb(env);
 	const [message] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
-	if (!message?.mailboxId) return false;
+	if (!message?.mailboxId || message.employeeHiddenAt || message.consumedByMessageId) return false;
 	const access = await getMailboxAccessLevel(db, user, message.mailboxId);
 	if (!access?.canRead) return false;
 	await db.update(messages).set({ read: true }).where(eq(messages.id, messageId));
@@ -106,10 +113,14 @@ export async function updateMessageStatusForUser(
 ) {
 	const db = getDb(env);
 	const [message] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
-	if (!message?.mailboxId) return false;
+	if (!message?.mailboxId || message.employeeHiddenAt || message.consumedByMessageId) return false;
 	const access = await getMailboxAccessLevel(db, user, message.mailboxId);
 	if (!access?.canManage) return false;
 	await db.update(messages).set({ status }).where(eq(messages.id, messageId));
+	if (status === "trash" && message.status !== "trash")
+		await recordDeletionEvent(env, message, "trashed", user);
+	if (message.status === "trash" && status !== "trash")
+		await recordDeletionEvent(env, message, "restored", user);
 	await createAuditLog(env, {
 		actorUserId: user.id,
 		mailboxId: message.mailboxId,
@@ -128,7 +139,13 @@ export async function updateMessageStatus(
 ) {
 	const db = getDb(env);
 	const [message] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
-	if (!message || message.userId !== userId) return false;
+	if (
+		!message ||
+		message.employeeHiddenAt ||
+		message.consumedByMessageId ||
+		message.userId !== userId
+	)
+		return false;
 	await db.update(messages).set({ status }).where(eq(messages.id, messageId));
 	return true;
 }

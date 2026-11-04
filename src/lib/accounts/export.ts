@@ -34,10 +34,14 @@ const EXPORT_SECTIONS: ExportSection[] = [
 	},
 	{ name: "contacts", sql: "SELECT * FROM contacts WHERE user_id = ?", bindings: ["account"] },
 	{ name: "folders", sql: "SELECT * FROM folders WHERE user_id = ?", bindings: ["account"] },
-	{ name: "messages", sql: "SELECT * FROM messages WHERE user_id = ?", bindings: ["account"] },
+	{
+		name: "messages",
+		sql: "SELECT * FROM messages WHERE user_id = ? AND employee_hidden_at IS NULL AND consumed_by_message_id IS NULL",
+		bindings: ["account"],
+	},
 	{
 		name: "message-attachments",
-		sql: "SELECT * FROM message_attachments WHERE message_id IN (SELECT id FROM messages WHERE user_id = ?)",
+		sql: "SELECT * FROM message_attachments WHERE message_id IN (SELECT id FROM messages WHERE user_id = ? AND employee_hidden_at IS NULL AND consumed_by_message_id IS NULL)",
 		bindings: ["account"],
 	},
 	{
@@ -112,9 +116,9 @@ const OBJECT_REFERENCES_SQL = `
 	UNION SELECT avatar_key FROM mailboxes WHERE user_id = ? AND avatar_key IS NOT NULL
 	UNION SELECT r2_key FROM signature_assets
 		WHERE mailbox_id IN (SELECT id FROM mailboxes WHERE user_id = ?)
-	UNION SELECT raw_r2_key FROM messages WHERE user_id = ? AND raw_r2_key IS NOT NULL
+	UNION SELECT raw_r2_key FROM messages WHERE user_id = ? AND employee_hidden_at IS NULL AND consumed_by_message_id IS NULL AND raw_r2_key IS NOT NULL
 	UNION SELECT r2_key FROM message_attachments
-		WHERE message_id IN (SELECT id FROM messages WHERE user_id = ?)
+		WHERE message_id IN (SELECT id FROM messages WHERE user_id = ? AND employee_hidden_at IS NULL AND consumed_by_message_id IS NULL)
 `;
 
 function writeString(target: Uint8Array, offset: number, length: number, value: string): void {

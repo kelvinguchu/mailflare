@@ -151,11 +151,19 @@ export async function buildOutboundThreading(
 			providerMessageId: messages.providerMessageId,
 			references: messages.references,
 			status: messages.status,
+			employeeHiddenAt: messages.employeeHiddenAt,
+			consumedByMessageId: messages.consumedByMessageId,
 		})
 		.from(messages)
 		.where(eq(messages.id, input.replyToMessageId))
 		.limit(1);
-	if (!parent || parent.mailboxId !== input.mailboxId || parent.status === "draft") {
+	if (
+		!parent ||
+		parent.employeeHiddenAt ||
+		parent.consumedByMessageId ||
+		parent.mailboxId !== input.mailboxId ||
+		parent.status === "draft"
+	) {
 		throw new Error("Reply message is not readable in the selected mailbox");
 	}
 

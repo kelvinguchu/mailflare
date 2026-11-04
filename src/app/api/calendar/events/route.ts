@@ -44,6 +44,7 @@ export async function GET(request: Request) {
 			.where(
 				and(
 					eq(calendarEvents.userId, user.id),
+					eq(calendarEvents.importCancelled, false),
 					lt(calendarEvents.startsAt, end),
 					gt(calendarEvents.endsAt, start),
 				),

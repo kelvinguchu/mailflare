@@ -37,7 +37,7 @@ export async function queryMessageCountAggregates(
 				snoozed_until,
 				coalesce(mailbox_id, 'unassigned') || ':' || coalesce(thread_id, id) AS thread_key
 			FROM messages
-			WHERE ${filterSql}
+			WHERE (${filterSql}) AND employee_hidden_at IS NULL AND consumed_by_message_id IS NULL
 		), classified AS (
 			SELECT
 				*,

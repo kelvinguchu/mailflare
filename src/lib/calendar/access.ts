@@ -4,11 +4,19 @@ import { getAuthorizedSenderAddress } from "@/lib/email/sender";
 import { getMailboxAccessLevel } from "@/lib/mailboxes/access";
 import { CalendarInputError } from "./validation";
 
+/** Feature availability is separate from ownership of individual calendar records. */
+export function requireCalendarFeature(user: SessionUser): void {
+	if (user.disabled || user.activationStatus !== "active" || user.archivedAt) {
+		throw new CalendarInputError("Calendar access requires an active account", 403);
+	}
+}
+
 export async function requireCalendarMailboxAccess(
 	env: CloudflareEnv,
 	user: SessionUser,
 	mailboxId: string | null | undefined,
 ): Promise<void> {
+	requireCalendarFeature(user);
 	if (!mailboxId) return;
 	const access = await getMailboxAccessLevel(getDb(env), user, mailboxId);
 	if (!access) throw new CalendarInputError("Calendar mailbox not found", 404);
@@ -20,6 +28,7 @@ export async function requireCalendarSender(
 	mailboxId: string | null | undefined,
 	from: string | null | undefined,
 ): Promise<{ mailboxId: string; fromAddr: string }> {
+	requireCalendarFeature(user);
 	if (!mailboxId || !from?.trim()) {
 		throw new CalendarInputError("Email reminders require a mailbox and sender address");
 	}

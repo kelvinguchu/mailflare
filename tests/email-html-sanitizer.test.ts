@@ -155,3 +155,20 @@ describe("email HTML sanitizer", () => {
 		expect(fragment.querySelector("strong")?.textContent).toBe("Kept");
 	});
 });
+
+describe("sanitizeEmailHtml table colours", () => {
+	it("keeps bgcolor, so a white link on a coloured cell stays visible", () => {
+		const { html } = sanitizeEmailHtml(
+			`<table><tr><td bgcolor="#00508f"><a href="https://example.test" style="color:#ffffff">View Invoice</a></td></tr></table>`,
+		);
+		expect(html).toContain('bgcolor="#00508f"');
+		expect(html).toContain("View Invoice");
+	});
+
+	it("drops a bgcolor that is not a plain colour", () => {
+		const { html } = sanitizeEmailHtml(
+			`<table><tr><td bgcolor="url(https://tracker.test/x)">Hi</td></tr></table>`,
+		);
+		expect(html).not.toContain("tracker.test");
+	});
+});

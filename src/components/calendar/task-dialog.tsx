@@ -56,6 +56,7 @@ import { FormError, TimezoneSelect } from "./calendar-fields";
 import type { ReminderTarget, TaskDialogState } from "./calendar-types";
 import { PRIORITY_OPTIONS, PRIORITY_STYLES, errorMessage } from "./calendar-utils";
 import { ItemReminders } from "./item-reminders";
+import { TaskRepeatField } from "./task-repeat-field";
 import {
 	buildTaskCreateInput,
 	buildTaskPatch,
@@ -280,6 +281,9 @@ function TaskEditor({
 							? "Review and change this task, its reminders, and its activity."
 							: "Create a task for yourself or assign it to a colleague."}
 					</DialogDescription>
+					<label htmlFor="task-title" className="mb-1 text-sm font-medium text-neutral-700">
+						Task title <span className="font-normal text-neutral-500">(required)</span>
+					</label>
 					<div className="flex items-start gap-2.5">
 						{task && (
 							<span
@@ -290,7 +294,10 @@ function TaskEditor({
 							</span>
 						)}
 						<Textarea
+							id="task-title"
 							aria-label="Task title"
+							aria-describedby={!values.title.trim() ? "task-title-help" : undefined}
+							required
 							placeholder="What needs to be done?"
 							value={values.title}
 							maxLength={200}
@@ -304,11 +311,16 @@ function TaskEditor({
 								}
 							}}
 							className={cn(
-								"min-h-10 resize-none border-0 px-0 py-1.5 text-lg font-medium wrap-break-word shadow-none focus-visible:ring-0 md:text-lg",
+								"min-h-10 resize-none px-3 py-2 text-base font-medium wrap-break-word md:text-base",
 								completed && "text-neutral-500 line-through",
 							)}
 						/>
 					</div>
+					{!values.title.trim() && (
+						<p id="task-title-help" className="text-xs font-normal text-neutral-500">
+							Add a short title above to enable {task ? "Save changes" : "Create task"}.
+						</p>
+					)}
 					{task && <TaskPeopleLine task={task} account={account.data} />}
 				</DialogHeader>
 
@@ -355,6 +367,18 @@ function TaskEditor({
 						<dt className="pt-2 text-neutral-500">Due</dt>
 						<dd className="min-w-0 space-y-2">
 							<DueField values={values} disabled={!permissions.canEdit} onChange={set} />
+						</dd>
+
+						<dt className="pt-2 text-neutral-500">
+							<label htmlFor="task-repeat">Repeat</label>
+						</dt>
+						<dd className="min-w-0">
+							<TaskRepeatField
+								values={values.repeat}
+								due={values}
+								disabled={!permissions.canEdit}
+								onChange={(repeat) => set("repeat", repeat)}
+							/>
 						</dd>
 
 						<dt className="pt-2 text-neutral-500">

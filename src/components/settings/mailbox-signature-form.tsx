@@ -290,7 +290,8 @@ export function MailboxSignatureForm() {
 				<div className="space-y-2 lg:sticky lg:top-4">
 					<SignaturePreview assets={assets} rows={previewRows} text={previewText} from={address} />
 					<p className="px-1 text-xs text-neutral-500">
-						Added to new messages, replies, and forwards.
+						Added to new messages, replies, and forwards. If this is empty, CaliberCode addresses
+						use the default: the logo, your name, our contact details and social links.
 					</p>
 				</div>
 			</div>

@@ -23,9 +23,8 @@ async function setCompleted(
 	if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	try {
 		const { taskId } = await params;
-		return NextResponse.json({
-			task: await setCalendarTaskCompleted(env, user, taskId, completed),
-		});
+		const { nextTask, ...task } = await setCalendarTaskCompleted(env, user, taskId, completed);
+		return NextResponse.json({ task, nextTask });
 	} catch (error) {
 		if (error instanceof CalendarInputError) {
 			return NextResponse.json({ error: error.message }, { status: error.status });

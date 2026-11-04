@@ -1,5 +1,11 @@
 import { authFetch } from "@/lib/auth/client";
 import type { ComposeAttachment, ComposeDraft, DraftResponse } from "./types";
+import { attachmentLimitError } from "@/lib/email/limits";
+export {
+	MAX_ATTACHMENT_COUNT as MAX_ATTACHMENTS,
+	MAX_ATTACHMENT_SIZE as MAX_ATTACHMENT_BYTES,
+	MAX_TOTAL_ATTACHMENT_SIZE as MAX_TOTAL_ATTACHMENT_BYTES,
+} from "@/lib/email/limits";
 
 export async function fetchDraft(draftId: string): Promise<ComposeDraft> {
 	const res = await authFetch(`/api/drafts/${draftId}`);
@@ -22,6 +28,7 @@ export function buildSendFormData(input: {
 	to: string;
 	cc?: string;
 	replyToMessageId?: string | null;
+	forwardMessageId?: string | null;
 }): FormData {
 	const form = new FormData();
 	form.set("from", input.from);
@@ -34,6 +41,7 @@ export function buildSendFormData(input: {
 	}
 	if (input.mailboxId) form.set("mailboxId", input.mailboxId);
 	if (input.replyToMessageId) form.set("replyToMessageId", input.replyToMessageId);
+	if (input.forwardMessageId) form.set("forwardMessageId", input.forwardMessageId);
 	for (const attachment of input.attachments) {
 		form.append("attachments", attachment.file);
 	}
@@ -81,19 +89,7 @@ function formatSignatureBlock(signature: string | null | undefined): string {
 	return value ? `\n\n${value}` : "";
 }
 
-export const MAX_ATTACHMENTS = 10;
-export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
-export const MAX_TOTAL_ATTACHMENT_BYTES = 20 * 1024 * 1024;
-
 /** Why `files` can't be added to a message that already has `current`, or null when they can. */
 export function getAttachmentLimitError(current: File[], files: File[]): string | null {
-	if (current.length + files.length > MAX_ATTACHMENTS) {
-		return `A message can include at most ${MAX_ATTACHMENTS} attachments`;
-	}
-	if (files.some((file) => file.size > MAX_ATTACHMENT_BYTES)) {
-		return "Each attachment must be 10 MB or smaller";
-	}
-	const total = [...current, ...files].reduce((sum, file) => sum + file.size, 0);
-	if (total > MAX_TOTAL_ATTACHMENT_BYTES) return "Attachments must total 20 MB or less";
-	return null;
+	return attachmentLimitError([...current, ...files]);
 }

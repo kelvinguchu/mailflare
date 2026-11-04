@@ -21,8 +21,12 @@ import { errorMessage } from "./calendar-utils";
 
 /** CaliberCode advisory hours are always booked and shown in Nairobi time. */
 const NAIROBI = "Africa/Nairobi";
-/** Start hours the booking page offers; the CMS checks the full range. */
-const START_HOURS = [8, 9, 10, 11, 12, 14, 15, 17, 18, 19, 20];
+/**
+ * Start hours an advisor can move a session to: the booking page's hours
+ * (from 10:00, nothing from 17:00) plus 08:00 and 09:00, which only advisors
+ * can use. The CMS checks the full range.
+ */
+const START_HOURS = [8, 9, 10, 11, 12, 14, 15];
 
 const pad = (value: number) => String(value).padStart(2, "0");
 

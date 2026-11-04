@@ -1,3 +1,4 @@
+import { employeeVisible } from "@/lib/team-inboxes/retention";
 import { NextResponse } from "next/server";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
 	if (!user || user.disabled) {
 		return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 	}
-	const conditions: SQL[] = [];
+	const conditions: SQL[] = [employeeVisible()!];
 	if (mailboxId) {
 		const access = await getMailboxAccessLevel(db, user, mailboxId);
 		if (!access?.canRead) {

@@ -61,6 +61,11 @@ export default defineConfig([
 		files: ["scripts/**/*.mjs"],
 		...tseslint.configs.disableTypeChecked,
 	},
+	{
+		files: ["vendor/braces/**/*.js"],
+		languageOptions: { sourceType: "commonjs" },
+		rules: { "@typescript-eslint/no-require-imports": "off" },
+	},
 	globalIgnores([
 		".next/**",
 		".open-next/**",

@@ -121,6 +121,11 @@ export async function seedEveryBackupTable(): Promise<void> {
 			.bind("a".repeat(64), timestamp + 3600, timestamp),
 		db
 			.prepare(
+				"INSERT INTO message_deletion_events (id,message_id,actor_user_id,actor_email,action,created_at) VALUES ('deletion_event_backup','message_backup','user_backup','backup@example.test','restored',?)",
+			)
+			.bind(timestamp),
+		db
+			.prepare(
 				`INSERT INTO message_attachments
 			(id, message_id, filename, content_type, size, disposition, content_id, r2_key, created_at)
 			VALUES ('attachment_backup', 'message_backup', 'attachment.txt', 'text/plain', 10,

@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getDb } from "@/db";
-import { calendarEvents } from "@/db/schema";
+import { calendarEvents, calendarReminders } from "@/db/schema";
 import { requireCalendarMailboxAccess, requireCalendarSender } from "@/lib/calendar/access";
 import type { CalendarEventInput } from "@/lib/calendar/types";
 import { createCalendarInvitation } from "@/lib/calendar/utils";
@@ -47,12 +47,14 @@ export async function PATCH(request: Request, { params }: CalendarEventRoutePara
 	try {
 		const idempotencyKey = normalizeIdempotencyKey(request.headers.get("Idempotency-Key"));
 		const { eventId } = await params;
-		if (/^cc_(advisory_\d+|event_[a-z0-9]+)$/i.test(eventId)) {
+		if (/^cc_(advisory_\d+|block_\d+|event_[a-z0-9]+)$/i.test(eventId)) {
 			return NextResponse.json({ error: "Managed by CaliberCode" }, { status: 403 });
 		}
 		const input = (await request.json()) as CalendarEventInput;
 		rejectCalendarRecurrence(input.recurrenceRule);
 		const existing = await requireOwnedEvent(env, user.id, eventId);
+		if (existing.importUid)
+			throw new CalendarInputError("Import an updated invitation to change this event", 409);
 		const allDay = input.allDay ?? existing.allDay;
 		const startsAt = requiredDate(input.startsAt, allDay, "an event start");
 		const endsAt = requiredDate(input.endsAt, allDay, "an event end");
@@ -108,10 +110,26 @@ export async function DELETE(request: Request, { params }: CalendarEventRoutePar
 	try {
 		const idempotencyKey = normalizeIdempotencyKey(request.headers.get("Idempotency-Key"));
 		const { eventId } = await params;
-		if (/^cc_(advisory_\d+|event_[a-z0-9]+)$/i.test(eventId)) {
+		if (/^cc_(advisory_\d+|block_\d+|event_[a-z0-9]+)$/i.test(eventId)) {
 			return NextResponse.json({ error: "Managed by CaliberCode" }, { status: 403 });
 		}
 		const event = await requireOwnedEvent(env, user.id, eventId);
+		if (event.importUid) {
+			const db = getDb(env);
+			await db.batch([
+				db
+					.update(calendarEvents)
+					.set({ importCancelled: true, updatedAt: new Date() })
+					.where(and(eq(calendarEvents.id, eventId), eq(calendarEvents.userId, user.id))),
+				db
+					.update(calendarReminders)
+					.set({ status: "cancelled", updatedAt: new Date() })
+					.where(
+						and(eq(calendarReminders.eventId, eventId), eq(calendarReminders.userId, user.id)),
+					),
+			]);
+			return NextResponse.json({ ok: true });
+		}
 		const attendees = parseStoredAttendees(event.attendees);
 		if (event.mailboxId && event.organizer && attendees.length > 0) {
 			const mailboxId = event.mailboxId;

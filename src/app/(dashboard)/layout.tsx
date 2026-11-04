@@ -1,5 +1,6 @@
 "use client";
 
+import { InboxModeTabs } from "@/components/team-inboxes/inbox-mode-tabs";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { ReminderNotifier } from "@/components/calendar/reminder-notifier";
 import { ComposeProvider } from "@/components/compose/compose-context";
@@ -35,9 +36,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 									<main
 										id="main-content"
 										tabIndex={-1}
-										className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain rounded-tl-3xl bg-white scrollbar-gutter-stable"
+										className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-contain rounded-tl-3xl bg-white scrollbar-gutter-stable"
 									>
-										{children}
+										<InboxModeTabs />
+										<div className="min-h-0 flex-1 overflow-auto">{children}</div>
 									</main>
 								</div>
 								<FloatingComposer />

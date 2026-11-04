@@ -1,3 +1,4 @@
+import { seedTeamInspection } from "@/lib/team-inboxes/seed";
 import {
 	demoCredentials,
 	ensureDemoDomain,
@@ -11,6 +12,7 @@ export async function seedDemoData(env: CloudflareEnv): Promise<{ messageCount: 
 	const user = await ensureDemoUser(env);
 	const domain = await ensureDemoDomain(env, user.id);
 	const mailboxMap = await ensureDemoMailboxes(env, user.id, domain.id);
+	if (env.DEPLOYMENT_ENV === "local") await seedTeamInspection(env, user.id, domain.id);
 	const messageCount = await insertDemoMessages(env, user.id, mailboxMap);
 
 	console.info("Seeded demo user:", demoCredentials);

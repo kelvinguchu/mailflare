@@ -48,8 +48,9 @@ import {
 
 const DELIVERY_LABELS: Record<string, string> = {
 	scheduled: "Scheduled",
-	queued: "Sending",
-	accepted: "Sent",
+	queued: "Queued",
+	sending: "Sending",
+	accepted: "Provider accepted",
 	delivered: "Delivered",
 	failed: "Not delivered",
 	suppressed: "Not delivered",
@@ -127,7 +128,9 @@ export function ExpandedConversationMessage({
 	onCollapse,
 	onReply,
 	onForward,
+	inspection,
 }: {
+	inspection?: MessageDetailResponse;
 	message: Message;
 	currentAccountName?: string;
 	collapsible: boolean;
@@ -136,7 +139,7 @@ export function ExpandedConversationMessage({
 	onForward: (message: Message, detail: MessageDetailResponse | null) => void;
 }) {
 	const [data, setData] = useState<MessageDetailResponse | null>(
-		() => getCachedMessageDetailForDisplay(message.id) ?? null,
+		() => inspection ?? getCachedMessageDetailForDisplay(message.id) ?? null,
 	);
 	const [loadError, setLoadError] = useState(false);
 	const [starred, setStarred] = useState(message.starred);
@@ -147,6 +150,10 @@ export function ExpandedConversationMessage({
 	useEffect(() => setStarred(message.starred), [message.starred]);
 
 	useEffect(() => {
+		if (inspection) {
+			setData(inspection);
+			return;
+		}
 		let cancelled = false;
 		const cached = getCachedMessageDetailForDisplay(message.id);
 		async function load() {
@@ -167,7 +174,7 @@ export function ExpandedConversationMessage({
 		return () => {
 			cancelled = true;
 		};
-	}, [message.id]);
+	}, [message.id, inspection]);
 
 	const detailMessage = data?.message ?? message;
 	const attachments = data?.attachments ?? [];
@@ -175,7 +182,7 @@ export function ExpandedConversationMessage({
 		detailMessage,
 		currentAccountName,
 	);
-	const senderName = message.direction === "outbound" ? "me" : fromName;
+	const senderName = message.direction === "outbound" && !inspection ? "me" : fromName;
 	const ownAddress =
 		message.direction === "inbound"
 			? (detailMessage.deliveredToAddr ?? message.toAddr)
@@ -187,8 +194,13 @@ export function ExpandedConversationMessage({
 		ownAddress,
 	);
 	const sanitizedHtml = sanitizeEmailHtml(
-		resolveInlineAttachmentUrls(bodyDisplay.htmlBody, message.id, attachments),
-		{ allowRemoteImages: remoteImagesAllowed },
+		inspection
+			? (resolveInlineAttachmentUrls(bodyDisplay.htmlBody, message.id, attachments)?.replaceAll(
+					"/api/messages/",
+					"/api/team-inboxes/messages/",
+				) ?? null)
+			: resolveInlineAttachmentUrls(bodyDisplay.htmlBody, message.id, attachments),
+		{ allowRemoteImages: !inspection && remoteImagesAllowed, inspection: !!inspection },
 	);
 	const cloudAttachments = extractCloudAttachments(bodyDisplay.latestContent);
 	const deliveryLabel =
@@ -203,7 +215,7 @@ export function ExpandedConversationMessage({
 				<div className="min-w-0 flex-1">
 					<p className="truncate text-sm text-neutral-900">
 						<span className="font-semibold">
-							{message.direction === "inbound" ? (
+							{message.direction === "inbound" && !inspection ? (
 								<ContactDetailsTrigger
 									mailboxId={message.mailboxId}
 									address={message.fromAddr}
@@ -269,48 +281,53 @@ export function ExpandedConversationMessage({
 					>
 						{formatConversationDate(message.createdAt)}
 					</time>
-					<Tooltip label={starred ? "Starred" : "Not starred"}>
-						<Button
-							type="button"
-							variant="ghost"
-							size="icon-sm"
-							aria-label={starred ? "Remove star" : "Star message"}
-							onClick={() =>
-								void toggleMessageStar(message.id)
-									.then((result) => setStarred(result.starred))
-									.catch(() => undefined)
-							}
-						>
-							<Star
-								className={cn(
-									"size-4",
-									starred ? "fill-amber-400 text-amber-400" : "text-neutral-400",
-								)}
-							/>
-						</Button>
-					</Tooltip>
-					<Tooltip label="Reply">
-						<Button
-							type="button"
-							variant="ghost"
-							size="icon-sm"
-							aria-label="Reply"
-							onClick={() => onReply(message, data)}
-						>
-							<Reply className="size-4 text-neutral-600" />
-						</Button>
-					</Tooltip>
-					<Tooltip label="Forward">
-						<Button
-							type="button"
-							variant="ghost"
-							size="icon-sm"
-							aria-label="Forward"
-							onClick={() => onForward(message, data)}
-						>
-							<Forward className="size-4 text-neutral-600" />
-						</Button>
-					</Tooltip>
+					{!inspection && (
+						<>
+							{" "}
+							<Tooltip label={starred ? "Starred" : "Not starred"}>
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon-sm"
+									aria-label={starred ? "Remove star" : "Star message"}
+									onClick={() =>
+										void toggleMessageStar(message.id)
+											.then((result) => setStarred(result.starred))
+											.catch(() => undefined)
+									}
+								>
+									<Star
+										className={cn(
+											"size-4",
+											starred ? "fill-amber-400 text-amber-400" : "text-neutral-400",
+										)}
+									/>
+								</Button>
+							</Tooltip>
+							<Tooltip label="Reply">
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon-sm"
+									aria-label="Reply"
+									onClick={() => onReply(message, data)}
+								>
+									<Reply className="size-4 text-neutral-600" />
+								</Button>
+							</Tooltip>
+							<Tooltip label="Forward">
+								<Button
+									type="button"
+									variant="ghost"
+									size="icon-sm"
+									aria-label="Forward"
+									onClick={() => onForward(message, data)}
+								>
+									<Forward className="size-4 text-neutral-600" />
+								</Button>
+							</Tooltip>
+						</>
+					)}
 				</div>
 			</header>
 
@@ -361,7 +378,7 @@ export function ExpandedConversationMessage({
 							{data?.delivery?.error ? ` ${data.delivery.error}` : ""}
 						</div>
 					)}
-				{sanitizedHtml.blockedRemoteImageCount > 0 && (
+				{!inspection && sanitizedHtml.blockedRemoteImageCount > 0 && (
 					<div
 						className="mb-4 flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
 						role="status"
@@ -435,6 +452,7 @@ export function ExpandedConversationMessage({
 						<div className="grid gap-2 sm:grid-cols-2">
 							{attachments.map((attachment) => (
 								<MessageAttachmentCard
+									inspection={!!inspection}
 									key={attachment.id}
 									attachment={attachment}
 									messageId={message.id}
@@ -446,6 +464,7 @@ export function ExpandedConversationMessage({
 				)}
 			</div>
 			<MessageAttachmentViewer
+				inspection={!!inspection}
 				attachment={previewAttachment}
 				messageId={message.id}
 				open={previewAttachment !== null}

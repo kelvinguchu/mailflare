@@ -22,7 +22,8 @@ export function MessageRowParty({
 	if (folder === "drafts") {
 		return <span className={className}>{fallback}</span>;
 	}
-	if (!thread || thread.participants.length === 0) return null;
+	if (!thread || thread.participants.length === 0)
+		return <span className={className}>{fallback}</span>;
 	// A locally marked-read row should not keep bold names until the list refreshes.
 	const participants = message.read
 		? thread.participants.map((participant) => ({ ...participant, unread: false }))

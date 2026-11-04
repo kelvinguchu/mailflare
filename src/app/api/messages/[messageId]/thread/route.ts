@@ -1,3 +1,4 @@
+import { employeeVisible } from "@/lib/team-inboxes/retention";
 import { and, asc, eq, inArray, ne } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { getDb } from "@/db";
@@ -18,13 +19,19 @@ export async function GET(request: Request, { params }: MessageThreadRouteParams
 	const { messageId } = await params;
 	const db = getDb(env);
 	const [target] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
-	if (!target?.mailboxId || target.status === "draft") {
+	if (
+		!target?.mailboxId ||
+		target.employeeHiddenAt ||
+		target.consumedByMessageId ||
+		target.status === "draft"
+	) {
 		return NextResponse.json({ error: "Not found" }, { status: 404 });
 	}
 	const access = await getMailboxAccessLevel(db, user, target.mailboxId);
 	if (!access?.canRead) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
 	const conditions = [
+		employeeVisible()!,
 		eq(messages.mailboxId, target.mailboxId),
 		ne(messages.status, "draft"),
 		target.threadId ? eq(messages.threadId, target.threadId) : eq(messages.id, target.id),

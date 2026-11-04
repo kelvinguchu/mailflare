@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { NextResponse } from "next/server";
+import { MAX_SEND_REQUEST_SIZE, SendLimitError } from "@/lib/email/limits";
 import { getEnv } from "@/lib/cloudflare";
 import { authenticateApiKey, requireScope } from "@/lib/api/auth";
 import { sendEmailSchema } from "@/lib/validators";
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
 
 	let body: unknown;
 	try {
-		body = await readJsonBody(request, 30 * 1024 * 1024);
+		body = await readJsonBody(request, MAX_SEND_REQUEST_SIZE);
 	} catch (error) {
 		const status = error instanceof RequestBodyTooLargeError ? 413 : 400;
 		return NextResponse.json({ error: "Invalid send request" }, { status });
@@ -50,6 +51,8 @@ export async function POST(request: Request) {
 			headers: { "Idempotency-Key": result.idempotencyKey },
 		});
 	} catch (err) {
+		if (err instanceof SendLimitError)
+			return NextResponse.json({ error: err.message, code: err.code }, { status: err.status });
 		const message = err instanceof Error ? err.message : "Send failed";
 		const status = err instanceof IdempotencyConflictError ? 409 : getSendErrorStatus(message);
 		return NextResponse.json({ error: message }, { status });

@@ -1,8 +1,8 @@
 import { and, desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import type { getDb } from "@/db";
-import { domains, mailboxes, users } from "@/db/schema";
-import { assertAdmin } from "@/lib/auth/admin";
+import { mailboxes, users } from "@/db/schema";
+import { requireActiveAdmin } from "@/lib/accounts/admin-domains";
 import { requireUser } from "@/lib/auth/cookies";
 import { getEnv } from "@/lib/cloudflare";
 
@@ -28,15 +28,6 @@ export function listAccountsForAdmin(db: Db) {
 		})
 		.from(users)
 		.orderBy(desc(users.createdAt));
-}
-
-export async function getDomainForAdmin(db: Db, adminUserId: string, domainId: string) {
-	const [domain] = await db
-		.select()
-		.from(domains)
-		.where(and(eq(domains.id, domainId), eq(domains.userId, adminUserId)))
-		.limit(1);
-	return domain ?? null;
 }
 
 export async function getExistingMailbox(db: Db, domainId: string, localPart: string) {
@@ -90,7 +81,7 @@ export async function requireAdmin(request: Request) {
 	const env = getEnv();
 	try {
 		const user = await requireUser(env, request);
-		assertAdmin(user);
+		requireActiveAdmin(user);
 		return { env, user, error: null };
 	} catch {
 		return { env, user: null, error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };

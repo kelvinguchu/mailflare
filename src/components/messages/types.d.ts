@@ -17,6 +17,7 @@ export type MessageFolderConfig = {
 };
 
 export type MessageListRowProps = {
+	inspection?: { onOpen: () => void; badges: ReactNode };
 	message: Message;
 	config: MessageFolderConfig;
 	selected: boolean;

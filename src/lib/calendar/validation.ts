@@ -1,3 +1,9 @@
+import {
+	RecurrenceRuleError,
+	completeRecurrence,
+	formatRecurrenceRule,
+	parseRecurrenceRule,
+} from "./recurrence";
 import type { CalendarPriority, CalendarReminderChannel } from "./types";
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -28,7 +34,7 @@ export function calendarText(value: string | null | undefined, maxLength = 10_00
 }
 
 export function calendarTimezone(value: string | null | undefined): string {
-	const timezone = value?.trim() || "UTC";
+	const timezone = value?.trim() || "Africa/Nairobi";
 	try {
 		new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format(0);
 	} catch {
@@ -95,6 +101,21 @@ export function rejectCalendarRecurrence(value: string | null | undefined): void
 		throw new CalendarInputError(
 			"Repeating calendar items are not enabled until recurrence exceptions are supported",
 		);
+	}
+}
+
+/** Validates a task repeat rule and stores it in canonical, start-independent form. */
+export function calendarTaskRecurrence(
+	value: string | null | undefined,
+	due: { dueAt: Date | null; allDay: boolean; timezone: string },
+): string | null {
+	if (!value?.trim()) return null;
+	if (!due.dueAt) throw new CalendarInputError("Set a due date before making a task repeat");
+	try {
+		return formatRecurrenceRule(completeRecurrence(parseRecurrenceRule(value), due.dueAt, due));
+	} catch (error) {
+		if (error instanceof RecurrenceRuleError) throw new CalendarInputError(error.message);
+		throw error;
 	}
 }
 

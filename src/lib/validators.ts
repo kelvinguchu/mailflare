@@ -17,6 +17,7 @@ export const sendEmailSchema = z.object({
 	mailboxId: z.string().min(1).max(200),
 	includeSignature: z.boolean().optional(),
 	replyToMessageId: z.string().min(1).max(200).nullable().optional(),
+	forwardMessageId: z.string().min(1).max(200).optional(),
 	attachments: z
 		.array(
 			z.object({

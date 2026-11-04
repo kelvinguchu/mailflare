@@ -38,6 +38,16 @@ export { CalendarSyncService } from "./src/lib/calendar/calibercode-sync";
 export default {
 	async fetch(request: Request, env: CloudflareEnv, ctx: ExecutionContext) {
 		const url = new URL(request.url);
+		if (
+			env.MAIL_RETENTION_HOLD === "true" &&
+			request.method === "DELETE" &&
+			/^\/api\/(messages|drafts|mailboxes|domains|accounts)\//.test(url.pathname)
+		) {
+			return Response.json(
+				{ error: "Deletion is temporarily paused while mail retention is upgraded" },
+				{ status: 503, headers: { "Retry-After": "300", "Cache-Control": "no-store" } },
+			);
+		}
 		if (url.pathname === "/api/realtime") {
 			if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
 				return new Response("Expected WebSocket upgrade", { status: 426 });

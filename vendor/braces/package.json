@@ -1,0 +1,16 @@
+{
+	"name": "@mailflare/braces",
+	"version": "3.0.3-mailflare.1",
+	"private": true,
+	"description": "Mailflare hardened fork of micromatch/braces 3.0.3 with bounded AST depth",
+	"main": "index.js",
+	"license": "MIT",
+	"author": "Jon Schlinkert",
+	"repository": "https://github.com/micromatch/braces",
+	"engines": {
+		"node": ">=8"
+	},
+	"dependencies": {
+		"fill-range": "^7.1.1"
+	}
+}

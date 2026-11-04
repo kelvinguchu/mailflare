@@ -20,11 +20,13 @@ import { authFetch } from "@/lib/auth/client";
 import { formatEmailAddress, getEmailAddress } from "@/lib/email/address";
 import { useCompose } from "./compose-context";
 import { sendWithUndo } from "./send-with-undo";
+import { loadDraftFiles, saveDraftFiles } from "./send-recovery";
 import { AttachmentList } from "./attachment-list";
 import { fetchDraft, getAttachmentLimitError, removeLegacySignature } from "./utils";
 import type { ComposeAttachment, ComposeSnapshot } from "./types";
 import { RecipientField } from "./recipient-field";
 import { normalizeRecipients, RecipientValidationError } from "@/lib/email/recipients";
+import { validateMessageBudget } from "@/lib/email/limits";
 
 function showComposeError(message: string) {
 	toast.add({ type: "error", title: message });
@@ -44,6 +46,9 @@ export function ComposeForm({
 }) {
 	const { selectedMailbox, setSelectedMailbox, mailboxes } = useSelectedMailbox();
 	const { restoreComposer } = useCompose();
+	const draftRevision = useRef<number | undefined>(undefined);
+	const uploadedDraftFiles = useRef("");
+	const [draftSaveState, setDraftSaveState] = useState("Autosaves as draft");
 	const [draftId, setDraftId] = useState<string | null>(initialSnapshot?.draftId ?? null);
 	const [replyToMessageId, setReplyToMessageId] = useState<string | null>(
 		initialSnapshot?.replyToMessageId ?? null,
@@ -125,10 +130,31 @@ export function ComposeForm({
 		let cancelled = false;
 		setLoadingDraft(true);
 		fetchDraft(draftIdToLoad)
-			.then((draft) => {
+			.then(async (draft) => {
+				const localFiles = await loadDraftFiles(draft.id).catch(() => {
+					showComposeError("Saved files could not be loaded on this device.");
+					return [];
+				});
+				const savedFiles = draft.attachments?.length
+					? await Promise.all(
+							draft.attachments.map(async (attachment) => {
+								const response = await authFetch(
+									`/api/messages/${draft.id}/attachments/${attachment.id}?download=1`,
+								);
+								if (!response.ok) throw new Error("Saved attachment could not be loaded");
+								return {
+									id: attachment.id,
+									file: new File([await response.blob()], attachment.filename, {
+										type: attachment.type,
+									}),
+								};
+							}),
+						)
+					: localFiles;
 				if (cancelled) return;
-
+				draftRevision.current = draft.revision;
 				setDraftId(draft.id);
+				setAttachments(savedFiles);
 				setReplyToMessageId(draft.replyToMessageId ?? null);
 				setTo(draft.toAddr);
 				setCc(draft.ccAddr);
@@ -171,12 +197,16 @@ export function ComposeForm({
 
 	useEffect(() => {
 		const bodyContent = text.trim();
-		const hasContent = to.trim() || cc.trim() || subject.trim() || bodyContent;
+		const hasContent =
+			to.trim() || cc.trim() || subject.trim() || bodyContent || attachments.length;
 		if (!fromAddr || !hasContent || loadingDraft) return;
 		if (saveTimer.current) clearTimeout(saveTimer.current);
 
 		saveTimer.current = setTimeout(() => {
+			setDraftSaveState("Saving draft and files�");
+			const previousSave = draftSave.current;
 			const save = (async () => {
+				const currentDraftId = (await previousSave?.catch(() => draftId)) ?? draftId;
 				const payload = {
 					mailboxId: selectedMailbox?.id,
 					from: fromAddr,
@@ -186,18 +216,53 @@ export function ComposeForm({
 					text,
 					replyToMessageId,
 				};
-				const res = await authFetch(draftId ? `/api/drafts/${draftId}` : "/api/drafts", {
-					method: draftId ? "PATCH" : "POST",
-					headers: { "Content-Type": "application/json" },
-					body: JSON.stringify(payload),
-				});
-				const data = (await res.json()) as { draft?: { id: string } };
+				const fileFingerprint = attachments
+					.map((item) => `${item.id}:${item.file.size}:${item.file.lastModified}`)
+					.join("|");
+				const filesChanged = fileFingerprint !== uploadedDraftFiles.current;
+				const form = new FormData();
+				form.set("payload", JSON.stringify({ ...payload, revision: draftRevision.current }));
+				if (filesChanged)
+					for (const attachment of attachments)
+						form.append("attachments", attachment.file, attachment.file.name);
+
+				const res = await authFetch(
+					currentDraftId ? `/api/drafts/${currentDraftId}` : "/api/drafts",
+					{
+						method: currentDraftId ? "PATCH" : "POST",
+						...(filesChanged
+							? { body: form }
+							: {
+									headers: { "Content-Type": "application/json" },
+									body: JSON.stringify({ ...payload, revision: draftRevision.current }),
+								}),
+						signal: AbortSignal.timeout(15_000),
+					},
+				);
+				const data = (await res.json()) as {
+					draft?: { id: string; revision: number };
+					error?: string;
+				};
 				if (res.ok && data.draft?.id) {
+					draftRevision.current = data.draft.revision;
+					uploadedDraftFiles.current = fileFingerprint;
+					setDraftSaveState("Draft and files saved");
+					try {
+						await saveDraftFiles(data.draft.id, attachments);
+					} catch {
+						showComposeError(
+							"Files could not be saved on this device. Keep this message open until sent.",
+						);
+					}
 					setDraftId(data.draft.id);
 					return data.draft.id;
 				}
+				setDraftSaveState(data.error ?? "Draft could not be saved. Keep this window open.");
 				return draftId;
-			})().catch(() => draftId);
+			})().catch(() => {
+				setDraftSaveState("Draft could not be saved. Keep this window open.");
+				return draftId;
+			});
 			draftSave.current = save;
 		}, 900);
 
@@ -205,6 +270,7 @@ export function ComposeForm({
 			if (saveTimer.current) clearTimeout(saveTimer.current);
 		};
 	}, [
+		attachments,
 		draftId,
 		cc,
 		fromAddr,
@@ -247,6 +313,15 @@ export function ComposeForm({
 			undoDelaySeconds: String(getUndoSendDelayPreference()),
 			replyToMessageId,
 		};
+		try {
+			validateMessageBudget(
+				message,
+				attachments.map(({ file }) => ({ filename: file.name, size: file.size })),
+			);
+		} catch (error) {
+			showComposeError(error instanceof Error ? error.message : "Message is too large");
+			return;
+		}
 		const fingerprint = snapshotFingerprint(message);
 		if (pendingSend.current?.fingerprint !== fingerprint) {
 			pendingSend.current = { fingerprint, key: crypto.randomUUID() };
@@ -313,7 +388,7 @@ export function ComposeForm({
 		<form onSubmit={onSubmit} className={frameClass}>
 			<div className="flex h-9 items-center justify-between bg-primary px-4 text-sm font-medium text-primary-foreground">
 				<span role="status" aria-live="polite">
-					{loadingDraft ? "Loading draft…" : draftId ? "Draft saved" : "New Message"}
+					{loadingDraft ? "Loading draft…" : draftId ? draftSaveState : "New Message"}
 				</span>
 				{mode === "popup" && (
 					<div className="flex items-center gap-1 text-primary-foreground/70">
@@ -431,6 +506,8 @@ export function ComposeForm({
 				/>
 			</div>
 			<AttachmentList
+				to={to}
+				cc={cc}
 				attachments={attachments}
 				onRemove={(id) => setAttachments((current) => current.filter((item) => item.id !== id))}
 				className="border-t border-neutral-100 px-4 py-3"
@@ -459,7 +536,7 @@ export function ComposeForm({
 					className="order-last w-full text-xs text-neutral-500 sm:order-none sm:w-auto sm:flex-1"
 					aria-live="polite"
 				>
-					{draftId ? "Saved to drafts" : "Autosaves as draft"}
+					{draftSaveState}
 				</p>
 				<Button type="submit" disabled={loadingDraft || !fromAddr} className="rounded-full px-5">
 					<Send aria-hidden="true" className="h-4 w-4" />

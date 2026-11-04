@@ -1,3 +1,5 @@
+import { employeeVisible } from "@/lib/team-inboxes/retention";
+import { and } from "drizzle-orm";
 import { asc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { messages } from "@/db/schema";
@@ -34,7 +36,7 @@ export async function exportMailboxToMbox(env: CloudflareEnv, mailboxId: string)
 			htmlBody: messages.htmlBody,
 		})
 		.from(messages)
-		.where(eq(messages.mailboxId, mailboxId))
+		.where(and(employeeVisible(), eq(messages.mailboxId, mailboxId)))
 		.orderBy(asc(messages.createdAt));
 
 	return rows

@@ -25,7 +25,13 @@ export async function POST(
 
 	const db = getDb(env);
 	const [message] = await db
-		.select({ id: messages.id, mailboxId: messages.mailboxId, status: messages.status })
+		.select({
+			id: messages.id,
+			employeeHiddenAt: messages.employeeHiddenAt,
+			consumedByMessageId: messages.consumedByMessageId,
+			mailboxId: messages.mailboxId,
+			status: messages.status,
+		})
 		.from(messages)
 		.where(and(eq(messages.id, messageId), eq(messages.direction, "inbound")))
 		.limit(1);
@@ -52,11 +58,16 @@ export async function DELETE(
 
 	const db = getDb(env);
 	const [message] = await db
-		.select({ id: messages.id, mailboxId: messages.mailboxId })
+		.select({
+			id: messages.id,
+			employeeHiddenAt: messages.employeeHiddenAt,
+			consumedByMessageId: messages.consumedByMessageId,
+			mailboxId: messages.mailboxId,
+		})
 		.from(messages)
 		.where(and(eq(messages.id, messageId), eq(messages.direction, "inbound")))
 		.limit(1);
-	if (!message?.mailboxId)
+	if (!message?.mailboxId || message.employeeHiddenAt || message.consumedByMessageId)
 		return NextResponse.json({ error: "Message not found" }, { status: 404 });
 
 	const access = await getMailboxAccessLevel(db, user, message.mailboxId);

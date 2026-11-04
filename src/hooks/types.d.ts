@@ -25,6 +25,7 @@ export type Message = {
 	deliveryStatus?:
 		| "scheduled"
 		| "queued"
+		| "sending"
 		| "canceled"
 		| "accepted"
 		| "delivered"

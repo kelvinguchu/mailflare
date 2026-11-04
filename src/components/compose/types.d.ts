@@ -1,4 +1,6 @@
 export type ComposeDraft = {
+	revision?: number;
+	attachments?: import("@/lib/email/attachment-types").AttachmentMetadata[];
 	id: string;
 	mailboxId: string | null;
 	fromAddr: string;
@@ -40,6 +42,11 @@ export type ComposeSnapshot = {
 	draftId?: string | null;
 	/** The message this replies to, so the sent reply joins its conversation. */
 	replyToMessageId?: string | null;
+	/**
+	 * Set when forwarding: the server rebuilds the original in its own format below
+	 * `note`. `text` still holds a plain copy, for when the composer reopens this.
+	 */
+	forward?: { messageId: string; note: string } | null;
 };
 
 export type SendResponse = {
@@ -48,4 +55,5 @@ export type SendResponse = {
 	status?: string;
 	undoDeadline?: string | null;
 	error?: string;
+	deliveryStatus?: string;
 };

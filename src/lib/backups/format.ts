@@ -1,5 +1,5 @@
 export const DATABASE_BACKUP_FORMAT = "mailflare-database-backup";
-export const DATABASE_BACKUP_VERSION = 12 as const;
+export const DATABASE_BACKUP_VERSION = 13 as const;
 export const MAX_DATABASE_RESTORE_BYTES = 10 * 1024 * 1024;
 export const MAX_BACKUP_OBJECTS = 5_000;
 export const DATABASE_BACKUP_R2_STRATEGY = "independent-copies-v1" as const;
@@ -19,6 +19,7 @@ export const BACKUP_TABLES = [
 	"api_keys",
 	"messages",
 	"message_attachments",
+	"message_deletion_events",
 	"storage_deletion_jobs",
 	"outbound_jobs",
 	"sender_policies",
@@ -61,6 +62,7 @@ const TABLE_INTRODUCED_IN_BACKUP_VERSION: Partial<Record<(typeof BACKUP_TABLES)[
 		operational_snapshots: 10,
 		restore_drill_records: 10,
 		mfa_policy_settings: 12,
+		message_deletion_events: 13,
 	};
 
 function getBackupTablesAvailableInVersion(version: number) {
@@ -78,6 +80,7 @@ export const LEGACY_V7_BACKUP_TABLES = getBackupTablesAvailableInVersion(7);
 export const LEGACY_V8_BACKUP_TABLES = getBackupTablesAvailableInVersion(8);
 export const LEGACY_V9_BACKUP_TABLES = getBackupTablesAvailableInVersion(9);
 export const LEGACY_V10_BACKUP_TABLES = getBackupTablesAvailableInVersion(10);
+export const LEGACY_V12_BACKUP_TABLES = getBackupTablesAvailableInVersion(12);
 export const LEGACY_V11_BACKUP_TABLES = getBackupTablesAvailableInVersion(11);
 
 // These are D1/SQLite bookkeeping tables or derived FTS5 index tables, not

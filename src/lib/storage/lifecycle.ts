@@ -1,4 +1,6 @@
-import { and, eq, inArray, lte, or } from "drizzle-orm";
+import { hideRetainedMessage, isRetainedTeamMessage } from "@/lib/team-inboxes/retention";
+import { canInspectTeam } from "@/lib/team-inboxes/policy";
+import { and, eq, inArray, lte, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
 	auditLogs,
@@ -59,12 +61,16 @@ export async function requestPermanentMessageDeletion(
 	user: SessionUser,
 	messageId: string,
 ): Promise<DeleteRequestResult> {
+	if (env.MAIL_RETENTION_HOLD === "true") return { outcome: "not_allowed" };
 	const db = getDb(env);
 	const [message] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
-	if (!message?.mailboxId) return { outcome: "not_found" };
+	if (!message?.mailboxId || message.employeeHiddenAt || message.consumedByMessageId)
+		return { outcome: "not_found" };
 	const access = await getMailboxAccessLevel(db, user, message.mailboxId);
 	if (!access?.canManage) return { outcome: "not_found" };
 	if (message.status !== "trash") return { outcome: "not_allowed" };
+	if (isRetainedTeamMessage(env, message))
+		return hideRetainedMessage(env, message, user, "removed");
 	return enqueueAndProcessDeletion(env, message, "user", user.id);
 }
 
@@ -73,10 +79,28 @@ export async function requestDraftDeletion(
 	userId: string,
 	messageId: string,
 ): Promise<DeleteRequestResult> {
+	if (env.MAIL_RETENTION_HOLD === "true") return { outcome: "not_allowed" };
 	const db = getDb(env);
 	const [message] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
-	if (!message || message.userId !== userId || message.status !== "draft") {
+	if (
+		!message ||
+		message.employeeHiddenAt ||
+		message.consumedByMessageId ||
+		message.userId !== userId ||
+		message.status !== "draft"
+	) {
 		return { outcome: "not_found" };
+	}
+	if (isRetainedTeamMessage(env, message)) {
+		const actor = await env.DB.prepare("SELECT email FROM users WHERE id = ?")
+			.bind(userId)
+			.first<{ email: string }>();
+		return hideRetainedMessage(
+			env,
+			message,
+			{ id: userId, email: actor?.email ?? "Unknown" },
+			"draft_discarded",
+		);
 	}
 	return enqueueAndProcessDeletion(env, message, "draft", userId);
 }
@@ -97,6 +121,7 @@ export async function runStorageLifecycleMaintenance(
 		completedDeletionJobsDeleted: 0,
 	};
 
+	if (env.MAIL_RETENTION_HOLD === "true") return result;
 	result.trashQueued = await enqueueExpiredTrash(env, now);
 	const deletionResult = await processDueDeletionJobs(env, now);
 	result.deletionsCompleted = deletionResult.completed;
@@ -244,6 +269,37 @@ async function processDeletionJob(env: CloudflareEnv, jobId: string, now: Date):
 		.set({ status: "processing", attemptCount: job.attemptCount + 1, updatedAt: now })
 		.where(eq(storageDeletionJobs.id, job.id));
 	try {
+		const [protectedMessage] = await db
+			.select()
+			.from(messages)
+			.where(eq(messages.id, job.messageId))
+			.limit(1);
+		if (
+			protectedMessage &&
+			isRetainedTeamMessage(env, protectedMessage) &&
+			!job.ownerAuthorizedAt
+		) {
+			const actor = job.actorUserId
+				? await env.DB.prepare("SELECT id, email FROM users WHERE id = ?")
+						.bind(job.actorUserId)
+						.first<{ id: string; email: string }>()
+				: null;
+			await hideRetainedMessage(
+				env,
+				protectedMessage,
+				actor,
+				job.reason === "draft"
+					? "draft_discarded"
+					: job.reason === "user"
+						? "removed"
+						: "automatic_expiry",
+			);
+			await db
+				.update(storageDeletionJobs)
+				.set({ status: "completed", completedAt: now, updatedAt: now, lastError: "RETAINED" })
+				.where(eq(storageDeletionJobs.id, job.id));
+			return true;
+		}
 		const keys = parseObjectKeys(job.objectKeys);
 		for (let index = 0; index < keys.length; index += 1_000) {
 			await env.BUCKET.delete(keys.slice(index, index + 1_000));
@@ -297,11 +353,17 @@ async function enqueueExpiredTrash(env: CloudflareEnv, now: Date): Promise<numbe
 		.where(
 			and(
 				eq(messages.status, "trash"),
+				sql`employee_hidden_at IS NULL AND consumed_by_message_id IS NULL`,
 				lte(messages.trashedAt, cutoff(now, STORAGE_RETENTION_DAYS.trash)),
 			),
 		)
 		.limit(DELETE_BATCH_SIZE);
-	for (const message of expired) await ensureDeletionJob(env, message, "retention", null);
+	for (const message of expired) {
+		if (message.employeeHiddenAt || message.consumedByMessageId) continue;
+		if (isRetainedTeamMessage(env, message))
+			await hideRetainedMessage(env, message, null, "automatic_expiry");
+		else await ensureDeletionJob(env, message, "retention", null);
+	}
 	return expired.length;
 }
 
@@ -473,4 +535,42 @@ function unixSeconds(value: Date): number {
 
 function changed(result: { rowsAffected?: number; meta?: { changes?: number } }): number {
 	return result.rowsAffected ?? result.meta?.changes ?? 0;
+}
+
+export async function purgeRetainedMessage(
+	env: CloudflareEnv,
+	user: SessionUser,
+	messageId: string,
+): Promise<DeleteRequestResult> {
+	if (env.MAIL_RETENTION_HOLD === "true" || !canInspectTeam(env, user))
+		return { outcome: "not_allowed" };
+	const db = getDb(env);
+	const [message] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
+	if (!message || !message.employeeHiddenAt) return { outcome: "not_found" };
+	const jobId = await ensureDeletionJob(env, message, "user", user.id);
+	const attachments = await db
+		.select({ key: messageAttachments.r2Key })
+		.from(messageAttachments)
+		.where(eq(messageAttachments.messageId, messageId));
+	const keys = [
+		...new Set(
+			[message.rawR2Key, ...attachments.map((item) => item.key)].filter(
+				(key): key is string => !!key,
+			),
+		),
+	];
+	await db
+		.update(storageDeletionJobs)
+		.set({
+			ownerAuthorizedAt: new Date(),
+			actorUserId: user.id,
+			status: "pending",
+			objectKeys: JSON.stringify(keys),
+		})
+		.where(eq(storageDeletionJobs.id, jobId));
+	return {
+		outcome: "accepted",
+		jobId,
+		completed: await processDeletionJob(env, jobId, new Date()),
+	};
 }

@@ -15,6 +15,13 @@ import {
 	wallClockToInstant,
 } from "@/lib/calendar/wall-clock";
 import { isTaskOverdue, taskDueKey } from "./calendar-utils";
+import {
+	NO_REPEAT,
+	buildTaskRecurrenceRule,
+	getTaskRepeatValues,
+	repeatValuesKey,
+	type TaskRepeatValues,
+} from "./task-repeat-utils";
 
 export type TaskStatusFilter = "open" | "overdue" | "completed" | "all";
 export type TaskDueState = "overdue" | "today" | "upcoming" | "none" | "completed";
@@ -279,6 +286,7 @@ export type TaskFormValues = {
 	/** `YYYY-MM-DDTHH:mm` wall-clock time in `timezone`. */
 	dueTime: string;
 	timezone: string;
+	repeat: TaskRepeatValues;
 };
 
 export function getTaskFormValues(
@@ -305,15 +313,12 @@ export function getTaskFormValues(
 			dueDate: defaults.dueKey ?? dateKey(now),
 			dueTime: instantToWallClock(nextHalfHour, defaults.timezone),
 			timezone: defaults.timezone,
+			repeat: NO_REPEAT,
 		};
 	}
 	let dueMode: TaskDueMode = "none";
 	if (task.dueAt) dueMode = task.allDay ? "date" : "time";
-	return {
-		title: task.title,
-		description: task.description,
-		priority: task.priority,
-		assigneeUserId: task.assigneeUserId,
+	const due = {
 		dueMode,
 		dueDate: task.dueAt && task.allDay ? utcDateKey(task.dueAt) : dateKey(now),
 		dueTime:
@@ -321,6 +326,14 @@ export function getTaskFormValues(
 				? instantToWallClock(task.dueAt, task.timezone)
 				: instantToWallClock(nextHalfHour, task.timezone),
 		timezone: task.timezone,
+	};
+	return {
+		title: task.title,
+		description: task.description,
+		priority: task.priority,
+		assigneeUserId: task.assigneeUserId,
+		...due,
+		repeat: getTaskRepeatValues(task.recurrenceRule, due),
 	};
 }
 
@@ -348,7 +361,19 @@ export function buildTaskCreateInput(values: TaskFormValues): CalendarTaskInput 
 		timezone: values.timezone,
 		...getDueFields(values),
 		...(values.assigneeUserId ? { assigneeUserId: values.assigneeUserId } : {}),
+		...optionalRecurrence(buildTaskRecurrenceRule(values.repeat, values)),
 	};
+}
+
+function optionalRecurrence(rule: string | null): Pick<CalendarTaskInput, "recurrenceRule"> {
+	return rule ? { recurrenceRule: rule } : {};
+}
+
+/** A preset follows the due date, so moving the date also changes the stored rule. */
+function repeatChanged(values: TaskFormValues, baseline: TaskFormValues): boolean {
+	const key = repeatValuesKey(values.repeat, values);
+	if (key !== repeatValuesKey(baseline.repeat, baseline)) return true;
+	return key !== "none" && dueChanged(values, baseline);
 }
 
 function dueChanged(values: TaskFormValues, baseline: TaskFormValues): boolean {
@@ -380,6 +405,13 @@ export function buildTaskPatch(
 	if (dueChanged(values, baseline)) {
 		Object.assign(patch, getDueFields(values), { timezone: values.timezone });
 	}
+	if (repeatChanged(values, baseline)) {
+		patch.recurrenceRule = buildTaskRecurrenceRule(
+			values.repeat,
+			values,
+			!dueChanged(values, baseline),
+		);
+	}
 	return patch;
 }
 
@@ -389,7 +421,8 @@ export function isTaskFormDirty(values: TaskFormValues, baseline: TaskFormValues
 		values.description !== baseline.description ||
 		values.priority !== baseline.priority ||
 		values.assigneeUserId !== baseline.assigneeUserId ||
-		dueChanged(values, baseline)
+		dueChanged(values, baseline) ||
+		repeatChanged(values, baseline)
 	);
 }
 

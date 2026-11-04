@@ -24,18 +24,19 @@ function validSourceId(source: unknown, sourceId: unknown): boolean {
 export class CalendarSyncService extends WorkerEntrypoint<CloudflareEnv> {
 	async syncEvent(input: CaliberCodeCalendarInput): Promise<void> {
 		if (
-		!input ||
-		!(["advisory", "event"] as unknown[]).includes(input.source) ||
-		!validSourceId(input.source, input.sourceId) ||
-		typeof input.title !== "string" ||
-		!input.title.trim() ||
-		input.title.length > 200 ||
-		typeof input.description !== "string" ||
-		input.description.length > 10_000 ||
-		typeof input.location !== "string" ||
-		input.location.length > 500 ||
-		typeof input.active !== "boolean"
-		) throw new Error("Invalid CaliberCode calendar entry");
+			!input ||
+			!(["advisory", "event"] as unknown[]).includes(input.source) ||
+			!validSourceId(input.source, input.sourceId) ||
+			typeof input.title !== "string" ||
+			!input.title.trim() ||
+			input.title.length > 200 ||
+			typeof input.description !== "string" ||
+			input.description.length > 10_000 ||
+			typeof input.location !== "string" ||
+			input.location.length > 500 ||
+			typeof input.active !== "boolean"
+		)
+			throw new Error("Invalid CaliberCode calendar entry");
 
 		const start = Date.parse(input.startsAt);
 		const end = Date.parse(input.endsAt);
@@ -45,8 +46,7 @@ export class CalendarSyncService extends WorkerEntrypoint<CloudflareEnv> {
 
 		const id = `cc_${input.source}_${input.sourceId}`;
 		if (!input.active) {
-			await this.env.DB.prepare("DELETE FROM calendar_events WHERE id = ?")
-				.bind(id).run();
+			await this.env.DB.prepare("DELETE FROM calendar_events WHERE id = ?").bind(id).run();
 			return;
 		}
 
@@ -67,19 +67,34 @@ export class CalendarSyncService extends WorkerEntrypoint<CloudflareEnv> {
 			 location = excluded.location, starts_at = excluded.starts_at,
 			 ends_at = excluded.ends_at, updated_at = excluded.updated_at
 			 WHERE calendar_events.user_id = excluded.user_id`,
-		).bind(id, owner.id, input.title.trim(), input.description, input.location,
-			Math.floor(start / 1000), Math.floor(end / 1000), now, now).run();
+		)
+			.bind(
+				id,
+				owner.id,
+				input.title.trim(),
+				input.description,
+				input.location,
+				Math.floor(start / 1000),
+				Math.floor(end / 1000),
+				now,
+				now,
+			)
+			.run();
 
 		// Mailflare's existing reminder dispatcher delivers this in its native UI.
 		const reminderId = `cc_rem_${input.source}_${input.sourceId}_${Math.floor(start / 1000)}`;
 		const remindAt = Math.floor((start - 24 * 60 * 60 * 1000) / 1000);
 		await this.env.DB.prepare(
 			"DELETE FROM calendar_reminders WHERE event_id = ? AND status = 'scheduled' AND id <> ?",
-		).bind(id, reminderId).run();
+		)
+			.bind(id, reminderId)
+			.run();
 		if (remindAt <= now) {
 			await this.env.DB.prepare(
 				"DELETE FROM calendar_reminders WHERE event_id = ? AND status = 'scheduled'",
-			).bind(id).run();
+			)
+				.bind(id)
+				.run();
 			return;
 		}
 		await this.env.DB.prepare(
@@ -91,7 +106,17 @@ export class CalendarSyncService extends WorkerEntrypoint<CloudflareEnv> {
 			 title = excluded.title, message = excluded.message,
 			 remind_at = excluded.remind_at, updated_at = excluded.updated_at
 			 WHERE calendar_reminders.status = 'scheduled'`,
-		).bind(reminderId, owner.id, id, input.title.trim(),
-			"CaliberCode appointment or event starts in 24 hours.", remindAt, now, now).run();
+		)
+			.bind(
+				reminderId,
+				owner.id,
+				id,
+				input.title.trim(),
+				"CaliberCode appointment or event starts in 24 hours.",
+				remindAt,
+				now,
+				now,
+			)
+			.run();
 	}
 }

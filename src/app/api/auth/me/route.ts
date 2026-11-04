@@ -1,3 +1,4 @@
+import { canInspectTeam } from "@/lib/team-inboxes/policy";
 import { NextResponse } from "next/server";
 import { getCurrentSessionUser } from "@/lib/auth/cookies";
 import { evaluateMfaPolicy, getMfaPolicy } from "@/lib/auth/mfa-policy";
@@ -34,6 +35,9 @@ export async function GET(request: Request) {
 			role: user.role,
 			mfaEnabled: !!user.mfaEnabledAt,
 			canManageMailboxes: user.canManageMailboxes,
+			canInspectTeam:
+				canInspectTeam(env, user) &&
+				!["enrollment_required", "restricted"].includes(mfaPolicyStatus.state),
 			hasAvatar: !!user.avatarKey,
 		},
 		mfaPolicy: {

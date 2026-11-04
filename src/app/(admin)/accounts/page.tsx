@@ -83,7 +83,7 @@ export default function AccountsPage() {
 	useEffect(() => {
 		loadAccounts()
 			.then(async () => {
-				const response = await authFetch("/api/domains");
+				const response = await authFetch("/api/accounts/domains");
 				const data = (await response.json()) as { domains?: Domain[]; error?: string };
 				if (!response.ok) throw new Error(data.error ?? "Unable to load domains");
 				setDomains(data.domains ?? []);

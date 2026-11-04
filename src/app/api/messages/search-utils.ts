@@ -1,3 +1,5 @@
+import { employeeVisible } from "@/lib/team-inboxes/retention";
+import { and } from "drizzle-orm";
 import { eq, gte, inArray, lte, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { messageAttachments, messages } from "@/db/schema";
@@ -39,13 +41,16 @@ export function getMessageAccessCondition(
 	if (mailboxId) {
 		return {
 			allowed: accessibleMailboxIds.includes(mailboxId),
-			condition: eq(messages.mailboxId, mailboxId),
+			condition: and(employeeVisible(), eq(messages.mailboxId, mailboxId))!,
 		};
 	}
 	if (accessibleMailboxIds.length > 0) {
-		return { allowed: true, condition: inArray(messages.mailboxId, [...accessibleMailboxIds]) };
+		return {
+			allowed: true,
+			condition: and(employeeVisible(), inArray(messages.mailboxId, [...accessibleMailboxIds]))!,
+		};
 	}
-	return { allowed: true, condition: eq(messages.userId, userId) };
+	return { allowed: true, condition: and(employeeVisible(), eq(messages.userId, userId))! };
 }
 
 export function getMessageSearchConditions(filters: MessageSearchFilters): SQL[] {

@@ -48,7 +48,7 @@ function pad(value: number, length = 2): string {
 }
 
 export function browserTimezone(): string {
-	return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+	return Intl.DateTimeFormat().resolvedOptions().timeZone || "Africa/Nairobi";
 }
 
 export function supportedTimezones(include: string[] = []): string[] {
@@ -182,6 +182,17 @@ export type TimedLayout<T> = {
 	endMinute: number;
 	column: number;
 	columns: number;
+	/** Items in the same cluster overlap one another, directly or through other items. */
+	cluster: number;
+};
+
+/** Stands in for the items that don't fit beside the others in a crowded cluster. */
+export type TimedOverflow<T> = {
+	items: T[];
+	startMinute: number;
+	endMinute: number;
+	column: number;
+	columns: number;
 };
 
 function wallMinutes(date: Date): number {
@@ -211,15 +222,21 @@ export function layoutTimedEvents<T extends { startsAt: string; endsAt: string }
 				endMinute: Math.min(MINUTES_PER_DAY, Math.max(rawEnd, startMinute + minimumMinutes)),
 				column: 0,
 				columns: 1,
+				cluster: 0,
 			};
 		})
 		.sort((a, b) => a.startMinute - b.startMinute || b.endMinute - a.endMinute);
 
 	let cluster: TimedLayout<T>[] = [];
+	let clusterIndex = 0;
 	let columnEnds: number[] = [];
 	let clusterEnd = -1;
 	const finish = () => {
-		for (const entry of cluster) entry.columns = columnEnds.length;
+		for (const entry of cluster) {
+			entry.columns = columnEnds.length;
+			entry.cluster = clusterIndex;
+		}
+		if (cluster.length) clusterIndex += 1;
 		cluster = [];
 		columnEnds = [];
 	};
@@ -241,6 +258,46 @@ export function layoutTimedEvents<T extends { startsAt: string; endsAt: string }
 	}
 	finish();
 	return entries;
+}
+
+/**
+ * Caps how many side-by-side columns a cluster may use. In a cluster that needs more,
+ * the items from the last allowed column onwards move into overflow blocks that take
+ * that column, one block per run of overlapping hidden items.
+ */
+export function capTimedColumns<T>(
+	layout: TimedLayout<T>[],
+	maxColumns: number,
+): { blocks: TimedLayout<T>[]; overflow: TimedOverflow<T>[] } {
+	const limit = Math.max(2, Math.floor(maxColumns));
+	const blocks: TimedLayout<T>[] = [];
+	const hiddenByCluster = new Map<number, TimedLayout<T>[]>();
+	for (const entry of layout) {
+		if (entry.columns <= limit) blocks.push(entry);
+		else if (entry.column < limit - 1) blocks.push({ ...entry, columns: limit });
+		else hiddenByCluster.set(entry.cluster, [...(hiddenByCluster.get(entry.cluster) ?? []), entry]);
+	}
+	const overflow: TimedOverflow<T>[] = [];
+	for (const hidden of hiddenByCluster.values()) {
+		hidden.sort((a, b) => a.startMinute - b.startMinute || a.endMinute - b.endMinute);
+		let group: TimedOverflow<T> | null = null;
+		for (const entry of hidden) {
+			if (group && entry.startMinute < group.endMinute) {
+				group.items.push(entry.item);
+				group.endMinute = Math.max(group.endMinute, entry.endMinute);
+				continue;
+			}
+			group = {
+				items: [entry.item],
+				startMinute: entry.startMinute,
+				endMinute: entry.endMinute,
+				column: limit - 1,
+				columns: limit,
+			};
+			overflow.push(group);
+		}
+	}
+	return { blocks, overflow };
 }
 
 export function formatTime(value: Date | string, timeZone?: string): string {

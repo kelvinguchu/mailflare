@@ -2,16 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import {
-	CalendarDays,
-	CalendarPlus,
-	ChevronDown,
-	ChevronLeft,
-	ChevronRight,
-	ListTodo,
-	PanelRight,
-} from "lucide-react";
+import { Ban, CalendarDays, CalendarPlus, ChevronDown, ListTodo, PanelRight } from "lucide-react";
+import { BlockBookingDialog } from "@/components/calendar/block-booking-dialog";
 import { CalendarSidePanel } from "@/components/calendar/calendar-side-panel";
+import {
+	CalendarRangeNav,
+	CalendarViewSwitch,
+	useCalendarShortcuts,
+} from "@/components/calendar/calendar-toolbar";
 import type {
 	CalendarGridProps,
 	CalendarView,
@@ -34,8 +32,8 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Spinner } from "@/components/ui/spinner";
 import { toast } from "@/components/ui/toast";
+import { useCurrentAccount } from "@/hooks/use-current-account";
 import {
 	calendarKeys,
 	getCalendarEvent,
@@ -43,16 +41,11 @@ import {
 	listCalendarEvents,
 	listCalendarTasks,
 } from "@/lib/calendar/client";
+import { canManageAdvisory } from "@/lib/calendar/calibercode-schedule";
 import type { CalendarReminderRecord } from "@/lib/calendar/types";
 import { startOfLocalDay } from "@/lib/calendar/wall-clock";
 import { cn } from "@/lib/utils";
-import { queryRange, rangeTitle, shiftAnchor, visibleDays } from "./utils";
-
-const VIEWS: Array<{ value: CalendarView; label: string; shortcut: string }> = [
-	{ value: "month", label: "Month", shortcut: "m" },
-	{ value: "week", label: "Week", shortcut: "w" },
-	{ value: "day", label: "Day", shortcut: "d" },
-];
+import { queryRange, visibleDays } from "./utils";
 
 export default function CalendarPage() {
 	const [view, setView] = useState<CalendarView>("month");
@@ -61,6 +54,9 @@ export default function CalendarPage() {
 	const [taskDialog, setTaskDialog] = useState<TaskDialogState | null>(null);
 	const [reminderDialog, setReminderDialog] = useState<ReminderDialogState | null>(null);
 	const [panelOpen, setPanelOpen] = useState(false);
+	const [blockingTime, setBlockingTime] = useState(false);
+	const account = useCurrentAccount();
+	const canBlockBookings = account.data ? canManageAdvisory(account.data) : false;
 
 	const days = useMemo(() => visibleDays(view, anchor), [view, anchor]);
 	const range = useMemo(() => queryRange(days), [days]);
@@ -82,28 +78,16 @@ export default function CalendarPage() {
 		placeholderData: keepPreviousData,
 		refetchOnMount: "always",
 	});
-	const anyDialogOpen = Boolean(eventDialog || taskDialog || reminderDialog || panelOpen);
+	const anyDialogOpen = Boolean(
+		eventDialog || taskDialog || reminderDialog || panelOpen || blockingTime,
+	);
 
-	useEffect(() => {
-		function onKeyDown(event: KeyboardEvent) {
-			if (anyDialogOpen || event.metaKey || event.ctrlKey || event.altKey) return;
-			const target = event.target as HTMLElement | null;
-			if (target?.closest("input, textarea, select, [contenteditable=true], [role=combobox]"))
-				return;
-			const key = event.key.toLowerCase();
-			const nextView = VIEWS.find((item) => item.shortcut === key)?.value;
-			if (nextView) setView(nextView);
-			else if (key === "t") setAnchor(startOfLocalDay(new Date()));
-			else if (key === "arrowleft" || key === "k")
-				setAnchor((current) => shiftAnchor(view, current, -1));
-			else if (key === "arrowright" || key === "j")
-				setAnchor((current) => shiftAnchor(view, current, 1));
-			else if (key === "c") openNewEvent();
-			else return;
-			event.preventDefault();
-		}
-		window.addEventListener("keydown", onKeyDown);
-		return () => window.removeEventListener("keydown", onKeyDown);
+	useCalendarShortcuts({
+		disabled: anyDialogOpen,
+		view,
+		onViewChange: setView,
+		onAnchorChange: setAnchor,
+		onCreate: () => openNewEvent(),
 	});
 
 	// Tasks open from notification links (`?task=`) and from in-app notification actions.
@@ -210,75 +194,21 @@ export default function CalendarPage() {
 					<CalendarDays aria-hidden="true" className="size-6 text-primary" />
 					<span className="sr-only sm:not-sr-only">Calendar</span>
 				</h1>
-				<div className="flex items-center gap-1">
-					<Button
-						variant="outline"
-						size="sm"
-						className="rounded-full px-4"
-						onClick={() => setAnchor(startOfLocalDay(new Date()))}
-						title="Today (T)"
-					>
-						Today
-					</Button>
-					<Button
-						variant="ghost"
-						size="icon-sm"
-						className="rounded-full"
-						aria-label={`Previous ${view}`}
-						onClick={() => setAnchor((current) => shiftAnchor(view, current, -1))}
-					>
-						<ChevronLeft />
-					</Button>
-					<Button
-						variant="ghost"
-						size="icon-sm"
-						className="rounded-full"
-						aria-label={`Next ${view}`}
-						onClick={() => setAnchor((current) => shiftAnchor(view, current, 1))}
-					>
-						<ChevronRight />
-					</Button>
-				</div>
-				<h2 className="text-lg text-neutral-800" aria-live="polite">
-					{rangeTitle(view, days, anchor)}
-				</h2>
-				{(events.isFetching || tasks.isFetching) && (
-					<span role="status" className="inline-flex items-center gap-2 text-sm text-neutral-500">
-						<Spinner aria-hidden="true" className="text-neutral-400" />
-						<span className="sr-only">Updating calendar…</span>
-					</span>
-				)}
+				<CalendarRangeNav
+					view={view}
+					days={days}
+					anchor={anchor}
+					onAnchorChange={setAnchor}
+					busy={events.isFetching || tasks.isFetching}
+				/>
 				<span className="flex-1" />
-				<div
-					className="flex rounded-full bg-neutral-100 p-0.5"
-					role="radiogroup"
-					aria-label="Calendar view"
-				>
-					{VIEWS.map((item) => (
-						<button
-							key={item.value}
-							type="button"
-							role="radio"
-							aria-checked={view === item.value}
-							title={`${item.label} (${item.shortcut.toUpperCase()})`}
-							onClick={() => setView(item.value)}
-							className={cn(
-								"rounded-full px-3 py-1 text-sm font-medium transition-colors",
-								view === item.value
-									? "bg-white text-neutral-900 shadow-sm"
-									: "text-neutral-500 hover:text-neutral-800",
-							)}
-						>
-							{item.label}
-						</button>
-					))}
-				</div>
+				<CalendarViewSwitch view={view} onViewChange={setView} />
 				<DropdownMenu>
 					<DropdownMenuTrigger render={<Button className="rounded-full pr-3 pl-4" />}>
 						Create
 						<ChevronDown />
 					</DropdownMenuTrigger>
-					<DropdownMenuContent align="end" className="w-44">
+					<DropdownMenuContent align="end" className="w-52">
 						<DropdownMenuItem onClick={() => openNewEvent()}>
 							<CalendarPlus />
 							Event
@@ -287,6 +217,12 @@ export default function CalendarPage() {
 							<ListTodo />
 							Task
 						</DropdownMenuItem>
+						{canBlockBookings && (
+							<DropdownMenuItem onClick={() => setBlockingTime(true)}>
+								<Ban />
+								Block booking time
+							</DropdownMenuItem>
+						)}
 					</DropdownMenuContent>
 				</DropdownMenu>
 				<Button
@@ -340,6 +276,11 @@ export default function CalendarPage() {
 			<EventDialog state={eventDialog} onStateChange={setEventDialog} />
 			<TaskDialog state={taskDialog} onStateChange={setTaskDialog} />
 			<ReminderDialog state={reminderDialog} onClose={() => setReminderDialog(null)} />
+			<BlockBookingDialog
+				open={blockingTime}
+				initialDate={anchor}
+				onClose={() => setBlockingTime(false)}
+			/>
 		</div>
 	);
 }

@@ -6,9 +6,8 @@ import { getMailboxAccessLevel } from "@/lib/mailboxes/access";
 import type { SessionUser } from "@/lib/auth/types";
 import type { AttachmentContent, AttachmentMetadata, StoredAttachment } from "./attachment-types";
 
-export const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024;
-export const MAX_TOTAL_ATTACHMENT_SIZE = 20 * 1024 * 1024;
-export const MAX_ATTACHMENT_COUNT = 10;
+import { attachmentLimitError, MAX_ATTACHMENT_COUNT, SendLimitError } from "./limits";
+export { MAX_ATTACHMENT_SIZE, MAX_TOTAL_ATTACHMENT_SIZE, MAX_ATTACHMENT_COUNT } from "./limits";
 
 export function decodeBase64Content(content: string): ArrayBuffer {
 	const binary = atob(content.replace(/\s/g, ""));
@@ -35,27 +34,20 @@ export function normalizeAttachmentContent(
 }
 
 function sanitizeFilename(filename: string): string {
-	const normalized = filename.trim().replace(/[/\\\0]/g, "_");
+	const normalized = filename.trim().replace(/[/\\\x00-\x1f\x7f]/g, "_");
 	return normalized || "attachment";
 }
 
 export function validateAttachments(attachments: AttachmentContent[]): void {
-	if (attachments.length > MAX_ATTACHMENT_COUNT) {
-		throw new Error(`A message can include at most ${MAX_ATTACHMENT_COUNT} attachments`);
-	}
-
-	let totalSize = 0;
-	for (const attachment of attachments) {
-		const size = attachment.content.byteLength;
-		if (size > MAX_ATTACHMENT_SIZE) {
-			throw new Error(`${attachment.filename} exceeds the 10 MB attachment limit`);
-		}
-		totalSize += size;
-	}
-
-	if (totalSize > MAX_TOTAL_ATTACHMENT_SIZE) {
-		throw new Error("Attachments exceed the 20 MB total limit");
-	}
+	const error = attachmentLimitError(
+		attachments.map((file) => ({ size: file.content.byteLength })),
+	);
+	if (error)
+		throw new SendLimitError(
+			error,
+			attachments.length > MAX_ATTACHMENT_COUNT ? "E_TOO_MANY_ATTACHMENTS" : "E_CONTENT_TOO_LARGE",
+			attachments.length > MAX_ATTACHMENT_COUNT ? 400 : 413,
+		);
 }
 
 export async function storeMessageAttachments(
@@ -141,9 +133,27 @@ export async function getAttachmentForUser(
 	messageId: string,
 	attachmentId: string,
 ) {
+	const attachment = await getAuthorizedAttachment(env, user, messageId, attachmentId);
+	if (!attachment) return null;
+	const object = await env.BUCKET.get(attachment.r2Key);
+	return object ? { attachment, object } : null;
+}
+
+export async function getAuthorizedAttachment(
+	env: CloudflareEnv,
+	user: SessionUser,
+	messageId: string,
+	attachmentId: string,
+) {
 	const db = getDb(env);
 	const [message] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
-	if (!message) return null;
+	if (
+		!message ||
+		message.employeeHiddenAt ||
+		message.consumedByMessageId ||
+		message.securityStatus === "quarantined"
+	)
+		return null;
 
 	if (message.mailboxId) {
 		const access = await getMailboxAccessLevel(db, user, message.mailboxId);
@@ -162,7 +172,5 @@ export async function getAttachmentForUser(
 	if (!attachment) return null;
 	if (attachment.securityStatus === "quarantined") return null;
 
-	const object = await env.BUCKET.get(attachment.r2Key);
-	if (!object) return null;
-	return { attachment, object };
+	return attachment;
 }

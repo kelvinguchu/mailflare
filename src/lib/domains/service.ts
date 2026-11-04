@@ -122,6 +122,13 @@ export async function removeDomainForUser(
 		.where(and(eq(domains.id, domainId), eq(domains.userId, userId)))
 		.limit(1);
 	if (!domain) throw new Error("Domain not found");
+	const retained = await env.DB.prepare(
+		"SELECT 1 FROM messages JOIN mailboxes ON messages.mailbox_id = mailboxes.id WHERE mailboxes.domain_id = ? LIMIT 1",
+	)
+		.bind(domainId)
+		.first();
+	if (retained)
+		throw new Error("This domain contains retained company mail. Disable its mailboxes instead.");
 
 	try {
 		await deleteEmailRoutingRulesForDomain(env, domain.zoneId, domain.hostname);

@@ -80,6 +80,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build:worker
+      - run: npm run test:worker-runtime
       - run: npx wrangler d1 migrations apply DB --env production --remote
       - run: npx wrangler deploy --env production --message "git:${RELEASE_SHA}"
       - name: Verify production

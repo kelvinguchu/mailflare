@@ -5,6 +5,8 @@ import { getDb } from "@/db";
 import { mailboxes, signatureAssets } from "@/db/schema";
 import type { AttachmentContent } from "./attachment-types";
 
+import { buildDefaultSignature, type DefaultSignatureSender } from "./default-signature";
+
 export const MAX_SIGNATURE_HTML_LENGTH = 50_000;
 export const MAX_SIGNATURE_TEXT_LENGTH = 10_000;
 
@@ -152,6 +154,7 @@ export async function renderMailboxSignatureForSend(
 	env: Pick<CloudflareEnv, "DB" | "BUCKET">,
 	mailboxId: string,
 	input: { html?: string; text?: string },
+	sender?: DefaultSignatureSender,
 ): Promise<RenderedMailboxSignature> {
 	const [mailbox] = await getDb(env)
 		.select({
@@ -170,6 +173,15 @@ export async function renderMailboxSignatureForSend(
 	const bodyText = input.text ?? (input.html ? (signatureHtmlToText(input.html) ?? "") : "");
 	const bodyHtml = input.html ?? textToEmailHtml(input.text ?? "");
 	if (!signatureText && !signatureHtml) {
+		const fallback = sender ? buildDefaultSignature(sender) : null;
+		if (fallback) {
+			return {
+				html: appendHtmlSignature(bodyHtml, fallback.html, mailbox.signatureVersion),
+				text: appendTextSignature(bodyText, fallback.text),
+				attachments: fallback.attachments,
+				version: mailbox.signatureVersion,
+			};
+		}
 		return {
 			html: bodyHtml || undefined,
 			text: bodyText || undefined,
@@ -226,7 +238,7 @@ function normalizeSignatureText(value: string | null | undefined): string | null
 	return normalized;
 }
 
-function signatureHtmlToText(html: string): string | null {
+export function signatureHtmlToText(html: string): string | null {
 	const document = parseDocument(html, { decodeEntities: true });
 	const text = document.children
 		.map(renderTextNode)

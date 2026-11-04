@@ -5,6 +5,9 @@ export interface MessageAttachmentViewerProps {
 	messageId: string;
 	onOpenChange: (open: boolean) => void;
 	open: boolean;
+	localFile?: File;
+	inspection?: boolean;
+	proposedAttendees?: string[];
 }
 
 export type AttachmentPreviewKind = "audio" | "image" | "pdf" | "text" | "unsupported" | "video";

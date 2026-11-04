@@ -17,11 +17,17 @@ export async function POST(
 
 	const db = getDb(env);
 	const [message] = await db
-		.select({ id: messages.id, mailboxId: messages.mailboxId, starred: messages.starred })
+		.select({
+			id: messages.id,
+			employeeHiddenAt: messages.employeeHiddenAt,
+			consumedByMessageId: messages.consumedByMessageId,
+			mailboxId: messages.mailboxId,
+			starred: messages.starred,
+		})
 		.from(messages)
 		.where(eq(messages.id, messageId))
 		.limit(1);
-	if (!message?.mailboxId)
+	if (!message?.mailboxId || message.employeeHiddenAt || message.consumedByMessageId)
 		return NextResponse.json({ error: "Message not found" }, { status: 404 });
 
 	const access = await getMailboxAccessLevel(db, user, message.mailboxId);

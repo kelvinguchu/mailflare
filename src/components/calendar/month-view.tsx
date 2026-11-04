@@ -1,18 +1,22 @@
 "use client";
 
-import { Circle, CircleCheck } from "lucide-react";
+import { useState } from "react";
+import { Circle, CircleCheck, Repeat } from "lucide-react";
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import type { CalendarEventRecord, CalendarTaskRecord } from "@/lib/calendar/types";
-import { dateKey, eventDayKeys, formatTime, isMultiDayTimed } from "@/lib/calendar/wall-clock";
+import { dateKey, formatTime } from "@/lib/calendar/wall-clock";
 import type { CalendarGridProps } from "./calendar-types";
-import { defaultEventStart, getTaskTone, taskDueKey, type TaskTone } from "./calendar-utils";
+import { defaultEventStart, getTaskTone, type TaskTone } from "./calendar-utils";
+import {
+	dayItemKey,
+	monthDayItems,
+	ownerTint,
+	splitDayItems,
+	type DayItem,
+} from "./calendar-grid-utils";
 
-const MAX_VISIBLE_ITEMS = 3;
-
-type DayItem =
-	| { kind: "banner"; event: CalendarEventRecord }
-	| { kind: "timed"; event: CalendarEventRecord }
-	| { kind: "task"; task: CalendarTaskRecord };
+/** Rows a day cell holds, the "+N more" control included. */
+const DAY_ROWS = 4;
 
 const TASK_ITEM_TONES: Record<TaskTone, string> = {
 	completed: "text-neutral-400 line-through",
@@ -27,43 +31,60 @@ function dayNumberClass(isToday: boolean, inMonth: boolean): string {
 		: "text-neutral-400 hover:bg-neutral-100";
 }
 
+type ItemHandlers = Pick<CalendarGridProps, "onSelectEvent" | "onSelectTask" | "owners">;
+
 function MonthDayItemButton({
 	item,
 	onSelectEvent,
 	onSelectTask,
-}: Readonly<{
-	item: DayItem;
-	onSelectEvent: CalendarGridProps["onSelectEvent"];
-	onSelectTask: CalendarGridProps["onSelectTask"];
-}>) {
+	owners,
+}: Readonly<ItemHandlers & { item: DayItem }>) {
 	if (item.kind === "task") {
 		const completed = item.task.status === "completed";
+		const owner = owners?.task(item.task);
+		const Icon = completed ? CircleCheck : Circle;
 		return (
 			<button
 				type="button"
 				onClick={() => onSelectTask(item.task)}
+				title={owner ? `${owner.name}: ${item.task.title}` : undefined}
 				className={cn(
 					"relative flex w-full min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-left text-xs hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary/40",
 					TASK_ITEM_TONES[getTaskTone(item.task)],
+					owner?.upcoming && "opacity-70",
 				)}
 			>
-				{completed ? (
-					<CircleCheck className="size-3 shrink-0" />
-				) : (
-					<Circle className="size-3 shrink-0" />
+				<Icon className="size-3 shrink-0" style={owner ? { color: owner.color } : undefined} />
+				{owner && !item.task.allDay && item.task.dueAt && (
+					<span className="shrink-0 text-neutral-500 tabular-nums">
+						{formatTime(item.task.dueAt)}
+					</span>
 				)}
 				<span className="truncate">{item.task.title}</span>
+				{owner?.upcoming && (
+					<Repeat aria-label="Upcoming repeat" className="size-3 shrink-0 text-neutral-400" />
+				)}
+				{owner && <span className="sr-only">, {owner.name}</span>}
 			</button>
 		);
 	}
+	const owner = owners?.event(item.event);
 	if (item.kind === "banner") {
 		return (
 			<button
 				type="button"
 				onClick={() => onSelectEvent(item.event)}
-				className="relative w-full min-w-0 truncate rounded-md bg-primary/90 px-1.5 py-0.5 text-left text-xs font-medium text-primary-foreground hover:bg-primary focus-visible:ring-2 focus-visible:ring-primary/60"
+				title={owner ? `${owner.name}: ${item.event.title}` : undefined}
+				style={owner ? ownerTint(owner.color, true) : undefined}
+				className={cn(
+					"relative w-full min-w-0 truncate rounded-md px-1.5 py-0.5 text-left text-xs font-medium focus-visible:ring-2 focus-visible:ring-primary/60",
+					owner
+						? "text-neutral-900 hover:brightness-95"
+						: "bg-primary/90 text-primary-foreground hover:bg-primary",
+				)}
 			>
 				{item.event.title}
+				{owner && <span className="sr-only">, {owner.name}</span>}
 			</button>
 		);
 	}
@@ -71,14 +92,58 @@ function MonthDayItemButton({
 		<button
 			type="button"
 			onClick={() => onSelectEvent(item.event)}
+			title={owner ? `${owner.name}: ${item.event.title}` : undefined}
 			className="relative flex w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left text-xs text-neutral-800 hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary/40"
 		>
-			<span className="size-1.5 shrink-0 rounded-full bg-primary" />
+			<span
+				className="size-1.5 shrink-0 rounded-full bg-primary"
+				style={owner ? { backgroundColor: owner.color } : undefined}
+			/>
 			<span className="shrink-0 text-neutral-500 tabular-nums">
 				{formatTime(item.event.startsAt)}
 			</span>
 			<span className="truncate font-medium">{item.event.title}</span>
+			{owner && <span className="sr-only">, {owner.name}</span>}
 		</button>
+	);
+}
+
+/** Lists every item of a crowded day in place, without leaving the month. */
+function MoreItemsPopover({
+	day,
+	items,
+	hidden,
+	handlers,
+}: Readonly<{ day: Date; items: DayItem[]; hidden: number; handlers: ItemHandlers }>) {
+	const [open, setOpen] = useState(false);
+	const close =
+		<T,>(select: (value: T) => void) =>
+		(value: T) => {
+			setOpen(false);
+			select(value);
+		};
+	return (
+		<Popover open={open} onOpenChange={setOpen}>
+			<PopoverTrigger className="relative w-full rounded-md px-1.5 py-0.5 text-left text-xs font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 focus-visible:ring-2 focus-visible:ring-primary/40">
+				+{hidden} more
+			</PopoverTrigger>
+			<PopoverContent align="start" className="w-72 gap-2 p-3">
+				<PopoverTitle className="px-1 text-sm text-neutral-900">
+					{day.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
+				</PopoverTitle>
+				<div className="flex max-h-80 flex-col gap-0.5 overflow-y-auto overscroll-contain">
+					{items.map((item) => (
+						<MonthDayItemButton
+							key={dayItemKey(item)}
+							item={item}
+							owners={handlers.owners}
+							onSelectEvent={close(handlers.onSelectEvent)}
+							onSelectTask={close(handlers.onSelectTask)}
+						/>
+					))}
+				</div>
+			</PopoverContent>
+		</Popover>
 	);
 }
 
@@ -91,25 +156,11 @@ export function MonthView({
 	onSelectTask,
 	onCreateEvent,
 	onOpenDay,
+	owners,
 }: Readonly<CalendarGridProps>) {
 	const today = dateKey(new Date());
-	const itemsByDay = new Map<string, DayItem[]>();
-	const push = (key: string, item: DayItem) => {
-		const list = itemsByDay.get(key) ?? [];
-		list.push(item);
-		itemsByDay.set(key, list);
-	};
-	for (const event of events) {
-		const banner = event.allDay || isMultiDayTimed(event);
-		for (const key of eventDayKeys(event)) {
-			push(key, banner ? { kind: "banner", event } : { kind: "timed", event });
-		}
-	}
-	for (const task of tasks) {
-		const key = taskDueKey(task);
-		if (key) push(key, { kind: "task", task });
-	}
-	const order = { banner: 0, timed: 1, task: 2 };
+	const itemsByDay = monthDayItems(events, tasks, { timedTasks: !!owners });
+	const handlers: ItemHandlers = { onSelectEvent, onSelectTask, owners };
 	const weeks = days.length / 7;
 
 	return (
@@ -131,13 +182,8 @@ export function MonthView({
 				{days.map((day) => {
 					const key = dateKey(day);
 					const inMonth = day.getMonth() === anchor.getMonth();
-					const items = (itemsByDay.get(key) ?? []).sort(
-						(a, b) =>
-							order[a.kind] - order[b.kind] ||
-							("event" in a && "event" in b ? a.event.startsAt.localeCompare(b.event.startsAt) : 0),
-					);
-					const visible = items.slice(0, MAX_VISIBLE_ITEMS);
-					const hidden = items.length - visible.length;
+					const items = itemsByDay.get(key) ?? [];
+					const { visible, hidden } = splitDayItems(items, DAY_ROWS);
 					return (
 						<div
 							key={key}
@@ -147,19 +193,21 @@ export function MonthView({
 							)}
 						>
 							{/* Sits behind the day's content, so empty space creates an event by pointer or keyboard. */}
-							<button
-								type="button"
-								aria-label={`Create event on ${day.toLocaleDateString(undefined, { dateStyle: "full" })}`}
-								className="absolute inset-0 cursor-default outline-none focus-visible:bg-primary/5 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset"
-								onClick={() => {
-									const start = defaultEventStart(day);
-									onCreateEvent({
-										start,
-										end: new Date(start.getTime() + 3_600_000),
-										allDay: false,
-									});
-								}}
-							/>
+							{onCreateEvent && (
+								<button
+									type="button"
+									aria-label={`Create event on ${day.toLocaleDateString(undefined, { dateStyle: "full" })}`}
+									className="absolute inset-0 cursor-default outline-none focus-visible:bg-primary/5 focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-inset"
+									onClick={() => {
+										const start = defaultEventStart(day);
+										onCreateEvent({
+											start,
+											end: new Date(start.getTime() + 3_600_000),
+											allDay: false,
+										});
+									}}
+								/>
+							)}
 							<button
 								type="button"
 								onClick={() => onOpenDay(day)}
@@ -174,24 +222,25 @@ export function MonthView({
 									: day.getDate()}
 							</button>
 							{visible.map((item) => (
-								<MonthDayItemButton
-									key={
-										item.kind === "task" ? `task-${item.task.id}` : `${item.kind}-${item.event.id}`
-									}
-									item={item}
-									onSelectEvent={onSelectEvent}
-									onSelectTask={onSelectTask}
-								/>
+								<MonthDayItemButton key={dayItemKey(item)} item={item} {...handlers} />
 							))}
-							{hidden > 0 && (
-								<button
-									type="button"
-									onClick={() => onOpenDay(day)}
-									className="relative w-full rounded-md px-1.5 py-0.5 text-left text-xs font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 focus-visible:ring-2 focus-visible:ring-primary/40"
-								>
-									{hidden} more
-								</button>
-							)}
+							{hidden.length > 0 &&
+								(owners ? (
+									<MoreItemsPopover
+										day={day}
+										items={items}
+										hidden={hidden.length}
+										handlers={handlers}
+									/>
+								) : (
+									<button
+										type="button"
+										onClick={() => onOpenDay(day)}
+										className="relative w-full rounded-md px-1.5 py-0.5 text-left text-xs font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 focus-visible:ring-2 focus-visible:ring-primary/40"
+									>
+										{hidden.length} more
+									</button>
+								))}
 						</div>
 					);
 				})}

@@ -48,6 +48,26 @@ const MIGRATION_NAMES = [
 	"0046_add_operational_visibility.sql",
 	"0047_add_cc_recipient_semantics.sql",
 	"0048_add_mfa_policy.sql",
+	"0049_add_calendar_imports.sql",
+	"0050_add_team_inbox_retention.sql",
+	"0051_add_task_recurrence.sql",
+];
+
+const RETENTION_SCHEMA_STATEMENTS = [
+	`CREATE TRIGGER messages_record_origin AFTER INSERT ON messages
+BEGIN
+ UPDATE messages SET original_user_id = coalesce(new.original_user_id, new.user_id),
+ original_user_email = coalesce(new.original_user_email, (SELECT email FROM users WHERE id = new.user_id)),
+ original_mailbox_id = coalesce(new.original_mailbox_id, new.mailbox_id),
+ original_mailbox_address = coalesce(new.original_mailbox_address, (SELECT local_part || '@' || hostname FROM mailboxes JOIN domains ON domain_id = domains.id WHERE mailboxes.id = new.mailbox_id)),
+ original_mailbox_type = coalesce(new.original_mailbox_type, (SELECT type FROM mailboxes WHERE id = new.mailbox_id)) WHERE id = new.id;
+END`,
+	`CREATE TRIGGER messages_record_pretrash AFTER UPDATE OF status ON messages
+WHEN new.status = 'trash' AND old.status <> 'trash'
+BEGIN
+ UPDATE messages SET deletion_original_status = old.status, deletion_original_folder_id = old.folder_id,
+ deletion_original_folder_name = (SELECT name FROM folders WHERE id = old.folder_id) WHERE id = new.id;
+END`,
 ];
 
 const SEARCH_SCHEMA_STATEMENTS = [
@@ -236,7 +256,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS folders_mailbox_name_idx ON folders(mailbox_id
 CREATE INDEX IF NOT EXISTS folders_user_idx ON folders(user_id);
 CREATE INDEX IF NOT EXISTS folders_mailbox_idx ON folders(mailbox_id);
 CREATE TABLE IF NOT EXISTS api_keys (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, name text NOT NULL, prefix text NOT NULL, key_hash text NOT NULL, scopes text NOT NULL, created_at integer NOT NULL, last_used_at integer);
-CREATE TABLE IF NOT EXISTS messages (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, direction text NOT NULL, provider_message_id text, in_reply_to text, "references" text, reply_to_message_id text REFERENCES messages(id) ON DELETE set null, folder_id text REFERENCES folders(id) ON DELETE set null, from_addr text NOT NULL, to_addr text NOT NULL, cc_addr text DEFAULT '' NOT NULL, delivered_to_addr text, subject text, snippet text, text_body text, html_body text, raw_r2_key text, inbound_delivery_key text, status text DEFAULT 'received' NOT NULL, delivery_status text, delivery_detail text, delivery_updated_at integer, security_status text DEFAULT 'clean' NOT NULL, security_reason text, spam_score integer DEFAULT 0 NOT NULL, read integer DEFAULT false NOT NULL, starred integer DEFAULT false NOT NULL, snoozed_until integer, trashed_at integer, thread_id text, created_at integer NOT NULL);
+CREATE TABLE IF NOT EXISTS messages (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, direction text NOT NULL, provider_message_id text, in_reply_to text, "references" text, reply_to_message_id text REFERENCES messages(id) ON DELETE set null, folder_id text REFERENCES folders(id) ON DELETE set null, from_addr text NOT NULL, to_addr text NOT NULL, cc_addr text DEFAULT '' NOT NULL, delivered_to_addr text, subject text, snippet text, text_body text, html_body text, raw_r2_key text, inbound_delivery_key text, status text DEFAULT 'received' NOT NULL, delivery_status text, delivery_detail text, delivery_updated_at integer, security_status text DEFAULT 'clean' NOT NULL, security_reason text, spam_score integer DEFAULT 0 NOT NULL, read integer DEFAULT false NOT NULL, starred integer DEFAULT false NOT NULL, snoozed_until integer, trashed_at integer, employee_hidden_at integer, deletion_original_status text, deletion_original_folder_id text, deletion_original_folder_name text, original_user_id text, original_user_email text, original_mailbox_id text, original_mailbox_address text, original_mailbox_type text, draft_save_token text, draft_revision integer NOT NULL DEFAULT 0, consumed_by_message_id text, thread_id text, created_at integer NOT NULL);
 CREATE INDEX IF NOT EXISTS messages_user_created_idx ON messages(user_id, created_at);
 CREATE INDEX IF NOT EXISTS messages_mailbox_idx ON messages(mailbox_id);
 CREATE INDEX IF NOT EXISTS messages_mailbox_thread_created_idx ON messages(mailbox_id, thread_id, created_at);
@@ -250,9 +270,19 @@ CREATE INDEX IF NOT EXISTS messages_mailbox_provider_message_idx ON messages(mai
 CREATE INDEX IF NOT EXISTS messages_folder_idx ON messages(folder_id);
 CREATE UNIQUE INDEX IF NOT EXISTS messages_inbound_delivery_key_idx ON messages(inbound_delivery_key);
 CREATE INDEX IF NOT EXISTS messages_trash_retention_idx ON messages(status, trashed_at);
+CREATE TABLE IF NOT EXISTS message_deletion_events (
+ id text PRIMARY KEY NOT NULL,
+ message_id text NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+ actor_user_id text, actor_email text, action text NOT NULL,
+ from_status text, from_folder_name text, created_at integer NOT NULL
+);
+CREATE INDEX IF NOT EXISTS message_deletion_events_message_idx ON message_deletion_events(message_id, created_at);
+CREATE INDEX IF NOT EXISTS messages_original_mailbox_created_idx ON messages(original_mailbox_id, created_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS messages_employee_visible_idx ON messages(mailbox_id, employee_hidden_at, created_at DESC, id DESC);
+
 CREATE TABLE IF NOT EXISTS message_attachments (id text PRIMARY KEY NOT NULL, message_id text NOT NULL REFERENCES messages(id) ON DELETE cascade, filename text NOT NULL, content_type text NOT NULL, size integer NOT NULL, disposition text DEFAULT 'attachment' NOT NULL, content_id text, security_status text DEFAULT 'safe' NOT NULL, security_reason text, r2_key text NOT NULL UNIQUE, created_at integer NOT NULL);
 CREATE INDEX IF NOT EXISTS message_attachments_message_idx ON message_attachments(message_id);
-CREATE TABLE IF NOT EXISTS storage_deletion_jobs (id text PRIMARY KEY NOT NULL, message_id text NOT NULL UNIQUE, actor_user_id text REFERENCES users(id) ON DELETE set null, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, reason text NOT NULL CHECK (reason IN ('user', 'draft', 'retention')), status text DEFAULT 'pending' NOT NULL CHECK (status IN ('pending', 'processing', 'failed', 'completed')), object_keys text DEFAULT '[]' NOT NULL, attempt_count integer DEFAULT 0 NOT NULL, next_attempt_at integer, last_error text, created_at integer NOT NULL, updated_at integer NOT NULL, completed_at integer);
+CREATE TABLE IF NOT EXISTS storage_deletion_jobs (id text PRIMARY KEY NOT NULL, message_id text NOT NULL UNIQUE, actor_user_id text REFERENCES users(id) ON DELETE set null, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, owner_authorized_at integer, reason text NOT NULL CHECK (reason IN ('user', 'draft', 'retention')), status text DEFAULT 'pending' NOT NULL CHECK (status IN ('pending', 'processing', 'failed', 'completed')), object_keys text DEFAULT '[]' NOT NULL, attempt_count integer DEFAULT 0 NOT NULL, next_attempt_at integer, last_error text, created_at integer NOT NULL, updated_at integer NOT NULL, completed_at integer);
 CREATE INDEX IF NOT EXISTS storage_deletion_jobs_due_idx ON storage_deletion_jobs(status, next_attempt_at, created_at);
 CREATE INDEX IF NOT EXISTS storage_deletion_jobs_completed_idx ON storage_deletion_jobs(completed_at);
 CREATE TABLE IF NOT EXISTS storage_lifecycle_state (prefix text PRIMARY KEY NOT NULL, cursor text, last_scanned_at integer, updated_at integer NOT NULL);
@@ -270,13 +300,15 @@ CREATE INDEX IF NOT EXISTS dead_letter_events_status_created_idx ON dead_letter_
 CREATE INDEX IF NOT EXISTS dead_letter_events_source_created_idx ON dead_letter_events(source_queue, created_at);
 CREATE TABLE IF NOT EXISTS email_templates (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, name text NOT NULL, subject text DEFAULT '' NOT NULL, text_body text DEFAULT '' NOT NULL, created_at integer NOT NULL, updated_at integer NOT NULL);
 CREATE INDEX IF NOT EXISTS email_templates_user_idx ON email_templates(user_id);
-CREATE TABLE IF NOT EXISTS calendar_events (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, title text NOT NULL, description text DEFAULT '' NOT NULL, location text DEFAULT '' NOT NULL, attendees text DEFAULT '[]' NOT NULL, organizer text, starts_at integer NOT NULL, ends_at integer NOT NULL, timezone text DEFAULT 'UTC' NOT NULL, all_day integer DEFAULT 0 NOT NULL, sequence integer DEFAULT 0 NOT NULL, idempotency_key text, request_hash text, created_at integer NOT NULL, updated_at integer NOT NULL);
+CREATE TABLE IF NOT EXISTS calendar_events (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, title text NOT NULL, description text DEFAULT '' NOT NULL, location text DEFAULT '' NOT NULL, attendees text DEFAULT '[]' NOT NULL, organizer text, starts_at integer NOT NULL, ends_at integer NOT NULL, timezone text DEFAULT 'UTC' NOT NULL, all_day integer DEFAULT 0 NOT NULL, sequence integer DEFAULT 0 NOT NULL, idempotency_key text, request_hash text, created_at integer NOT NULL, updated_at integer NOT NULL, import_uid text, import_organizer text, import_cancelled integer DEFAULT 0 NOT NULL);
 CREATE INDEX IF NOT EXISTS calendar_events_user_starts_idx ON calendar_events(user_id, starts_at);
 CREATE UNIQUE INDEX IF NOT EXISTS calendar_events_user_idempotency_idx ON calendar_events(user_id, idempotency_key);
- CREATE TABLE IF NOT EXISTS calendar_tasks (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, assignee_user_id text REFERENCES users(id) ON DELETE set null, completed_by_user_id text REFERENCES users(id) ON DELETE set null, assigned_at integer, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, title text NOT NULL, description text DEFAULT '' NOT NULL, due_at integer, timezone text DEFAULT 'UTC' NOT NULL, all_day integer DEFAULT 0 NOT NULL, status text DEFAULT 'open' NOT NULL CHECK (status IN ('open', 'completed')), priority text DEFAULT 'none' NOT NULL CHECK (priority IN ('none', 'low', 'medium', 'high')), completed_at integer, created_at integer NOT NULL, updated_at integer NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS calendar_events_import_identity_idx ON calendar_events(user_id, import_uid, import_organizer);
+ CREATE TABLE IF NOT EXISTS calendar_tasks (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, assignee_user_id text REFERENCES users(id) ON DELETE set null, completed_by_user_id text REFERENCES users(id) ON DELETE set null, assigned_at integer, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, title text NOT NULL, description text DEFAULT '' NOT NULL, due_at integer, timezone text DEFAULT 'UTC' NOT NULL, all_day integer DEFAULT 0 NOT NULL, status text DEFAULT 'open' NOT NULL CHECK (status IN ('open', 'completed')), priority text DEFAULT 'none' NOT NULL CHECK (priority IN ('none', 'low', 'medium', 'high')), completed_at integer, created_at integer NOT NULL, updated_at integer NOT NULL, recurrence_rule text, recurrence_series_id text, recurrence_index integer);
 CREATE INDEX IF NOT EXISTS calendar_tasks_user_status_due_idx ON calendar_tasks(user_id, status, due_at);
  CREATE INDEX IF NOT EXISTS calendar_tasks_user_due_idx ON calendar_tasks(user_id, due_at);
  CREATE INDEX IF NOT EXISTS calendar_tasks_assignee_status_due_idx ON calendar_tasks(assignee_user_id, status, due_at);
+ CREATE UNIQUE INDEX IF NOT EXISTS calendar_tasks_recurrence_occurrence_idx ON calendar_tasks(recurrence_series_id, recurrence_index);
 CREATE TABLE IF NOT EXISTS calendar_reminders (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, event_id text REFERENCES calendar_events(id) ON DELETE cascade, task_id text REFERENCES calendar_tasks(id) ON DELETE cascade, mailbox_id text REFERENCES mailboxes(id) ON DELETE set null, title text NOT NULL, message text DEFAULT '' NOT NULL, channel text DEFAULT 'in_app' NOT NULL CHECK (channel IN ('in_app', 'email')), recipient text, from_addr text, remind_at integer NOT NULL, timezone text DEFAULT 'UTC' NOT NULL, status text DEFAULT 'scheduled' NOT NULL CHECK (status IN ('scheduled', 'processing', 'delivered', 'dismissed', 'cancelled', 'failed')), snoozed_until integer, claimed_at integer, delivered_at integer, dismissed_at integer, attempt_count integer DEFAULT 0 NOT NULL, last_error text, created_at integer NOT NULL, updated_at integer NOT NULL, CHECK ((event_id IS NOT NULL AND task_id IS NULL) OR (event_id IS NULL AND task_id IS NOT NULL)), CHECK (channel = 'in_app' OR (mailbox_id IS NOT NULL AND recipient IS NOT NULL AND from_addr IS NOT NULL)));
 CREATE INDEX IF NOT EXISTS calendar_reminders_due_idx ON calendar_reminders(status, remind_at);
 CREATE INDEX IF NOT EXISTS calendar_reminders_user_status_idx ON calendar_reminders(user_id, status, remind_at);
@@ -352,6 +384,7 @@ export async function migrateCleanDatabase(db: D1Database): Promise<boolean> {
 		...searchSchemaStatements,
 		...storageLifecycleStatements,
 		...accountLifecycleStatements,
+		...RETENTION_SCHEMA_STATEMENTS.map((statement) => db.prepare(statement)),
 		...migrationStatements,
 	]);
 	return true;

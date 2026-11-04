@@ -78,9 +78,11 @@ const TAG_ATTRIBUTES: Record<string, Set<string>> = {
 	img: new Set(["alt", "height", "src", "width"]),
 	li: new Set(["value"]),
 	ol: new Set(["start", "type"]),
-	table: new Set(["border", "cellpadding", "cellspacing", "width"]),
-	td: new Set(["align", "colspan", "rowspan", "valign", "width"]),
-	th: new Set(["align", "colspan", "rowspan", "scope", "valign", "width"]),
+	// Many emails colour their buttons with bgcolor; without it, white text vanishes.
+	table: new Set(["bgcolor", "border", "cellpadding", "cellspacing", "width"]),
+	tr: new Set(["bgcolor"]),
+	td: new Set(["align", "bgcolor", "colspan", "rowspan", "valign", "width"]),
+	th: new Set(["align", "bgcolor", "colspan", "rowspan", "scope", "valign", "width"]),
 };
 
 const ALLOWED_STYLE_PROPERTIES = new Set([
@@ -134,6 +136,7 @@ export interface SanitizedEmailHtml {
 
 export interface SanitizeEmailHtmlOptions {
 	allowRemoteImages?: boolean;
+	inspection?: boolean;
 }
 
 type ImageSourceKind = "inline" | "remote" | "unsafe";
@@ -148,7 +151,12 @@ function isSafeLinkUrl(value: string): boolean {
 	}
 }
 
-function classifyImageUrl(value: string): ImageSourceKind {
+function classifyImageUrl(value: string, inspection = false): ImageSourceKind {
+	if (
+		inspection &&
+		/^\/api\/team-inboxes\/messages\/[^/]+\/attachments\/[^/?#]+(?:\?[^#]*)?$/i.test(value)
+	)
+		return "inline";
 	if (/^\/api\/messages\/[^/]+\/attachments\/[^/?#]+(?:\?[^#]*)?$/i.test(value)) {
 		return "inline";
 	}
@@ -202,7 +210,8 @@ function sanitizeElement(
 	for (const attribute of Array.from(element.attributes)) {
 		const name = attribute.name.toLowerCase();
 		const allowed = GLOBAL_ATTRIBUTES.has(name) || TAG_ATTRIBUTES[tag]?.has(name);
-		if (!allowed || name.startsWith("on")) element.removeAttribute(attribute.name);
+		const unsafeColor = name === "bgcolor" && !/^#?[0-9a-z]{1,20}$/i.test(attribute.value.trim());
+		if (!allowed || name.startsWith("on") || unsafeColor) element.removeAttribute(attribute.name);
 	}
 
 	if (element instanceof HTMLElement) sanitizeStyle(element);
@@ -219,7 +228,7 @@ function sanitizeElement(
 
 	if (tag === "img") {
 		const src = element.getAttribute("src");
-		const sourceKind = src ? classifyImageUrl(src) : "unsafe";
+		const sourceKind = src ? classifyImageUrl(src, !!options.inspection) : "unsafe";
 		if (sourceKind === "remote" && !options.allowRemoteImages) {
 			onRemoteImageBlocked();
 			element.remove();

@@ -10,6 +10,7 @@ import type {
 	CalendarTaskInput,
 	CalendarTaskAssignee,
 	CalendarTaskActivity,
+	CalendarTaskCompletion,
 	CalendarTaskListParams,
 	CalendarTaskPatchInput,
 	CalendarTaskRecord,
@@ -79,6 +80,9 @@ function normalizeTask(task: Partial<CalendarTaskRecord> & { id: string }): Cale
 		status: "open",
 		priority: "none",
 		completedAt: null,
+		recurrenceRule: null,
+		recurrenceSeriesId: null,
+		recurrenceIndex: null,
 		...task,
 	};
 }
@@ -158,6 +162,23 @@ export async function rescheduleCalendarEvent(
 	);
 }
 
+/** Blocks a whole day (0-24) or hours on a date from CaliberCode advisory bookings. */
+export async function blockBookingTime(input: {
+	date: string;
+	startHour: number;
+	endHour: number;
+}) {
+	return calendarRequest<{
+		event: CalendarEventRecord;
+		conflicts: Array<{ reference: string; name: string; startHour: number; endHour: number }>;
+	}>("/api/calendar/advisory-blocks", { method: "POST", body: input });
+}
+
+/** Lifts a block, so the booking page offers that time again. */
+export async function unblockBookingTime(blockId: string) {
+	await calendarRequest(`/api/calendar/advisory-blocks/${blockId}`, { method: "DELETE" });
+}
+
 export async function deleteCalendarEvent(eventId: string, idempotencyKey: string) {
 	await calendarRequest(`/api/calendar/events/${eventId}`, { method: "DELETE", idempotencyKey });
 }
@@ -195,11 +216,14 @@ export async function deleteCalendarTask(taskId: string) {
 }
 
 export async function setCalendarTaskCompleted(taskId: string, completed: boolean) {
-	const data = await calendarRequest<{ task: CalendarTaskRecord }>(
+	const data = await calendarRequest<CalendarTaskCompletion>(
 		`/api/calendar/tasks/${taskId}/complete`,
 		{ method: completed ? "POST" : "DELETE" },
 	);
-	return normalizeTask(data.task);
+	return {
+		task: normalizeTask(data.task),
+		nextTask: data.nextTask ? normalizeTask(data.nextTask) : null,
+	};
 }
 
 export async function listCalendarReminders(params: CalendarReminderListParams) {

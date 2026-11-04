@@ -3,6 +3,7 @@ import type { LucideIcon } from "lucide-react";
 
 export interface MessageAttachmentCardProps {
 	attachment: MessageAttachment;
+	inspection?: boolean;
 	messageId: string;
 	onPreview: (attachment: MessageAttachment) => void;
 }

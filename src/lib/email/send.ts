@@ -1,3 +1,4 @@
+import { draftContentFingerprint } from "@/lib/team-inboxes/consume-draft";
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
@@ -32,8 +33,10 @@ import {
 } from "@/lib/email/outbound-idempotency";
 import { claimOutboundDelivery } from "@/lib/email/outbound-claim";
 import { buildOutboundThreading, normalizeProviderMessageId } from "@/lib/email/threading";
+import { renderForwardedContent, type ForwardSource } from "@/lib/email/forward";
 import { renderMailboxSignatureForSend } from "@/lib/email/signatures";
 import { normalizeRecipients, type NormalizedRecipient } from "@/lib/email/recipients";
+import { validateMessageBudget } from "./limits";
 
 export type SendEmailInput = {
 	userId: string;
@@ -48,6 +51,8 @@ export type SendEmailInput = {
 	mailboxId: string;
 	attachments?: AttachmentContent[];
 	replyToMessageId?: string | null;
+	/** The message being forwarded; `text` is then only the sender's note. */
+	forward?: ForwardSource | null;
 };
 
 export type QueuedEmail = {
@@ -59,8 +64,38 @@ export type QueuedEmail = {
 };
 
 type StoredOutboundPayload = {
+	draftContentHash?: string;
 	headers?: Record<string, string>;
 };
+
+function logSendStage(
+	stage: string,
+	started: number,
+	metadata: { messageId?: string; jobId?: string; fileCount?: number; attachmentBytes?: number },
+) {
+	console.info(
+		JSON.stringify({
+			event: "outbound_stage",
+			stage,
+			durationMs: Math.round(performance.now() - started),
+			...metadata,
+		}),
+	);
+}
+
+async function providerWithDeadline<T>(send: Promise<T>): Promise<T> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	try {
+		return await Promise.race([
+			send,
+			new Promise<never>((_, reject) => {
+				timer = setTimeout(() => reject(new Error("Provider confirmation timed out")), 45_000);
+			}),
+		]);
+	} finally {
+		if (timer) clearTimeout(timer);
+	}
+}
 
 export type OutboundQueueMessage = { jobId: string };
 
@@ -79,21 +114,46 @@ export async function queueEmail(
 	input: SendEmailInput,
 	options?: { idempotencyKey?: string | null; undoDelaySeconds?: number },
 ): Promise<QueuedEmail> {
-	if (!input.text?.trim() && !input.html?.trim()) {
+	if (!input.text?.trim() && !input.html?.trim() && !input.forward) {
 		throw new Error("Email body is required");
 	}
 	const db = getDb(env);
 	const idempotencyKey = normalizeIdempotencyKey(options?.idempotencyKey);
 	const sender = await getAuthorizedSenderAddress(env, input);
 	const recipients = normalizeRecipients({ to: input.to, cc: input.cc });
-	const rendered = input.includeSignature
-		? await renderMailboxSignatureForSend(env, sender.mailboxId, {
-				html: input.html,
-				text: input.text,
-			})
+	const renderStarted = performance.now();
+	const [account] = input.includeSignature
+		? await db.select({ name: users.name }).from(users).where(eq(users.id, input.userId)).limit(1)
+		: [];
+	const signed = input.includeSignature
+		? await renderMailboxSignatureForSend(
+				env,
+				sender.mailboxId,
+				{ html: input.html, text: input.text },
+				{ name: account?.name ?? "", fromAddr: sender.fromAddr },
+			)
 		: { html: input.html, text: input.text, attachments: [], version: null };
-	const attachments = [...(input.attachments ?? []), ...rendered.attachments];
+	const ownAttachments = [...(input.attachments ?? []), ...signed.attachments];
+	const forwarded = input.forward
+		? await renderForwardedContent(env, input.forward, ownAttachments)
+		: null;
+	const rendered = forwarded
+		? {
+				...signed,
+				html: `${signed.html ?? ""}${forwarded.html}`,
+				text: `${signed.text ?? ""}${forwarded.text}`,
+			}
+		: signed;
+	const attachments = [...ownAttachments, ...(forwarded?.attachments ?? [])];
+	logSendStage("signature", renderStarted, {
+		fileCount: attachments.length,
+		attachmentBytes: attachments.reduce((sum, file) => sum + file.content.byteLength, 0),
+	});
 	validateAttachments(attachments);
+	validateMessageBudget(
+		{ ...input, html: rendered.html, text: rendered.text, from: sender.fromAddr },
+		attachments.map((file) => ({ filename: file.filename, size: file.content.byteLength })),
+	);
 	const storedIdempotencyKey = await createStoredIdempotencyKey(input.userId, idempotencyKey);
 	const requestHash = await createOutboundRequestHash({
 		...input,
@@ -137,6 +197,10 @@ export async function queueEmail(
 		replyToMessageId: input.replyToMessageId,
 	});
 	const headers = { ...input.headers, ...threading.headers };
+	validateMessageBudget(
+		{ ...input, html: rendered.html, text: rendered.text, from: sender.fromAddr, headers },
+		attachments.map((file) => ({ filename: file.filename, size: file.content.byteLength })),
+	);
 
 	const jobId = newId("job");
 	const undoDelaySeconds = Math.max(0, Math.min(86_400, options?.undoDelaySeconds ?? 0));
@@ -168,13 +232,29 @@ export async function queueEmail(
 			deliveryStatus: initialStatus,
 			deliveryUpdatedAt: new Date(),
 		});
+		const storageStarted = performance.now();
 		storedAttachments = await storeMessageAttachments(env, messageId, attachments);
+		logSendStage("storage", storageStarted, {
+			messageId,
+			jobId,
+			fileCount: attachments.length,
+			attachmentBytes: attachments.reduce((sum, file) => sum + file.content.byteLength, 0),
+		});
+		const reservationStarted = performance.now();
 		const limitFailure = await reserveOutboundJob(env, {
 			id: jobId,
 			userId: input.userId,
 			domainId: sender.domainId,
 			messageId,
-			payload: JSON.stringify({ headers } satisfies StoredOutboundPayload),
+			payload: JSON.stringify({
+				headers,
+				draftContentHash: await draftContentFingerprint({
+					...input,
+					from: sender.fromAddr,
+					mailboxId: sender.mailboxId,
+					attachments: input.attachments ?? [],
+				}),
+			} satisfies StoredOutboundPayload),
 			idempotencyKey: storedIdempotencyKey,
 			requestHash,
 			status: initialStatus,
@@ -184,6 +264,7 @@ export async function queueEmail(
 			await auditRejectedSend(env, input, sender.mailboxId, limitFailure.code);
 			throw new Error(limitFailure.message);
 		}
+		logSendStage("reservation", reservationStarted, { messageId, jobId });
 	} catch (error) {
 		await Promise.allSettled(
 			storedAttachments.map((attachment) => env.BUCKET.delete(attachment.r2Key)),
@@ -194,7 +275,9 @@ export async function queueEmail(
 		throw error;
 	}
 
+	const publicationStarted = performance.now();
 	await enqueueOutboundJob(env, jobId, sendNotBefore);
+	logSendStage("queue", publicationStarted, { messageId, jobId });
 	// Recipient memory is best-effort and must never turn an accepted send into an error.
 	const remembered = await Promise.allSettled(
 		[...recipients.to, ...recipients.cc].map((recipient) =>
@@ -288,8 +371,27 @@ export async function processOutboundQueue(
 	}
 
 	let attachments: AttachmentContent[];
+	const loadingStarted = performance.now();
 	try {
 		attachments = await loadOutboundAttachments(env, message.id);
+		validateAttachments(attachments);
+		validateMessageBudget(
+			{
+				text: message.textBody,
+				html: message.htmlBody,
+				subject: message.subject,
+				from: message.fromAddr,
+				to: message.toAddr,
+				cc: message.ccAddr ?? undefined,
+				headers: storedPayload.headers,
+			},
+			attachments.map((file) => ({ filename: file.filename, size: file.content.byteLength })),
+		);
+		logSendStage("attachment_loading", loadingStarted, {
+			messageId: message.id,
+			jobId: job.id,
+			fileCount: attachments.length,
+		});
 	} catch (error) {
 		await handlePreDeliveryFailure(env, job.id, message, error, options.attempt);
 		return;
@@ -315,21 +417,30 @@ export async function processOutboundQueue(
 	}
 
 	let response: Awaited<ReturnType<CloudflareEnv["EMAIL"]["send"]>>;
+	await db
+		.update(messages)
+		.set({ deliveryStatus: "sending", deliveryUpdatedAt: new Date() })
+		.where(eq(messages.id, message.id));
+	const providerStarted = performance.now();
 	try {
-		response = await env.EMAIL.send({
-			from: message.fromAddr,
-			to: recipients.to.map(toEmailServiceRecipient),
-			...(recipients.cc.length > 0 ? { cc: recipients.cc.map(toEmailServiceRecipient) } : {}),
-			subject: message.subject ?? "",
-			headers: storedPayload.headers,
-			html: message.htmlBody ?? undefined,
-			text: message.textBody ?? undefined,
-			attachments: attachments.map(toEmailServiceAttachment),
-		});
+		response = await providerWithDeadline(
+			env.EMAIL.send({
+				from: message.fromAddr,
+				to: recipients.to.map(toEmailServiceRecipient),
+				...(recipients.cc.length > 0 ? { cc: recipients.cc.map(toEmailServiceRecipient) } : {}),
+				subject: message.subject ?? "",
+				headers: storedPayload.headers,
+				html: message.htmlBody ?? undefined,
+				text: message.textBody ?? undefined,
+				attachments: attachments.map(toEmailServiceAttachment),
+			}),
+		);
 	} catch (error) {
+		logSendStage("provider_failure", providerStarted, { messageId: message.id, jobId: job.id });
 		await handleProviderFailure(env, job.id, message, error, options.attempt);
 		return;
 	}
+	logSendStage("provider_accepted", providerStarted, { messageId: message.id, jobId: job.id });
 
 	await db.batch([
 		db
@@ -384,6 +495,27 @@ async function findOutboundJobByIdempotencyKey(
 		.where(and(eq(outboundJobs.userId, userId), eq(outboundJobs.idempotencyKey, idempotencyKey)))
 		.limit(1);
 	return job ?? null;
+}
+
+/** Read-only lookup: never enqueues or replays mail after a browser timeout. */
+export async function getSendOutcome(env: CloudflareEnv, userId: string, key: string) {
+	const idempotencyKey = normalizeIdempotencyKey(key);
+	const storedKey = await createStoredIdempotencyKey(userId, idempotencyKey);
+	const job = await findOutboundJobByIdempotencyKey(env, userId, storedKey);
+	if (!job?.messageId) return null;
+	const [message] = await getDb(env)
+		.select({ deliveryStatus: messages.deliveryStatus, deliveryDetail: messages.deliveryDetail })
+		.from(messages)
+		.where(eq(messages.id, job.messageId))
+		.limit(1);
+	return {
+		jobId: job.id,
+		messageId: job.messageId,
+		status: job.status,
+		undoDeadline: job.sendNotBefore?.toISOString() ?? null,
+		deliveryStatus: message?.deliveryStatus,
+		error: message?.deliveryDetail ?? job.error,
+	};
 }
 
 async function acceptExistingOutboundJob(
@@ -675,12 +807,29 @@ async function handleProviderFailure(
 				updatedAt: new Date(),
 			})
 			.where(and(eq(outboundJobs.id, jobId), eq(outboundJobs.status, "sending")));
+		await getDb(env)
+			.update(messages)
+			.set({ deliveryStatus: "queued", deliveryDetail: null, deliveryUpdatedAt: new Date() })
+			.where(eq(messages.id, message.id));
 		throw new OutboundRetryError(jobId, attempt);
 	}
 
 	const description =
 		action === "unknown" ? "E_DELIVERY_OUTCOME_UNKNOWN" : describeOutboundError(error);
-	await recordFinalOutboundFailure(env, jobId, message, description);
+	const detail =
+		error instanceof Error
+			? error.message
+					.replace(/[\r\n]/g, " ")
+					.replace(/[^\s<>]+@[^\s<>]+/g, "[address]")
+					.slice(0, 300)
+			: "";
+	await recordFinalOutboundFailure(
+		env,
+		jobId,
+		message,
+		description,
+		detail ? `${description}: ${detail}` : description,
+	);
 }
 
 async function handleInFlightReplay(
@@ -709,8 +858,9 @@ async function recordFinalOutboundFailure(
 	jobId: string,
 	message: typeof messages.$inferSelect,
 	description: string,
+	detail?: string,
 ): Promise<void> {
-	const changed = await markOutboundFailed(env, jobId, message.id, description);
+	const changed = await markOutboundFailed(env, jobId, message.id, description, detail);
 	if (!changed) return;
 	if (description === "E_RECIPIENT_SUPPRESSED") {
 		const recipients = normalizeRecipients({ to: message.toAddr, cc: message.ccAddr });
@@ -738,6 +888,7 @@ async function markOutboundFailed(
 	jobId: string,
 	messageId: string,
 	error: string,
+	detail?: string,
 ): Promise<boolean> {
 	const db = getDb(env);
 	const result = await env.DB.prepare(
@@ -757,7 +908,7 @@ async function markOutboundFailed(
 					: error === "E_DELIVERY_OUTCOME_UNKNOWN"
 						? "unknown"
 						: "failed",
-			deliveryDetail: error.slice(0, 1_000),
+			deliveryDetail: (detail ?? error).slice(0, 1_000),
 			deliveryUpdatedAt: new Date(),
 		})
 		.where(eq(messages.id, messageId));

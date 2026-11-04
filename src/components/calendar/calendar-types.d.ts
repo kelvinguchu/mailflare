@@ -47,6 +47,15 @@ export type ReminderDialogState = {
 	reminder?: CalendarReminderRecord;
 };
 
+/** Whose an item is, on calendars that show several people's items. */
+export type CalendarItemOwner = {
+	name: string;
+	/** Any CSS color; items are tinted with it. */
+	color: string;
+	/** A later occurrence of a repeating task, which doesn't exist until the one before is done. */
+	upcoming?: boolean;
+};
+
 export type CalendarGridProps = {
 	days: Date[];
 	anchor: Date;
@@ -54,6 +63,15 @@ export type CalendarGridProps = {
 	tasks: CalendarTaskRecord[];
 	onSelectEvent: (event: CalendarEventRecord) => void;
 	onSelectTask: (task: CalendarTaskRecord) => void;
-	onCreateEvent: (draft: EventDraft) => void;
+	/** Omitted on read-only calendars, where empty space does nothing. */
+	onCreateEvent?: (draft: EventDraft) => void;
 	onOpenDay: (day: Date) => void;
+	/**
+	 * Marks whose each item is. Shared calendars also place timed tasks in the hour
+	 * grid and list crowded days and time slots in popovers instead of squeezing them.
+	 */
+	owners?: {
+		event: (event: CalendarEventRecord) => CalendarItemOwner;
+		task: (task: CalendarTaskRecord) => CalendarItemOwner;
+	};
 };

@@ -12,6 +12,7 @@ interface CloudflareEnv {
 	DATABASE_BACKUP_WORKFLOW?: Workflow<import("./src/lib/backups/types").BackupWorkflowParams>;
 	LOGIN_RATE_LIMIT?: RateLimit;
 	PASSWORD_RESET_RATE_LIMIT?: RateLimit;
+	MAIL_RETENTION_HOLD?: "true" | "false";
 	DEPLOYMENT_ENV?: "local" | "staging" | "production";
 	CLOUDFLARE_MANAGEMENT_MODE?: "disabled" | "enabled";
 	OUTBOUND_DELIVERY_MODE?: "disabled" | "enabled";

@@ -1,8 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-	requestPermanentMessageDeletion,
-	runStorageLifecycleMaintenance,
-} from "@/lib/storage/lifecycle";
+import { purgeRetainedMessage, runStorageLifecycleMaintenance } from "@/lib/storage/lifecycle";
 import {
 	createMailEnv,
 	fixtureIds,
@@ -52,9 +49,12 @@ describe("storage lifecycle", () => {
 			),
 		]);
 
-		const result = await requestPermanentMessageDeletion(
-			createMailEnv(),
-			sessionUser(fixtureIds.owner),
+		await integrationEnv.DB.prepare(
+			"UPDATE messages SET employee_hidden_at = unixepoch() WHERE status = 'trash'",
+		).run();
+		const result = await purgeRetainedMessage(
+			createMailEnv({ DEPLOYMENT_ENV: "local" }),
+			{ ...sessionUser(fixtureIds.owner), email: "admin@example.com" },
 			"msg_delete",
 		);
 		expect(result).toMatchObject({ outcome: "accepted", completed: true });
@@ -105,9 +105,12 @@ describe("storage lifecycle", () => {
 				throw new Error("temporary R2 failure");
 			}),
 		} as Partial<R2Bucket> as R2Bucket;
-		const result = await requestPermanentMessageDeletion(
-			createMailEnv({ BUCKET: failingBucket }),
-			sessionUser(fixtureIds.owner),
+		await integrationEnv.DB.prepare(
+			"UPDATE messages SET employee_hidden_at = unixepoch() WHERE status = 'trash'",
+		).run();
+		const result = await purgeRetainedMessage(
+			createMailEnv({ BUCKET: failingBucket, DEPLOYMENT_ENV: "local" }),
+			{ ...sessionUser(fixtureIds.owner), email: "admin@example.com" },
 			"msg_retry_delete",
 		);
 		expect(result).toMatchObject({ outcome: "accepted", completed: false });

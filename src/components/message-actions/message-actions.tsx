@@ -197,13 +197,14 @@ export function MessageActions({
 			>
 				<ShieldAlert className="size-4" />
 			</ToolbarButton>
-			<ToolbarButton
-				label="Delete"
-				disabled={disabled || status === "trash"}
-				onClick={() => void runAction("trash")}
-			>
+			<ToolbarButton label="Delete" disabled={disabled} onClick={() => void runAction("trash")}>
 				<Trash2 className="size-4" />
 			</ToolbarButton>
+			{status === "trash" && (
+				<ToolbarButton label="Restore" disabled={disabled} onClick={() => void runAction("inbox")}>
+					<Mail className="size-4" />
+				</ToolbarButton>
+			)}
 			<Divider />
 			<ToolbarButton
 				label={read ? "Mark as unread" : "Mark as read"}

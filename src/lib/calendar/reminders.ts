@@ -10,7 +10,11 @@ import type { SessionUser } from "@/lib/auth/types";
 import { createScopedIdempotencyKey } from "@/lib/email/outbound-idempotency";
 import { queueEmail } from "@/lib/email/send";
 import { newId } from "@/lib/ids";
-import { requireCalendarMailboxAccess, requireCalendarSender } from "./access";
+import {
+	requireCalendarFeature,
+	requireCalendarMailboxAccess,
+	requireCalendarSender,
+} from "./access";
 import type {
 	CalendarReminderInput,
 	CalendarReminderPatchInput,
@@ -89,6 +93,7 @@ export async function createCalendarReminder(
 	user: SessionUser,
 	input: CalendarReminderInput,
 ) {
+	requireCalendarFeature(user);
 	const target = await requireReminderTarget(env, user, input.eventId, input.taskId);
 	const channel = calendarReminderChannel(input.channel);
 	const timezone = calendarTimezone(input.timezone ?? target.timezone);
@@ -261,10 +266,12 @@ export async function dispatchDueCalendarReminders(
 		`SELECT r.id, r.user_id, r.mailbox_id, r.title, r.message, r.channel, r.recipient,
 			r.from_addr, r.remind_at, r.snoozed_until, r.attempt_count
 		 FROM calendar_reminders AS r
-		 LEFT JOIN calendar_tasks AS t ON t.id = r.task_id
+			 LEFT JOIN calendar_tasks AS t ON t.id = r.task_id
 		 WHERE COALESCE(r.snoozed_until, r.remind_at) <= ?
 		   AND (r.status = 'scheduled' OR (r.status = 'processing' AND r.claimed_at < ?))
-		   AND (r.task_id IS NULL OR t.status = 'open')
+			   AND (r.task_id IS NULL OR t.status = 'open')
+			   AND EXISTS (SELECT 1 FROM users u WHERE u.id = r.user_id AND u.disabled = 0 AND u.activation_status = 'active' AND u.archived_at IS NULL)
+			   AND NOT EXISTS (SELECT 1 FROM calendar_events e WHERE e.id = r.event_id AND e.import_cancelled = 1)
 		 ORDER BY COALESCE(r.snoozed_until, r.remind_at), r.id
 		 LIMIT ?`,
 	)
@@ -283,7 +290,9 @@ export async function dispatchDueCalendarReminders(
 			   AND NOT EXISTS (
 			     SELECT 1 FROM calendar_tasks AS t
 			     WHERE t.id = calendar_reminders.task_id AND t.status = 'completed'
-			   )`,
+			   )
+			   AND EXISTS (SELECT 1 FROM users u WHERE u.id = calendar_reminders.user_id AND u.disabled = 0 AND u.activation_status = 'active' AND u.archived_at IS NULL)
+			   AND NOT EXISTS (SELECT 1 FROM calendar_events e WHERE e.id = calendar_reminders.event_id AND e.import_cancelled = 1)`,
 		)
 			.bind(nowSeconds, nowSeconds, reminder.id, nowSeconds, staleClaimSeconds)
 			.run();
@@ -317,7 +326,9 @@ async function deliverClaimedReminder(
 		 FROM calendar_reminders AS r
 		 LEFT JOIN calendar_tasks AS t ON t.id = r.task_id
 		 WHERE r.id = ? AND r.status = 'processing'
-		   AND (r.task_id IS NULL OR t.status = 'open')`,
+		   AND (r.task_id IS NULL OR t.status = 'open')
+		   AND EXISTS (SELECT 1 FROM users u WHERE u.id = r.user_id AND u.disabled = 0 AND u.activation_status = 'active' AND u.archived_at IS NULL)
+		   AND NOT EXISTS (SELECT 1 FROM calendar_events e WHERE e.id = r.event_id AND e.import_cancelled = 1)`,
 	)
 		.bind(reminder.id)
 		.first<{ id: string }>();

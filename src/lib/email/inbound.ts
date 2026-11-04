@@ -271,7 +271,13 @@ function logDuplicateDelivery(deliveryKey: string, messageId: string): void {
 export async function getMessageWithBody(env: CloudflareEnv, userId: string, messageId: string) {
 	const db = getDb(env);
 	const [message] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
-	if (!message || message.userId !== userId) return null;
+	if (
+		!message ||
+		message.employeeHiddenAt ||
+		message.consumedByMessageId ||
+		message.userId !== userId
+	)
+		return null;
 	const contactNames = await getMessageContactNames(env, userId, message.fromAddr, message.toAddr);
 	const attachments = await listMessageAttachments(env, messageId);
 	const unsubscribeUrl = await getUnsubscribeUrlFromRawR2Key(env, message.rawR2Key);
@@ -297,7 +303,7 @@ export async function getMessageWithBodyForUser(
 ) {
 	const db = getDb(env);
 	const [message] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
-	if (!message?.mailboxId) return null;
+	if (!message?.mailboxId || message.employeeHiddenAt || message.consumedByMessageId) return null;
 	const access = await getMailboxAccessLevel(db, user, message.mailboxId);
 	if (!access?.canRead) return null;
 	const contactNames = await getMessageContactNames(
@@ -344,11 +350,16 @@ export async function getMessageMetadataForUser(
 ) {
 	const db = getDb(env);
 	const [message] = await db
-		.select({ mailboxId: messages.mailboxId, rawR2Key: messages.rawR2Key })
+		.select({
+			mailboxId: messages.mailboxId,
+			rawR2Key: messages.rawR2Key,
+			employeeHiddenAt: messages.employeeHiddenAt,
+			consumedByMessageId: messages.consumedByMessageId,
+		})
 		.from(messages)
 		.where(eq(messages.id, messageId))
 		.limit(1);
-	if (!message?.mailboxId) return null;
+	if (!message?.mailboxId || message.employeeHiddenAt || message.consumedByMessageId) return null;
 	const access = await getMailboxAccessLevel(db, user, message.mailboxId);
 	if (!access?.canRead) return null;
 	const [attachments, unsubscribeUrl] = await Promise.all([

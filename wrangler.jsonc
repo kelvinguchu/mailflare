@@ -199,6 +199,7 @@
 			"routes": [{ "pattern": "mail.calibercode.io", "custom_domain": true }],
 			"vars": {
 				"DEPLOYMENT_ENV": "production",
+				"MAIL_RETENTION_HOLD": "false",
 				"CLOUDFLARE_MANAGEMENT_MODE": "enabled",
 				"OUTBOUND_DELIVERY_MODE": "enabled",
 				"AUTH_EMAIL_DELIVERY_MODE": "enabled",

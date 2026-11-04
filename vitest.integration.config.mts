@@ -3,9 +3,7 @@ import { cloudflareTest, readD1Migrations } from "@cloudflare/vitest-plugin";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig(async () => {
-	const migrations = await readD1Migrations(
-		path.join(import.meta.dirname, "drizzle/migrations"),
-	);
+	const migrations = await readD1Migrations(path.join(import.meta.dirname, "drizzle/migrations"));
 
 	return {
 		resolve: {
@@ -22,6 +20,8 @@ export default defineConfig(async () => {
 		test: {
 			include: ["tests/integration/**/*.test.ts"],
 			setupFiles: ["./tests/integration/setup.ts"],
+			maxWorkers: 2,
+			testTimeout: 30000,
 		},
 	};
 });
