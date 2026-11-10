@@ -227,7 +227,7 @@ export function KpiStrip({ health, now }: Readonly<{ health: OperationalHealth; 
 				<div
 					key={kpi.label}
 					className={cn(
-						"relative min-w-0 bg-white px-5 py-4",
+						"relative min-w-0 bg-white px-5 py-4 max-sm:px-4 max-sm:py-3.5",
 						kpi.href &&
 							"transition-colors focus-within:bg-neutral-50 hover:bg-neutral-50 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-primary/30 has-[a:focus-visible]:ring-inset",
 					)}

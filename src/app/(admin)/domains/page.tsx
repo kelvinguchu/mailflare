@@ -104,7 +104,7 @@ export default function DomainsPage() {
 							<DialogTrigger asChild>
 								<Button>
 									<Plus className="h-4 w-4" />
-									New domain
+									<span className="max-sm:sr-only">New domain</span>
 								</Button>
 							</DialogTrigger>
 							<DialogContent>
@@ -164,9 +164,9 @@ export default function DomainsPage() {
 				</div>
 			</section>
 			{dnsView && (
-				<Card className="rounded-3xl border-0 bg-white p-6">
+				<Card className="rounded-3xl border-0 bg-white p-6 max-sm:px-0 max-sm:py-5">
 					<CardHeader className="py-0">
-						<CardTitle>DNS — {dnsView.domain.hostname}</CardTitle>
+						<CardTitle className="max-sm:wrap-anywhere">DNS — {dnsView.domain.hostname}</CardTitle>
 					</CardHeader>
 					<CardContent className="space-y-4 pt-5 text-xs no-font-mono">
 						<div>

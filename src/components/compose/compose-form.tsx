@@ -381,7 +381,7 @@ export function ComposeForm({
 
 	const frameClass =
 		mode === "popup"
-			? "fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 flex h-[min(520px,calc(100dvh-88px))] w-[min(560px,calc(100vw-32px))] flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-2xl max-sm:right-2 max-sm:left-2 max-sm:w-auto"
+			? "fixed right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-40 flex h-[min(520px,calc(100dvh-88px))] w-[min(560px,calc(100vw-32px))] flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-2xl max-sm:inset-0 max-sm:h-auto max-sm:w-auto max-sm:rounded-none max-sm:border-0"
 			: "flex h-full min-h-[720px] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm";
 
 	return (

@@ -175,13 +175,13 @@ export default function SettingsImportPage() {
 	return (
 		<div className="space-y-6">
 			<div>
-				<h1 className="text-3xl font-medium text-neutral-900">Import</h1>
+				<h1 className="text-2xl font-medium text-neutral-900 sm:text-3xl">Import</h1>
 				<p className="mt-1 text-sm text-neutral-500">
 					Move mail from selected source sections into the matching sections of the current mailbox.
 				</p>
 			</div>
 
-			<div className="space-y-6 rounded-3xl bg-white p-6">
+			<div className="space-y-6 rounded-3xl bg-white p-6 max-sm:p-4">
 				<div className="flex flex-col gap-2">
 					<Label htmlFor="import-source">Import source</Label>
 					<Select value={activeTab} onValueChange={(value) => setActiveTab(value as ImportTab)}>
@@ -206,7 +206,7 @@ export default function SettingsImportPage() {
 							className="flex w-full items-center justify-between rounded-md border border-neutral-200 bg-white px-3 py-2 text-left text-sm shadow-sm shadow-neutral-200/50"
 						>
 							<span className="flex-1">Selected</span>
-							<span className="truncate">{sourceSummary}</span>
+							<span className="truncate max-md:min-w-0">{sourceSummary}</span>
 							<span className="text-neutral-400 px-2">▾</span>
 						</button>
 						{sourceDropdownOpen && (

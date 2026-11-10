@@ -46,7 +46,7 @@ export function CurrentMailboxForm() {
 
 	if (isLoading) {
 		return (
-			<Card className="rounded-3xl border-0 bg-white px-6">
+			<Card className="rounded-3xl border-0 bg-white px-6 max-sm:px-0">
 				<CardHeader>
 					<Skeleton className="h-6 w-36" />
 					<Skeleton className="h-4 w-72" />
@@ -62,7 +62,7 @@ export function CurrentMailboxForm() {
 
 	if (!selectedMailbox) {
 		return (
-			<Card className="rounded-3xl border-0 bg-white px-6">
+			<Card className="rounded-3xl border-0 bg-white px-6 max-sm:px-0">
 				<CardHeader>
 					<CardTitle>Sender identity</CardTitle>
 					<CardDescription>Select a mailbox to configure the name recipients see.</CardDescription>
@@ -76,7 +76,7 @@ export function CurrentMailboxForm() {
 	const canManage = selectedMailbox.permission === "full_access";
 
 	return (
-		<Card className="rounded-3xl border-0 bg-white px-6">
+		<Card className="rounded-3xl border-0 bg-white px-6 max-sm:px-0">
 			<CardHeader>
 				<CardTitle>Sender identity</CardTitle>
 				<CardDescription>
@@ -99,7 +99,7 @@ export function CurrentMailboxForm() {
 							Preview: {displayName.trim() || selectedMailbox.localPart} &lt;{address}&gt;
 						</p>
 					</div>
-					<div className="flex items-center gap-3">
+					<div className="flex items-center gap-3 max-sm:flex-wrap">
 						<Button type="submit" disabled={saving || !hasChanges || !canManage}>
 							<Save className="h-4 w-4" />
 							{saving ? "Saving..." : "Save sender name"}

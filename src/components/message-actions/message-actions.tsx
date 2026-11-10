@@ -78,7 +78,7 @@ function ToolbarButton({
 }
 
 function Divider() {
-	return <span aria-hidden="true" className="mx-1 h-4 w-px bg-neutral-200" />;
+	return <span aria-hidden="true" className="mx-1 h-4 w-px bg-neutral-200 max-sm:hidden" />;
 }
 
 export function MessageActions({
@@ -169,7 +169,7 @@ export function MessageActions({
 	);
 
 	return (
-		<div className="flex min-w-0 items-center">
+		<div className="flex min-w-0 items-center max-sm:overflow-x-auto max-sm:[scrollbar-width:none]">
 			<Tooltip label="Back">
 				<Link
 					href={listHref}

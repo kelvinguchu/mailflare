@@ -389,7 +389,7 @@ function DeliveryHistoryDialog({
 										className="rounded-lg border border-neutral-200 px-3 py-2.5"
 									>
 										<div className="flex items-center gap-2">
-											<span className="flex-1 text-sm font-medium text-neutral-900">
+											<span className="min-w-0 flex-1 text-sm font-medium text-neutral-900">
 												Scheduled for {formatDateTime(delivery.scheduledFor)}
 											</span>
 											<span
@@ -423,7 +423,7 @@ function DeliveryHistoryDialog({
 											{delivery.error && (
 												<>
 													<dt className="text-neutral-400">Error</dt>
-													<dd className="text-red-600">{delivery.error}</dd>
+													<dd className="break-words text-red-600">{delivery.error}</dd>
 												</>
 											)}
 										</dl>

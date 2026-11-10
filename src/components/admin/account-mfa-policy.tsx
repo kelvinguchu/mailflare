@@ -43,7 +43,7 @@ export function AccountMfaPolicy({
 	}
 
 	return (
-		<section className="space-y-5 rounded-3xl bg-white p-6">
+		<section className="space-y-5 rounded-3xl bg-white p-6 max-sm:p-4">
 			<div>
 				<h2 className="text-lg font-semibold text-neutral-900">Multi-factor policy</h2>
 				<p className="mt-1 text-sm text-neutral-500">
@@ -60,7 +60,7 @@ export function AccountMfaPolicy({
 						}).format(new Date(account.mfaPolicyExemptUntil!))}
 						.
 					</p>
-					<p className="mt-1">Reason: {account.mfaPolicyExemptionReason}</p>
+					<p className="mt-1 max-sm:wrap-anywhere">Reason: {account.mfaPolicyExemptionReason}</p>
 					<Button
 						type="button"
 						variant="outline"
@@ -115,7 +115,7 @@ export function AccountMfaPolicy({
 						revoked and their enrollment grace period restarts.
 					</p>
 					<Label htmlFor="mfa-reset-confirmation">
-						Type <span className="font-mono">reset mfa {account.email}</span>
+						Type <span className="font-mono max-sm:wrap-anywhere">reset mfa {account.email}</span>
 					</Label>
 					<Input
 						id="mfa-reset-confirmation"

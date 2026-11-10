@@ -389,7 +389,7 @@ function OverflowBlock({
 			>
 				+{group.items.length}
 			</PopoverTrigger>
-			<PopoverContent align="start" className="w-72 gap-2 p-3">
+			<PopoverContent align="start" className="w-72 max-w-[calc(100vw-1rem)] gap-2 p-3">
 				<PopoverTitle className="px-1 text-sm text-neutral-900">
 					{day.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })},
 					from {formatTime(start)}

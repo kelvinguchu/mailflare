@@ -44,7 +44,7 @@ export function ForwardingEmailForm({ initialForwardingEmail }: ForwardingEmailF
 					Incoming mail will also be sent to this verified Cloudflare Email Routing destination.
 				</p>
 			</div>
-			<div className="flex items-center gap-3">
+			<div className="flex items-center gap-3 max-sm:flex-wrap">
 				<Button type="submit" disabled={saving || forwardingEmail.trim() === savedForwardingEmail}>
 					{saving ? "Saving..." : "Save forwarding"}
 				</Button>

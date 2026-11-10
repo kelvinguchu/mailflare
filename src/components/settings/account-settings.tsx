@@ -51,13 +51,13 @@ export function AccountSettings() {
 	return (
 		<div className="space-y-8 py-4">
 			<div>
-				<h1 className="text-3xl font-medium text-neutral-900">Account</h1>
+				<h1 className="text-2xl font-medium text-neutral-900 sm:text-3xl">Account</h1>
 				<p className="mt-1 text-sm text-neutral-500">
 					Manage your account details and sign-in security.
 				</p>
 			</div>
 
-			<Card className="rounded-3xl border-0 bg-white px-6">
+			<Card className="rounded-3xl border-0 bg-white px-6 max-sm:px-0">
 				<CardHeader>
 					<CardTitle>Account details</CardTitle>
 					<CardDescription>
@@ -83,7 +83,7 @@ export function AccountSettings() {
 				</CardContent>
 			</Card>
 
-			<Card className="rounded-3xl border-0 bg-white px-6">
+			<Card className="rounded-3xl border-0 bg-white px-6 max-sm:px-0">
 				<CardHeader>
 					<CardTitle>Forwarding email</CardTitle>
 					<CardDescription>
@@ -95,7 +95,7 @@ export function AccountSettings() {
 				</CardContent>
 			</Card>
 
-			<Card className="rounded-3xl border-0 bg-white px-6">
+			<Card className="rounded-3xl border-0 bg-white px-6 max-sm:px-0">
 				<CardHeader>
 					<CardTitle>Sign-in security</CardTitle>
 					<CardDescription>
@@ -107,7 +107,7 @@ export function AccountSettings() {
 				</CardContent>
 			</Card>
 
-			<Card className="rounded-3xl border-0 bg-white px-6">
+			<Card className="rounded-3xl border-0 bg-white px-6 max-sm:px-0">
 				<CardHeader>
 					<CardTitle>Confirm identity</CardTitle>
 					<CardDescription>
@@ -119,7 +119,7 @@ export function AccountSettings() {
 				</CardContent>
 			</Card>
 
-			<Card className="rounded-3xl border-0 bg-white px-6">
+			<Card className="rounded-3xl border-0 bg-white px-6 max-sm:px-0">
 				<CardHeader>
 					<CardTitle>Email signature</CardTitle>
 				</CardHeader>
@@ -128,7 +128,7 @@ export function AccountSettings() {
 				</CardContent>
 			</Card>
 
-			<Card className="rounded-3xl border-0 bg-white px-6">
+			<Card className="rounded-3xl border-0 bg-white px-6 max-sm:px-0">
 				<CardHeader>
 					<CardTitle>Undo send</CardTitle>
 					<CardDescription>
@@ -140,7 +140,7 @@ export function AccountSettings() {
 				</CardContent>
 			</Card>
 
-			<Card className="rounded-3xl border-0 bg-white px-6">
+			<Card className="rounded-3xl border-0 bg-white px-6 max-sm:px-0">
 				<CardHeader>
 					<CardTitle>Sessions</CardTitle>
 					<CardDescription>
@@ -152,7 +152,7 @@ export function AccountSettings() {
 				</CardContent>
 			</Card>
 
-			<Card className="rounded-3xl border-0 bg-white px-6">
+			<Card className="rounded-3xl border-0 bg-white px-6 max-sm:px-0">
 				<CardHeader>
 					<CardTitle>Change password</CardTitle>
 					<CardDescription>Use at least 8 characters for your new password.</CardDescription>

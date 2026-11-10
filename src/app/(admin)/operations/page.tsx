@@ -60,7 +60,7 @@ export default function OperationsPage() {
 						<div className="flex items-center gap-3">
 							{data && (
 								<p
-									className="text-xs text-neutral-500"
+									className="text-xs text-neutral-500 max-sm:hidden"
 									title={formatDateTime(data.generatedAt)}
 									aria-live="polite"
 								>
@@ -78,7 +78,9 @@ export default function OperationsPage() {
 								<RefreshCw
 									className={cn(health.isFetching && "animate-spin motion-reduce:animate-none")}
 								/>
-								{health.isFetching ? "Checking…" : "Refresh"}
+								<span className="max-sm:sr-only">
+									{health.isFetching ? "Checking…" : "Refresh"}
+								</span>
 							</Button>
 						</div>
 					</>
@@ -122,6 +124,13 @@ export default function OperationsPage() {
 						measuring={snapshot.isPending}
 						onMeasure={() => snapshot.mutate()}
 					/>
+					{/* The header hides the last-checked time on phones, so show it here instead. */}
+					<p
+						className="text-xs text-neutral-500 sm:hidden"
+						title={formatDateTime(data.generatedAt)}
+					>
+						Checked {formatRelative(data.generatedAt, now)}
+					</p>
 					<KpiStrip health={data} now={now} />
 					<div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(22rem,1fr)]">
 						<ProcessingPanel health={data} now={now} />

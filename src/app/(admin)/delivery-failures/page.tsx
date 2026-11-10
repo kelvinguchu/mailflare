@@ -41,16 +41,16 @@ export default function DeliveryFailuresPage() {
 							disabled={failures.isFetching}
 						>
 							<RefreshCw className={`h-4 w-4 ${failures.isFetching ? "animate-spin" : ""}`} />
-							Refresh
+							<span className="max-sm:sr-only">Refresh</span>
 						</Button>
 					</>
 				}
 			/>
 
 			{(failures.data?.unresolvedCount ?? 0) > 0 ? (
-				<Card className="rounded-3xl border border-red-200 bg-red-50 p-6">
+				<Card className="rounded-3xl border border-red-200 bg-red-50 p-6 max-sm:px-0 max-sm:py-4">
 					<CardHeader className="flex-row items-center gap-3 space-y-0 py-0">
-						<AlertTriangle className="h-5 w-5 text-red-700" />
+						<AlertTriangle className="h-5 w-5 shrink-0 text-red-700" />
 						<CardTitle className="text-base text-red-950">
 							{failures.data?.unresolvedCount} unresolved queue{" "}
 							{failures.data?.unresolvedCount === 1 ? "failure" : "failures"}
@@ -58,9 +58,9 @@ export default function DeliveryFailuresPage() {
 					</CardHeader>
 				</Card>
 			) : failures.data ? (
-				<Card className="rounded-3xl border border-green-200 bg-green-50 p-6">
+				<Card className="rounded-3xl border border-green-200 bg-green-50 p-6 max-sm:px-0 max-sm:py-4">
 					<CardHeader className="flex-row items-center gap-3 space-y-0 py-0">
-						<CheckCircle2 className="h-5 w-5 text-green-700" />
+						<CheckCircle2 className="h-5 w-5 shrink-0 text-green-700" />
 						<CardTitle className="text-base text-green-950">No unresolved queue failures</CardTitle>
 					</CardHeader>
 				</Card>
@@ -73,7 +73,7 @@ export default function DeliveryFailuresPage() {
 			)}
 
 			<section className="overflow-hidden rounded-3xl bg-white">
-				<div className="border-b border-neutral-100 px-5 py-4">
+				<div className="border-b border-neutral-100 px-5 py-4 max-sm:px-4">
 					<h2 className="font-semibold text-neutral-900">Dead-letter history</h2>
 					<p className="mt-1 text-xs text-neutral-500">
 						Replay is audited. Outbound items with an uncertain provider outcome stay blocked to
@@ -90,7 +90,7 @@ export default function DeliveryFailuresPage() {
 					{(failures.data?.events ?? []).map((failure: DeliveryFailure) => (
 						<div
 							key={failure.id}
-							className="grid gap-4 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+							className="grid gap-4 px-5 py-4 max-sm:gap-3 max-sm:px-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
 						>
 							<div className="min-w-0 space-y-1">
 								<div className="flex flex-wrap items-center gap-2">
@@ -135,6 +135,7 @@ export default function DeliveryFailuresPage() {
 							<Button
 								type="button"
 								variant="outline"
+								className="max-sm:justify-self-start"
 								disabled={failure.status !== "unresolved" || replay.isPending}
 								onClick={() => replay.mutate(failure.id)}
 							>

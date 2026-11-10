@@ -155,7 +155,7 @@ export default function AccountDetailsPage() {
 	return (
 		<div className="space-y-6">
 			<AdminPageHeader title={account.name} />
-			<section className="space-y-5 rounded-3xl bg-white p-6">
+			<section className="space-y-5 rounded-3xl bg-white p-6 max-sm:p-4">
 				<div className="flex items-center gap-4">
 					<span className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-primary/12 text-xl font-semibold text-primary">
 						{account.name.charAt(0).toUpperCase()}
@@ -255,7 +255,7 @@ export default function AccountDetailsPage() {
 					{saving ? "Saving..." : "Save details"}
 				</Button>
 			</section>
-			<section className="space-y-4 rounded-3xl bg-white p-6">
+			<section className="space-y-4 rounded-3xl bg-white p-6 max-sm:p-4">
 				<div>
 					<h2 className="text-lg font-semibold text-neutral-900">Account activation</h2>
 					<p className="mt-1 text-sm text-neutral-500">
@@ -316,7 +316,7 @@ export default function AccountDetailsPage() {
 				)}
 			</section>
 			<AccountMfaPolicy account={account} onRefresh={refreshAccount} />
-			<section className="space-y-4 rounded-3xl bg-white p-6">
+			<section className="space-y-4 rounded-3xl bg-white p-6 max-sm:p-4">
 				<div>
 					<h2 className="text-lg font-semibold text-neutral-900">Sessions</h2>
 					<p className="mt-1 text-sm text-neutral-500">
@@ -333,7 +333,7 @@ export default function AccountDetailsPage() {
 					{sessionsBusy ? "Revoking..." : "Revoke all sessions"}
 				</Button>
 			</section>
-			<section className="space-y-5 rounded-3xl bg-white p-6">
+			<section className="space-y-5 rounded-3xl bg-white p-6 max-sm:p-4">
 				<div>
 					<h2 className="text-lg font-semibold text-neutral-900">Sender identities</h2>
 					<p className="mt-1 text-sm text-neutral-500">
@@ -346,9 +346,14 @@ export default function AccountDetailsPage() {
 				{mailboxes.map((mailbox) => {
 					const address = `${mailbox.localPart}@${mailbox.hostname}`;
 					return (
-						<div key={mailbox.id} className="space-y-3 rounded-2xl border border-neutral-100 p-4">
+						<div
+							key={mailbox.id}
+							className="space-y-3 rounded-2xl border border-neutral-100 p-4 max-sm:p-3"
+						>
 							<div className="space-y-2">
-								<Label htmlFor={`sender-name-${mailbox.id}`}>Sender name for {address}</Label>
+								<Label htmlFor={`sender-name-${mailbox.id}`} className="max-sm:wrap-anywhere">
+									Sender name for {address}
+								</Label>
 								<Input
 									id={`sender-name-${mailbox.id}`}
 									value={mailbox.displayName ?? ""}
@@ -363,7 +368,7 @@ export default function AccountDetailsPage() {
 									}
 									maxLength={100}
 								/>
-								<p className="text-xs text-neutral-500">
+								<p className="text-xs text-neutral-500 max-sm:wrap-anywhere">
 									Preview: {mailbox.displayName?.trim() || mailbox.localPart} &lt;{address}&gt;
 								</p>
 							</div>

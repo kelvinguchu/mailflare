@@ -233,7 +233,7 @@ function EventDetails({
 				<FormError message={unblock.isError ? errorMessage(unblock.error) : null} />
 			</DialogBody>
 			{blockId && (
-				<DialogFooter className="items-center">
+				<DialogFooter className="sm:items-center">
 					<Button
 						type="button"
 						variant="outline"
@@ -246,7 +246,7 @@ function EventDetails({
 				</DialogFooter>
 			)}
 			{reschedulable && !rescheduling && (
-				<DialogFooter className="items-center">
+				<DialogFooter className="sm:items-center">
 					<Button type="button" onClick={() => setRescheduling(true)}>
 						<CalendarClock />
 						Reschedule
@@ -254,10 +254,10 @@ function EventDetails({
 				</DialogFooter>
 			)}
 			{!managedByCaliberCode && (
-				<DialogFooter className="items-center">
+				<DialogFooter className="sm:items-center">
 					{confirmingDelete ? (
 						<>
-							<p className="mr-auto text-sm text-neutral-600">
+							<p className="mr-auto text-sm text-neutral-600 max-sm:order-last max-sm:mr-0">
 								Delete this event?
 								{attendees.length > 0 && !event.importUid && " Guests will be sent a cancellation."}
 							</p>
@@ -283,7 +283,7 @@ function EventDetails({
 							<Button
 								type="button"
 								variant="ghost"
-								className="mr-auto text-red-600 hover:bg-red-50 hover:text-red-700"
+								className="mr-auto text-red-600 hover:bg-red-50 hover:text-red-700 max-sm:mr-0"
 								onClick={() => setConfirmingDelete(true)}
 							>
 								<Trash2 />

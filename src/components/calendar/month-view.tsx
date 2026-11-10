@@ -49,14 +49,14 @@ function MonthDayItemButton({
 				onClick={() => onSelectTask(item.task)}
 				title={owner ? `${owner.name}: ${item.task.title}` : undefined}
 				className={cn(
-					"relative flex w-full min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-left text-xs hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary/40",
+					"relative flex w-full min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-left text-xs hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary/40 max-sm:gap-0.5 max-sm:px-0.5 max-sm:text-[11px]",
 					TASK_ITEM_TONES[getTaskTone(item.task)],
 					owner?.upcoming && "opacity-70",
 				)}
 			>
 				<Icon className="size-3 shrink-0" style={owner ? { color: owner.color } : undefined} />
 				{owner && !item.task.allDay && item.task.dueAt && (
-					<span className="shrink-0 text-neutral-500 tabular-nums">
+					<span className="shrink-0 text-neutral-500 tabular-nums max-sm:hidden">
 						{formatTime(item.task.dueAt)}
 					</span>
 				)}
@@ -77,7 +77,7 @@ function MonthDayItemButton({
 				title={owner ? `${owner.name}: ${item.event.title}` : undefined}
 				style={owner ? ownerTint(owner.color, true) : undefined}
 				className={cn(
-					"relative w-full min-w-0 truncate rounded-md px-1.5 py-0.5 text-left text-xs font-medium focus-visible:ring-2 focus-visible:ring-primary/60",
+					"relative w-full min-w-0 truncate rounded-md px-1.5 py-0.5 text-left text-xs font-medium focus-visible:ring-2 focus-visible:ring-primary/60 max-sm:px-1 max-sm:text-[11px]",
 					owner
 						? "text-neutral-900 hover:brightness-95"
 						: "bg-primary/90 text-primary-foreground hover:bg-primary",
@@ -93,13 +93,13 @@ function MonthDayItemButton({
 			type="button"
 			onClick={() => onSelectEvent(item.event)}
 			title={owner ? `${owner.name}: ${item.event.title}` : undefined}
-			className="relative flex w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left text-xs text-neutral-800 hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary/40"
+			className="relative flex w-full min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-left text-xs text-neutral-800 hover:bg-neutral-100 focus-visible:ring-2 focus-visible:ring-primary/40 max-sm:gap-1 max-sm:px-0.5 max-sm:text-[11px]"
 		>
 			<span
 				className="size-1.5 shrink-0 rounded-full bg-primary"
 				style={owner ? { backgroundColor: owner.color } : undefined}
 			/>
-			<span className="shrink-0 text-neutral-500 tabular-nums">
+			<span className="shrink-0 text-neutral-500 tabular-nums max-sm:hidden">
 				{formatTime(item.event.startsAt)}
 			</span>
 			<span className="truncate font-medium">{item.event.title}</span>
@@ -124,10 +124,14 @@ function MoreItemsPopover({
 		};
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
-			<PopoverTrigger className="relative w-full rounded-md px-1.5 py-0.5 text-left text-xs font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 focus-visible:ring-2 focus-visible:ring-primary/40">
-				+{hidden} more
+			<PopoverTrigger
+				aria-label={`+${hidden} more`}
+				className="relative w-full rounded-md px-1.5 py-0.5 text-left text-xs font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 focus-visible:ring-2 focus-visible:ring-primary/40 max-sm:px-0.5 max-sm:text-[11px]"
+			>
+				+{hidden}
+				<span className="max-sm:hidden"> more</span>
 			</PopoverTrigger>
-			<PopoverContent align="start" className="w-72 gap-2 p-3">
+			<PopoverContent align="start" className="w-72 max-w-[calc(100vw-1rem)] gap-2 p-3">
 				<PopoverTitle className="px-1 text-sm text-neutral-900">
 					{day.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
 				</PopoverTitle>
@@ -169,7 +173,7 @@ export function MonthView({
 				{days.slice(0, 7).map((day) => (
 					<div
 						key={day.getDay()}
-						className="px-2 py-2 text-center text-[11px] font-medium tracking-wide text-neutral-500 uppercase"
+						className="px-2 py-2 text-center text-[11px] font-medium tracking-wide text-neutral-500 uppercase max-sm:px-0 max-sm:text-[10px]"
 					>
 						{day.toLocaleDateString(undefined, { weekday: "short" })}
 					</div>
@@ -188,7 +192,7 @@ export function MonthView({
 						<div
 							key={key}
 							className={cn(
-								"group relative flex min-w-0 flex-col gap-0.5 border-r border-b border-neutral-100 px-1 pt-1 pb-1.5 nth-[7n]:border-r-0",
+								"group relative flex min-w-0 flex-col gap-0.5 border-r border-b border-neutral-100 px-1 pt-1 pb-1.5 nth-[7n]:border-r-0 max-sm:px-0.5",
 								!inMonth && "bg-neutral-50/70",
 							)}
 						>
@@ -236,9 +240,12 @@ export function MonthView({
 									<button
 										type="button"
 										onClick={() => onOpenDay(day)}
-										className="relative w-full rounded-md px-1.5 py-0.5 text-left text-xs font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 focus-visible:ring-2 focus-visible:ring-primary/40"
+										aria-label={`${hidden.length} more`}
+										className="relative w-full rounded-md px-1.5 py-0.5 text-left text-xs font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 focus-visible:ring-2 focus-visible:ring-primary/40 max-sm:px-0.5 max-sm:text-[11px]"
 									>
-										{hidden.length} more
+										<span className="sm:hidden">+</span>
+										{hidden.length}
+										<span className="max-sm:hidden"> more</span>
 									</button>
 								))}
 						</div>

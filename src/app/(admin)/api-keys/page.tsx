@@ -65,7 +65,7 @@ export default function ApiKeysPage() {
 							<DialogTrigger asChild>
 								<Button>
 									<Plus className="h-4 w-4" />
-									New API key
+									<span className="max-sm:sr-only">New API key</span>
 								</Button>
 							</DialogTrigger>
 							<DialogContent>
@@ -120,7 +120,7 @@ export default function ApiKeysPage() {
 					{(data?.apiKeys ?? []).map((key) => (
 						<div
 							key={key.id}
-							className="flex min-h-24 items-start gap-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm shadow-neutral-100"
+							className="flex min-h-24 items-start gap-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm shadow-neutral-100 max-sm:min-h-0 max-sm:rounded-xl max-sm:p-3.5"
 						>
 							<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-600">
 								<KeyRound className="h-5 w-5" />

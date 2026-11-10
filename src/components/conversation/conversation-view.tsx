@@ -161,7 +161,7 @@ export function ConversationView({ messageId }: Readonly<{ messageId: string }>)
 
 	return (
 		<div className="h-full overflow-y-auto overscroll-contain scrollbar-gutter-stable">
-			<div className="sticky top-0 z-10 flex h-12 items-center gap-2 bg-white px-2 sm:px-4">
+			<div className="sticky top-0 z-10 flex h-12 items-center gap-1 bg-white px-2 sm:gap-2 sm:px-4">
 				<MessageActions
 					messageId={focusMessage.id}
 					mailboxId={focusMessage.mailboxId}
@@ -178,7 +178,7 @@ export function ConversationView({ messageId }: Readonly<{ messageId: string }>)
 
 			<div className="pb-12">
 				<div className="flex items-start gap-3 py-4 pr-4 pl-4 sm:pr-6 sm:pl-[76px]">
-					<h1 className="min-w-0 flex-1 text-[22px] leading-snug text-neutral-900">
+					<h1 className="min-w-0 flex-1 text-[22px] leading-snug break-words text-neutral-900 max-sm:text-lg">
 						{thread.subject ?? focusMessage.subject ?? "(no subject)"}
 						{folderLabel && (
 							<span className="ml-2 inline-flex translate-y-[-3px] items-center rounded bg-neutral-100 px-1.5 py-0.5 align-middle text-xs font-medium text-neutral-600">

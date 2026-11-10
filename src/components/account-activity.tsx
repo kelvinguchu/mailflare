@@ -165,7 +165,7 @@ export function AccountActivityPanel({
 				</div>
 				<Button type="button" size="sm" className="shrink-0 rounded-full" onClick={onNewTask}>
 					<Plus />
-					New task
+					<span className="max-sm:sr-only">New task</span>
 				</Button>
 			</div>
 			<div

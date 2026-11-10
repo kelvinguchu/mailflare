@@ -29,13 +29,13 @@ export default function SettingsExportPage() {
 	return (
 		<div className="space-y-6">
 			<div>
-				<h1 className="text-3xl font-medium text-neutral-900">Export</h1>
+				<h1 className="text-2xl font-medium text-neutral-900 sm:text-3xl">Export</h1>
 				<p className="mt-1 text-sm text-neutral-500">
 					Download mail from the currently selected mailbox.
 				</p>
 			</div>
 
-			<Card className="rounded-3xl border-0 bg-white p-6">
+			<Card className="rounded-3xl border-0 bg-white p-6 max-sm:px-0 max-sm:py-5">
 				<CardHeader className="py-0">
 					<CardDescription>
 						Download message headers and bodies from the selected mailbox as an .mbox file.

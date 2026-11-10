@@ -14,12 +14,15 @@ export function AccountSettingsNav() {
 	const pathname = usePathname();
 
 	return (
-		<aside className="w-full shrink-0 lg:w-48">
-			<div className="sticky top-6 space-y-3">
-				<h2 className="px-4 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+		<aside className="w-full shrink-0 max-md:order-first lg:w-48">
+			<div className="sticky top-6 space-y-3 max-md:static">
+				<h2 className="px-4 text-xs font-semibold uppercase tracking-wide text-neutral-500 max-md:sr-only">
 					Account settings
 				</h2>
-				<nav className="space-y-1">
+				<nav
+					aria-label="Account settings"
+					className="space-y-1 max-md:-mx-4 max-md:flex max-md:gap-1 max-md:space-y-0 max-md:overflow-x-auto max-md:overscroll-x-contain max-md:px-4 max-md:pb-1"
+				>
 					{accountSettingsNavItems.map((item) => {
 						const href = getAccountSettingsHref(id, item.segment);
 						return (
@@ -27,7 +30,7 @@ export function AccountSettingsNav() {
 								key={item.segment || "details"}
 								href={href}
 								className={cn(
-									"block rounded-full px-4 py-2.5 text-sm font-medium transition-colors",
+									"block rounded-full px-4 py-2.5 text-sm font-medium transition-colors max-md:shrink-0 max-md:py-2 max-md:whitespace-nowrap",
 									isActiveAccountSettingsPath(pathname, href)
 										? "bg-primary/12 text-primary"
 										: "text-neutral-600 hover:bg-white/70 hover:text-neutral-900",

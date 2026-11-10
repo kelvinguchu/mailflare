@@ -35,7 +35,7 @@ export function CalendarRangeNav({
 				<Button
 					variant="outline"
 					size="sm"
-					className="rounded-full px-4"
+					className="rounded-full px-4 max-sm:px-3"
 					onClick={() => onAnchorChange(startOfLocalDay(new Date()))}
 					title="Today (T)"
 				>
@@ -60,7 +60,7 @@ export function CalendarRangeNav({
 					<ChevronRight />
 				</Button>
 			</div>
-			<h2 className="text-lg text-neutral-800" aria-live="polite">
+			<h2 className="text-lg text-neutral-800 max-sm:text-base" aria-live="polite">
 				{rangeTitle(view, days, anchor)}
 			</h2>
 			{busy && (
@@ -92,7 +92,7 @@ export function CalendarViewSwitch({
 					title={`${item.label} (${item.shortcut.toUpperCase()})`}
 					onClick={() => onViewChange(item.value)}
 					className={cn(
-						"rounded-full px-3 py-1 text-sm font-medium transition-colors",
+						"rounded-full px-3 py-1 text-sm font-medium transition-colors max-sm:px-2.5",
 						view === item.value
 							? "bg-white text-neutral-900 shadow-sm"
 							: "text-neutral-500 hover:text-neutral-800",

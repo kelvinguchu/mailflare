@@ -328,7 +328,7 @@ function TaskEditor({
 					{remoteChanged && dirty && (
 						<div
 							role="status"
-							className="flex items-center justify-between gap-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"
+							className="flex items-center justify-between gap-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 max-sm:flex-wrap"
 						>
 							<span>This task changed while you were editing.</span>
 							<Button
@@ -446,7 +446,7 @@ function TaskEditor({
 					)}
 				</DialogBody>
 
-				<DialogFooter className="items-center">
+				<DialogFooter className="sm:items-center">
 					{task && permissions.canDelete && (
 						<Button
 							type="button"
@@ -760,7 +760,10 @@ function TaskActivityList({
 					{visible.map((item) => {
 						const { actor, text } = describeTaskActivity(item, accountId);
 						return (
-							<li key={item.id} className="flex items-baseline gap-3 text-sm">
+							<li
+								key={item.id}
+								className="flex items-baseline gap-3 text-sm max-sm:flex-col max-sm:gap-0"
+							>
 								<span className="min-w-0 flex-1 wrap-break-word text-neutral-700">
 									<span className="font-medium text-neutral-900">{actor}</span> {text}
 								</span>

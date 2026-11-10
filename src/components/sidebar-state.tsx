@@ -1,20 +1,29 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from "react";
 import type { SidebarProviderProps, SidebarState } from "./sidebar-state-types";
 
 const SidebarContext = createContext<SidebarState>({
 	minimal: false,
 	narrow: false,
+	mobileOpen: false,
 	toggle: () => undefined,
+	closeMobile: () => undefined,
 });
 
+/**
+ * Desktop keeps the collapsible rail. Below 768px the navigation becomes an off-canvas drawer
+ * that always shows full labels, opens from the header, and closes on navigation or Escape.
+ */
 export function SidebarProvider({ children, expandedWidth = 240 }: SidebarProviderProps) {
+	const pathname = usePathname();
 	const [desktopMinimal, setDesktopMinimal] = useState(false);
 	const [narrow, setNarrow] = useState(false);
 	const [narrowExpanded, setNarrowExpanded] = useState(false);
 	const [storageKey, setStorageKey] = useState<string | null>(null);
-	const minimal = narrow ? !narrowExpanded : desktopMinimal;
+	const minimal = narrow ? false : desktopMinimal;
+	const mobileOpen = narrow && narrowExpanded;
 
 	useEffect(() => {
 		const query = window.matchMedia("(max-width: 767px)");
@@ -26,6 +35,19 @@ export function SidebarProvider({ children, expandedWidth = 240 }: SidebarProvid
 		query.addEventListener("change", update);
 		return () => query.removeEventListener("change", update);
 	}, []);
+
+	useEffect(() => {
+		setNarrowExpanded(false);
+	}, [pathname]);
+
+	useEffect(() => {
+		if (!mobileOpen) return;
+		const onKeyDown = (event: KeyboardEvent) => {
+			if (event.key === "Escape") setNarrowExpanded(false);
+		};
+		window.addEventListener("keydown", onKeyDown);
+		return () => window.removeEventListener("keydown", onKeyDown);
+	}, [mobileOpen]);
 
 	useEffect(() => {
 		void fetch("/api/auth/me", { cache: "no-store" })
@@ -50,11 +72,17 @@ export function SidebarProvider({ children, expandedWidth = 240 }: SidebarProvid
 		});
 	}
 
+	function closeMobile() {
+		setNarrowExpanded(false);
+	}
+
 	return (
-		<SidebarContext.Provider value={{ minimal, narrow, toggle }}>
+		<SidebarContext.Provider value={{ minimal, narrow, mobileOpen, toggle, closeMobile }}>
 			<div
 				className="h-full"
-				style={{ "--sidebar-width": `${minimal ? 72 : expandedWidth}px` } as React.CSSProperties}
+				style={
+					{ "--sidebar-width": `${desktopMinimal ? 72 : expandedWidth}px` } as React.CSSProperties
+				}
 			>
 				{children}
 			</div>

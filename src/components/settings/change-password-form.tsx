@@ -77,7 +77,7 @@ export function ChangePasswordForm() {
 					required
 				/>
 			</div>
-			<div className="flex items-center gap-3">
+			<div className="flex items-center gap-3 max-sm:flex-wrap">
 				<Button type="submit" disabled={loading}>
 					{loading ? "Changing..." : "Change password"}
 				</Button>

@@ -248,6 +248,8 @@ function FullMessageListRow({
 	const { openDraftComposer } = useCompose();
 	const className = cn(
 		"group relative grid h-10 w-full grid-cols-[20px_24px_minmax(140px,220px)_minmax(0,1fr)_auto] items-center gap-2 px-4 text-left text-sm hover:z-10 hover:bg-[#f2f6fc] hover:shadow-sm",
+		// Phones: sender and time on the first line, subject and preview wrap underneath.
+		"max-md:h-auto max-md:grid-cols-[20px_24px_minmax(0,1fr)_auto] max-md:gap-y-0.5 max-md:py-2.5",
 		(active || selected) && "bg-primary/8",
 		highlighted && HIGHLIGHT_CLASS,
 		row.draggable && DRAGGABLE_CLASS,
@@ -269,9 +271,12 @@ function FullMessageListRow({
 				message={row.rowMessage}
 				folder={config.folder}
 				fallback={row.party}
-				className={getMessagePartyClassName(row.rowMessage, config.folder)}
+				className={cn(
+					getMessagePartyClassName(row.rowMessage, config.folder),
+					"max-md:col-start-3 max-md:row-start-1",
+				)}
 			/>
-			<span className="truncate text-neutral-700">
+			<span className="truncate text-neutral-700 max-md:col-span-2 max-md:col-start-3 max-md:row-start-2 max-md:line-clamp-2 max-md:whitespace-normal max-md:text-[13px] max-md:leading-snug">
 				<span className={row.unread ? "font-bold text-neutral-900" : ""}>
 					{row.rowMessage.subject ?? "(no subject)"}
 				</span>
@@ -284,7 +289,7 @@ function FullMessageListRow({
 			<time
 				dateTime={message.createdAt}
 				className={cn(
-					"min-w-24 whitespace-nowrap text-right text-xs",
+					"min-w-24 whitespace-nowrap text-right text-xs max-md:col-start-4 max-md:row-start-1 max-md:min-w-0",
 					!row.inspection && "group-hover:opacity-0",
 					row.unread ? "font-semibold text-neutral-800" : "text-neutral-500",
 				)}
@@ -526,7 +531,7 @@ export function MessageFolderPage({
 			<div
 				className={`flex h-12 shrink-0 items-center justify-between border-b border-neutral-200 ${compact ? "px-3" : "px-4"}`}
 			>
-				<div className="flex items-center gap-3 w-full">
+				<div className="flex min-w-0 items-center gap-3 w-full">
 					<Tooltip label="Select all visible messages">
 						<Checkbox
 							checked={allVisibleSelected}
@@ -564,7 +569,7 @@ export function MessageFolderPage({
 									className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
 									aria-hidden="true"
 								/>
-								Updating…
+								<span className="max-sm:sr-only">Updating…</span>
 							</span>
 						)}
 						<span className="text-xs text-neutral-500 whitespace-nowrap">

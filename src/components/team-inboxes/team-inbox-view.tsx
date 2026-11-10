@@ -400,7 +400,7 @@ export function TeamInboxView({ identity, mfaEnabled }: { identity: string; mfaE
 					conversation ? (
 						<>
 							<div className="px-4 pt-5 sm:pl-[76px]">
-								<h2 className="text-[22px] leading-snug text-neutral-900">
+								<h2 className="text-[22px] leading-snug break-words text-neutral-900 max-sm:text-lg">
 									{focus?.message.subject ?? "(no subject)"}
 								</h2>
 							</div>

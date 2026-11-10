@@ -54,7 +54,7 @@ export function MfaPolicyManager() {
 
 	return (
 		<div className="grid items-start gap-6 xl:grid-cols-2">
-			<section className="space-y-5 rounded-3xl bg-white p-6">
+			<section className="space-y-5 rounded-3xl bg-white p-6 max-sm:p-4">
 				<div className="space-y-2">
 					<Label htmlFor="mfa-policy-mode">Enforcement</Label>
 					<select
@@ -89,7 +89,7 @@ export function MfaPolicyManager() {
 			</section>
 
 			{data && (
-				<section className="rounded-3xl bg-white p-6">
+				<section className="rounded-3xl bg-white p-6 max-sm:p-4">
 					<h2 className="text-lg font-semibold text-neutral-900">Coverage</h2>
 					<dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 						{Object.entries(data.counts).map(([label, count]) => (

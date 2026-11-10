@@ -295,9 +295,10 @@ export function TeamCalendarView({ viewerId }: Readonly<{ viewerId: string }>) {
 					<div
 						className={cn(
 							"h-full min-h-0 flex-1",
-							view === "month" && "min-w-[44rem]",
-							view === "week" && "min-w-[56rem]",
-							view === "day" && "min-w-[28rem]",
+							// Phones fit month and day to the screen; week scrolls sideways inside this section.
+							view === "month" && "min-w-[44rem] max-md:min-w-0",
+							view === "week" && "min-w-[56rem] max-md:min-w-[36rem]",
+							view === "day" && "min-w-[28rem] max-md:min-w-0",
 						)}
 					>
 						{view === "month" ? <MonthView {...gridProps} /> : <TimeGridView {...gridProps} />}
@@ -426,7 +427,7 @@ function PeoplePanel({
 							<Button
 								variant="ghost"
 								size="xs"
-								className="mr-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+								className="mr-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
 								aria-label={`Show only ${name}`}
 								onClick={() =>
 									onHiddenChange(

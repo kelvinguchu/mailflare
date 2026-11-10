@@ -15,7 +15,7 @@ export function NavItem({ link }: { link: NavLink }) {
 	const pathname = usePathname();
 	const { openComposer } = useCompose();
 	const { selectedMailbox } = useSelectedMailbox();
-	const { minimal } = useSidebar();
+	const { minimal, closeMobile } = useSidebar();
 	const [dragOver, setDragOver] = useState(false);
 
 	if (!link.href) {
@@ -56,7 +56,10 @@ export function NavItem({ link }: { link: NavLink }) {
 		return (
 			<button
 				type="button"
-				onClick={openComposer}
+				onClick={() => {
+					closeMobile();
+					openComposer();
+				}}
 				className={classes}
 				title={minimal ? link.label : undefined}
 				aria-label={minimal ? link.label : undefined}

@@ -150,7 +150,7 @@ export function InboxRules() {
 						onKeyDown={(event) => onRuleKeyDown(event, rule)}
 						className="group -mx-3 flex cursor-pointer items-center gap-3 rounded-lg px-3 py-3 outline-none transition-colors hover:bg-neutral-50 focus-visible:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-primary/25"
 					>
-						<div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/8 text-primary">
+						<div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/8 text-primary max-md:shrink-0">
 							{rule.action === "spam" ? (
 								<ShieldAlert className="h-4 w-4" />
 							) : rule.action === "trash" ? (
@@ -176,7 +176,7 @@ export function InboxRules() {
 								remove.mutate(rule.id);
 							}}
 							onKeyDown={(event) => event.stopPropagation()}
-							className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+							className="opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 max-md:opacity-100"
 							aria-label="Delete rule"
 						>
 							<Trash2 className="h-4 w-4" />

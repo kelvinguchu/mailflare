@@ -386,7 +386,7 @@ export function SignatureEditor({
 									/>
 									{row.href && (
 										<span
-											className="flex max-w-40 shrink-0 items-center gap-1 truncate text-[11px] text-neutral-400"
+											className="flex max-w-40 shrink-0 items-center gap-1 truncate text-[11px] text-neutral-400 max-sm:max-w-24"
 											title={row.href}
 										>
 											<Link2 className="size-3 shrink-0" aria-hidden="true" />
@@ -856,7 +856,7 @@ export function SignatureImagePicker({
 													),
 												)
 											}
-											className="absolute top-1 right-1 rounded-md bg-white/90 p-1 text-neutral-500 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-red-600 disabled:hidden"
+											className="absolute top-1 right-1 rounded-md bg-white/90 p-1 text-neutral-500 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:text-red-600 disabled:hidden max-md:opacity-100"
 										>
 											<Trash2 className="size-3.5" />
 										</button>

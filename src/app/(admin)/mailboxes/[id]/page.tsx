@@ -83,11 +83,26 @@ export default function MailboxSettingsPage() {
 				title={mailbox.data?.displayName || address || "Mailbox"}
 				actions={
 					<>
-						{mailbox.data?.type === "shared" && <Badge variant="secondary">Shared</Badge>}
-						{mailbox.data?.isPrimary && <Badge variant="secondary">Primary</Badge>}
+						{mailbox.data?.type === "shared" && (
+							<Badge variant="secondary" className="max-sm:hidden">
+								Shared
+							</Badge>
+						)}
+						{mailbox.data?.isPrimary && (
+							<Badge variant="secondary" className="max-sm:hidden">
+								Primary
+							</Badge>
+						)}
 					</>
 				}
 			/>
+			{/* The top bar is too narrow on phones for the badges, so they sit above the content there. */}
+			{(mailbox.data?.type === "shared" || mailbox.data?.isPrimary) && (
+				<div className="flex flex-wrap gap-2 sm:hidden">
+					{mailbox.data?.type === "shared" && <Badge variant="secondary">Shared</Badge>}
+					{mailbox.data?.isPrimary && <Badge variant="secondary">Primary</Badge>}
+				</div>
+			)}
 
 			{mailbox.isError && (
 				<p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -96,7 +111,7 @@ export default function MailboxSettingsPage() {
 			)}
 
 			<div className="grid items-start gap-6 xl:grid-cols-2">
-				<Card className="rounded-3xl border-0 bg-white p-6">
+				<Card className="rounded-3xl border-0 bg-white p-6 max-sm:px-0 max-sm:py-5">
 					<CardHeader className="py-0">
 						<CardTitle>Account</CardTitle>
 					</CardHeader>
@@ -164,7 +179,7 @@ export default function MailboxSettingsPage() {
 				</Card>
 
 				{mailbox.data?.type === "shared" && (
-					<Card className="rounded-3xl border-0 bg-white p-6">
+					<Card className="rounded-3xl border-0 bg-white p-6 max-sm:px-0 max-sm:py-5">
 						<CardHeader className="py-0">
 							<CardTitle>Shared access</CardTitle>
 							<CardDescription>
@@ -208,12 +223,12 @@ export default function MailboxSettingsPage() {
 										: "Failed to load shared access"}
 								</p>
 							)}
-							<div className="flex gap-2">
+							<div className="flex gap-2 max-sm:flex-col">
 								<Select
 									value={selectedUserId}
 									onValueChange={(value) => setSelectedUserId(value as string)}
 								>
-									<SelectTrigger className="min-w-0 flex-1">
+									<SelectTrigger className="min-w-0 flex-1 max-sm:w-full">
 										<SelectValue>
 											{(value) => {
 												const match = (sharedAccess.data?.availableUsers ?? []).find(

@@ -29,7 +29,10 @@ export default function DomainItemCard({
 	const [perDay, setPerDay] = useState(item.dailySendLimit);
 
 	return (
-		<div key={item.id} className="flex flex-col gap-3 rounded-3xl bg-white p-5">
+		<div
+			key={item.id}
+			className="flex flex-col gap-3 rounded-3xl bg-white p-5 max-sm:rounded-2xl max-sm:p-4"
+		>
 			<div className="flex items-start gap-3">
 				<span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-neutral-600">
 					<Globe2 className="h-5 w-5" />
@@ -46,7 +49,7 @@ export default function DomainItemCard({
 						{item.sendingEnabled && <Badge variant="outline">sending</Badge>}
 					</div>
 				</div>
-				<div className="flex gap-2">
+				<div className="flex shrink-0 gap-2">
 					<Button variant="outline" size="sm" onClick={() => loadDns(item.id)}>
 						DNS
 					</Button>
@@ -72,7 +75,7 @@ export default function DomainItemCard({
 						)}
 					</span>
 					{dns.routing.missing.length > 0 && (
-						<span className="text-red-600 flex items-center gap-1">
+						<span className="text-red-600 flex items-center gap-1 max-sm:wrap-anywhere">
 							<X className="h-3 w-3" />
 							Missing: {dns.routing.missing.join(", ")}
 						</span>
@@ -87,7 +90,9 @@ export default function DomainItemCard({
 						)}
 					</span>
 					{dns.sending.records.length > 0 && (
-						<span className="text-neutral-500">{dns.sending.records.join(", ")}</span>
+						<span className="text-neutral-500 max-sm:wrap-anywhere">
+							{dns.sending.records.join(", ")}
+						</span>
 					)}
 					<span className="text-neutral-300">|</span>
 					<span className="text-neutral-500">

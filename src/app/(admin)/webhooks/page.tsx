@@ -133,7 +133,7 @@ export default function WebhooksPage() {
 							{(deliveryData?.deliveries ?? []).map((delivery) => (
 								<div
 									key={delivery.id}
-									className="flex items-center justify-between gap-4 rounded-md border p-3"
+									className="flex items-center justify-between gap-4 rounded-md border p-3 max-sm:flex-wrap max-sm:gap-2"
 								>
 									<div className="min-w-0 text-sm">
 										<p className="truncate font-medium">{delivery.eventType}</p>
@@ -142,7 +142,7 @@ export default function WebhooksPage() {
 											{delivery.attempts === 1 ? "" : "s"}
 											{delivery.lastStatusCode ? ` · HTTP ${delivery.lastStatusCode}` : ""}
 										</p>
-										<p className="text-xs text-muted-foreground">
+										<p className="text-xs text-muted-foreground max-sm:wrap-anywhere">
 											{new Date(delivery.createdAt).toLocaleString()}
 											{delivery.lastError ? ` · ${delivery.lastError}` : ""}
 										</p>
@@ -160,7 +160,7 @@ export default function WebhooksPage() {
 						</CardContent>
 					</Card>
 				) : (
-					<p className="rounded-3xl bg-white p-6 text-sm text-neutral-500">
+					<p className="rounded-3xl bg-white p-6 text-sm text-neutral-500 max-sm:p-4">
 						Select an endpoint to see its delivery history.
 					</p>
 				)}

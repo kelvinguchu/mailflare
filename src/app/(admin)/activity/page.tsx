@@ -17,7 +17,50 @@ export default function ActivityPage() {
 		<div className="space-y-6">
 			<AdminPageHeader title="Activity" />
 
-			<section className="overflow-x-auto rounded-3xl bg-white">
+			<ul className="space-y-2 md:hidden" aria-label="Activity">
+				{activity.isLoading &&
+					Array.from({ length: 5 }, (_, index) => (
+						<li key={index} className="space-y-2 rounded-xl border bg-white p-3.5">
+							<Skeleton className="h-4 w-48" />
+							<Skeleton className="h-3 w-32" />
+						</li>
+					))}
+				{!activity.isLoading && (activity.data ?? []).length === 0 && (
+					<li className="rounded-xl border bg-white p-3.5 text-sm text-neutral-500">
+						No login or logout activity yet
+					</li>
+				)}
+				{(activity.data ?? []).map((log) => {
+					const metadata = getActivityMetadata(log);
+					const Icon = log.action === "auth.logout" ? LogOut : LogIn;
+					return (
+						<li key={log.id} className="rounded-xl border bg-white p-3.5">
+							<div className="flex items-start justify-between gap-3">
+								<p className="min-w-0 truncate text-sm font-medium text-neutral-900 no-font-mono">
+									{log.actorEmail ?? "(unknown email)"}
+								</p>
+								<Badge variant="outline" className="shrink-0 gap-1">
+									<Icon className="h-3 w-3" />
+									{getActivityLabel(log.action)}
+								</Badge>
+							</div>
+							<p className="mt-1 text-xs text-neutral-500">{formatActivityDate(log.createdAt)}</p>
+							<div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500">
+								<span>
+									{metadata.city || "(unknown city)"} • {metadata.country || "(unknown country)"}
+								</span>
+								<span className="max-w-full truncate">{metadata.device ?? "(unknown device)"}</span>
+								<span className="min-w-0 wrap-anywhere">
+									{metadata.platform || "(unknown platform)"} •{" "}
+									{metadata.ipAddress ?? "(unknown IP)"}
+								</span>
+							</div>
+						</li>
+					);
+				})}
+			</ul>
+
+			<section className="hidden overflow-x-auto rounded-3xl bg-white md:block">
 				<table className="w-full min-w-[760px] table-fixed text-left">
 					<thead className="border-b border-neutral-100 bg-neutral-50 text-xs font-semibold uppercase tracking-wide text-neutral-500">
 						<tr>

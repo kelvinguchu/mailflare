@@ -52,7 +52,7 @@ export default function BrandingPage() {
 		<div className="space-y-6">
 			<AdminPageHeader title="Branding" />
 			<div className="grid items-start gap-6 xl:grid-cols-[minmax(0,40rem)_minmax(0,1fr)]">
-				<Card className="rounded-3xl border-0 bg-white p-6">
+				<Card className="rounded-3xl border-0 bg-white p-6 max-sm:px-0 max-sm:py-5">
 					<CardHeader className="py-0">
 						<CardTitle className="flex items-center gap-2">
 							<Palette className="h-5 w-5" />
@@ -99,7 +99,7 @@ export default function BrandingPage() {
 								<button
 									type="button"
 									onClick={() => inputRef.current?.click()}
-									className="flex items-center gap-4 rounded-2xl border border-dashed border-neutral-300 p-4 text-left hover:bg-neutral-50"
+									className="flex items-center gap-4 rounded-2xl border border-dashed border-neutral-300 p-4 text-left hover:bg-neutral-50 max-sm:w-full max-sm:gap-3 max-sm:p-3"
 								>
 									<Image
 										src={preview ?? branding.iconUrl}
@@ -140,11 +140,14 @@ function BrandingPreview({
 	companyName,
 }: Readonly<{ iconUrl: string; appName: string; companyName: string }>) {
 	return (
-		<section aria-label="Preview" className="space-y-3 rounded-3xl bg-white p-6">
+		<section
+			aria-label="Preview"
+			className="space-y-3 rounded-3xl bg-white p-6 max-md:min-w-0 max-sm:p-4"
+		>
 			<h2 className="text-sm font-medium text-neutral-900">Preview</h2>
 			<div className="overflow-hidden rounded-2xl border border-neutral-200">
 				<div className="flex items-center gap-2 border-b border-neutral-200 bg-neutral-100 px-3 py-2">
-					<span className="flex max-w-56 items-center gap-2 rounded-t-lg bg-white px-3 py-1.5 text-xs text-neutral-700">
+					<span className="flex max-w-56 items-center gap-2 max-md:min-w-0 rounded-t-lg bg-white px-3 py-1.5 text-xs text-neutral-700">
 						<Image
 							src={iconUrl}
 							alt=""
@@ -157,7 +160,7 @@ function BrandingPreview({
 					</span>
 				</div>
 				<div className="flex min-h-40 bg-[#f6f8fc]">
-					<div className="w-48 space-y-2 p-3">
+					<div className="w-48 space-y-2 p-3 max-sm:w-32 max-sm:shrink-0">
 						<div className="flex items-center gap-2 px-1 py-1">
 							<Image
 								src={iconUrl}
@@ -173,10 +176,10 @@ function BrandingPreview({
 						<div className="h-3 w-24 rounded bg-neutral-200" />
 						<div className="h-3 w-20 rounded bg-neutral-200" />
 					</div>
-					<div className="mt-3 flex-1 rounded-tl-2xl bg-white p-4">
-						<div className="h-3 w-40 rounded bg-neutral-200" />
-						<div className="mt-3 h-3 w-56 rounded bg-neutral-100" />
-						<div className="mt-3 h-3 w-48 rounded bg-neutral-100" />
+					<div className="mt-3 flex-1 rounded-tl-2xl bg-white p-4 max-md:min-w-0 max-sm:p-3">
+						<div className="h-3 w-40 rounded bg-neutral-200 max-sm:max-w-full" />
+						<div className="mt-3 h-3 w-56 rounded bg-neutral-100 max-sm:max-w-full" />
+						<div className="mt-3 h-3 w-48 rounded bg-neutral-100 max-sm:max-w-full" />
 					</div>
 				</div>
 			</div>

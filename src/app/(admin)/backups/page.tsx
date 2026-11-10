@@ -138,14 +138,18 @@ export default function BackupsPage() {
 								onClick={() => restoreInput.current?.click()}
 							>
 								<Upload className="h-4 w-4" />
-								{restore.isPending ? "Restoring..." : "Restore"}
+								<span className="max-sm:sr-only">
+									{restore.isPending ? "Restoring..." : "Restore"}
+								</span>
 							</Button>
 							<Button
 								onClick={() => runBackup.mutate()}
 								disabled={runBackup.isPending || !backupConfigured}
 							>
 								<Play className="h-4 w-4" />
-								{runBackup.isPending ? "Starting..." : "Back up now"}
+								<span className="max-sm:sr-only">
+									{runBackup.isPending ? "Starting..." : "Back up now"}
+								</span>
 							</Button>
 						</div>
 					</>
@@ -159,7 +163,7 @@ export default function BackupsPage() {
 			)}
 
 			{configuration && !configuration.configured && (
-				<Card className="rounded-3xl border border-amber-200 bg-amber-50 p-6">
+				<Card className="rounded-3xl border border-amber-200 bg-amber-50 p-6 max-sm:px-0 max-sm:py-5">
 					<CardHeader className="py-0">
 						<div className="flex items-start gap-3">
 							<AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
@@ -187,7 +191,7 @@ export default function BackupsPage() {
 								type="button"
 								size="sm"
 								variant="outline"
-								className="ml-auto border-amber-300 bg-white/70"
+								className="ml-auto border-amber-300 bg-white/70 max-sm:ml-0"
 								disabled={backups.isFetching}
 								onClick={() => void backups.refetch()}
 							>
@@ -199,7 +203,7 @@ export default function BackupsPage() {
 				</Card>
 			)}
 
-			<Card className="rounded-3xl border-0 bg-white p-6">
+			<Card className="rounded-3xl border-0 bg-white p-6 max-sm:px-0 max-sm:py-5">
 				<CardHeader className="py-0">
 					<CardTitle>Automatic backup</CardTitle>
 					<CardDescription>
@@ -351,7 +355,7 @@ export default function BackupsPage() {
 					<DatabaseBackup className="h-5 w-5 text-neutral-500" />
 					<h2 className="font-semibold text-neutral-900">Backup history</h2>
 				</div>
-				<div className="grid grid-cols-[1fr_110px_110px_170px_120px] gap-4 border-b border-neutral-100 bg-neutral-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+				<div className="hidden grid-cols-[1fr_110px_110px_170px_120px] gap-4 border-b border-neutral-100 bg-neutral-50 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 md:grid">
 					<span>File</span>
 					<span>Status</span>
 					<span>Size</span>
@@ -362,25 +366,8 @@ export default function BackupsPage() {
 				{!backups.isLoading && (backups.data?.backups ?? []).length === 0 && (
 					<p className="px-4 py-6 text-sm text-neutral-500">No backups yet.</p>
 				)}
-				{(backups.data?.backups ?? []).map((backup: BackupItem) => (
-					<div
-						key={backup.id}
-						className="grid grid-cols-[1fr_110px_110px_170px_120px] items-center gap-4 border-b border-neutral-100 px-4 py-3 last:border-b-0"
-					>
-						<div className="min-w-0">
-							<p className="truncate text-sm font-medium text-neutral-900">
-								{backup.filename ?? backup.id}
-							</p>
-							<p className="truncate text-xs text-neutral-500">
-								{backup.trigger === "manual" ? "Manual" : "Scheduled"}
-								{backup.error ? `: ${backup.error}` : ""}
-							</p>
-						</div>
-						<Badge variant="outline" className={getStatusClass(backup.status)}>
-							{backup.status}
-						</Badge>
-						<span className="text-sm text-neutral-600">{formatBackupSize(backup.size)}</span>
-						<span className="text-sm text-neutral-600">{formatBackupDate(backup.createdAt)}</span>
+				{(backups.data?.backups ?? []).map((backup: BackupItem) => {
+					const actions = (
 						<div className="flex gap-1">
 							<Button
 								size="sm"
@@ -405,8 +392,52 @@ export default function BackupsPage() {
 								<Trash2 className="h-4 w-4 text-red-600" />
 							</Button>
 						</div>
-					</div>
-				))}
+					);
+					return (
+						<div key={backup.id} className="border-b border-neutral-100 last:border-b-0">
+							<div className="flex items-start gap-3 px-4 py-3.5 md:hidden">
+								<div className="min-w-0 flex-1">
+									<div className="flex items-start justify-between gap-2">
+										<p className="min-w-0 truncate text-sm font-medium text-neutral-900">
+											{backup.filename ?? backup.id}
+										</p>
+										<Badge variant="outline" className={getStatusClass(backup.status)}>
+											{backup.status}
+										</Badge>
+									</div>
+									<div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500">
+										<span>{backup.trigger === "manual" ? "Manual" : "Scheduled"}</span>
+										<span>{formatBackupSize(backup.size)}</span>
+										<span>{formatBackupDate(backup.createdAt)}</span>
+									</div>
+									{backup.error && (
+										<p className="mt-1 text-xs wrap-anywhere text-red-600">{backup.error}</p>
+									)}
+								</div>
+								<div className="shrink-0">{actions}</div>
+							</div>
+							<div className="hidden grid-cols-[1fr_110px_110px_170px_120px] items-center gap-4 px-4 py-3 md:grid">
+								<div className="min-w-0">
+									<p className="truncate text-sm font-medium text-neutral-900">
+										{backup.filename ?? backup.id}
+									</p>
+									<p className="truncate text-xs text-neutral-500">
+										{backup.trigger === "manual" ? "Manual" : "Scheduled"}
+										{backup.error ? `: ${backup.error}` : ""}
+									</p>
+								</div>
+								<Badge variant="outline" className={getStatusClass(backup.status)}>
+									{backup.status}
+								</Badge>
+								<span className="text-sm text-neutral-600">{formatBackupSize(backup.size)}</span>
+								<span className="text-sm text-neutral-600">
+									{formatBackupDate(backup.createdAt)}
+								</span>
+								{actions}
+							</div>
+						</div>
+					);
+				})}
 			</section>
 		</div>
 	);

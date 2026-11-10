@@ -116,7 +116,7 @@ export function MailboxAutoReplyForm() {
 					disabled={!canManage || saving}
 				/>
 			</div>
-			<div className="flex items-center gap-3">
+			<div className="flex items-center gap-3 max-sm:flex-wrap">
 				<Button type="submit" disabled={!canManage || saving || !changed}>
 					{saving ? "Saving..." : "Save auto-reply"}
 				</Button>

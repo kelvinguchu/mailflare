@@ -90,16 +90,32 @@ describe("accessibility and responsive route contracts", () => {
 		expect(settingsNav).toContain("overflow-x-auto");
 		expect(settingsNav).toContain("lg:w-64");
 		expect(calendar).toContain("aria-busy=");
-		expect(calendar).toContain('view === "month" && "min-w-[44rem]"');
-		expect(calendar).toContain('view === "week" && "min-w-[56rem]"');
-		expect(calendar).toContain('view === "day" && "min-w-[28rem]"');
+		// Desktop keeps its minimum grid widths; phones fit month and day to the screen and let
+		// week scroll inside its own section.
+		expect(calendar).toContain('view === "month" && "min-w-[44rem] max-md:min-w-0"');
+		expect(calendar).toContain('view === "week" && "min-w-[56rem] max-md:min-w-[36rem]"');
+		expect(calendar).toContain('view === "day" && "min-w-[28rem] max-md:min-w-0"');
 	});
 
-	it("defaults navigation to a compact rail without changing the desktop preference", () => {
+	it("turns navigation into a drawer on phones without changing the desktop preference", () => {
 		const sidebar = source("src/components/sidebar-state.tsx");
 		expect(sidebar).toContain('window.matchMedia("(max-width: 767px)")');
-		expect(sidebar).toContain("const minimal = narrow ? !narrowExpanded : desktopMinimal");
+		expect(sidebar).toContain("const minimal = narrow ? false : desktopMinimal");
+		expect(sidebar).toContain("const mobileOpen = narrow && narrowExpanded");
 		expect(sidebar).toContain("localStorage.setItem(storageKey, String(next))");
+
+		const drawer = source("src/components/app-sidebar.tsx");
+		expect(drawer).toContain('!mobileOpen && "max-md:invisible max-md:-translate-x-full"');
+		expect(drawer).toContain('aria-controls="primary-navigation"');
+		for (const layout of [
+			"src/app/(dashboard)/layout.tsx",
+			"src/app/(settings)/layout.tsx",
+			"src/app/(admin)/layout.tsx",
+		]) {
+			const text = source(layout);
+			expect(text).toContain("md:grid-cols-[var(--sidebar-width)_minmax(0,1fr)]");
+			expect(text).toContain("<MobileNavButton />");
+		}
 	});
 
 	it("announces page loading from the content area instead of a top progress bar", () => {

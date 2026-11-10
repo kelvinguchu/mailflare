@@ -260,6 +260,12 @@ export function ExpandedConversationMessage({
 							</span>
 						)}
 					</p>
+					<time
+						dateTime={message.createdAt}
+						className="block text-xs whitespace-nowrap text-neutral-500 sm:hidden"
+					>
+						{formatConversationDate(message.createdAt)}
+					</time>
 				</div>
 				<div className="flex shrink-0 items-center gap-0.5">
 					{collapsible && (
@@ -399,9 +405,14 @@ export function ExpandedConversationMessage({
 				{loadError && !data ? (
 					<p className="text-sm text-red-600">This message couldn’t be loaded.</p>
 				) : (
-					<div className="prose max-w-none text-neutral-900">
+					<div className="prose max-w-none text-neutral-900 max-md:min-w-0 max-md:[overflow-wrap:anywhere]">
 						{sanitizedHtml.html ? (
-							<div dangerouslySetInnerHTML={{ __html: sanitizedHtml.html }} />
+							// On phones, fixed-width newsletter layouts scroll inside the body instead of
+							// widening the whole reading pane, and images shrink to fit.
+							<div
+								className="max-md:overflow-x-auto max-md:[&_img]:h-auto max-md:[&_img]:max-w-full"
+								dangerouslySetInnerHTML={{ __html: sanitizedHtml.html }}
+							/>
 						) : (
 							<pre className="font-sans text-sm whitespace-pre-wrap">
 								{data ? cloudAttachments.content : message.snippet}

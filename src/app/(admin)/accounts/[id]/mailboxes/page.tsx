@@ -79,12 +79,12 @@ export default function AccountMailboxesPage() {
 	return (
 		<div className="space-y-6">
 			<AdminPageHeader title={account?.name ?? "Account"} />
-			<section className="space-y-4 rounded-3xl bg-white p-6">
+			<section className="space-y-4 rounded-3xl bg-white p-6 max-sm:p-4">
 				<div className="space-y-2">
 					{mailboxes.map((mailbox) => (
 						<div
 							key={mailbox.id}
-							className="flex items-center justify-between rounded-2xl bg-neutral-50 px-4 py-3"
+							className="flex items-center justify-between rounded-2xl bg-neutral-50 px-4 py-3 max-sm:gap-2 max-sm:px-3"
 						>
 							<span className="min-w-0">
 								<span className="block truncate font-medium">
@@ -109,15 +109,16 @@ export default function AccountMailboxesPage() {
 						<p className="text-sm text-neutral-500">No mailboxes yet.</p>
 					)}
 				</div>
-				<form onSubmit={addMailbox} className="flex gap-2">
+				<form onSubmit={addMailbox} className="flex gap-2 max-sm:flex-wrap">
 					<Input
 						value={localPart}
 						onChange={(event) => setLocalPart(event.target.value)}
 						placeholder="inbox"
 						required
+						className="max-sm:basis-full"
 					/>
 					<Select value={domainId} onValueChange={(value) => setDomainId(value as string)}>
-						<SelectTrigger aria-label="Domain">
+						<SelectTrigger aria-label="Domain" className="max-sm:min-w-0 max-sm:flex-1">
 							<SelectValue>
 								{(value) => {
 									const match = domains.find((domain) => domain.id === value);

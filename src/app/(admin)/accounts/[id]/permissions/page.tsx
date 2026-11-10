@@ -36,10 +36,58 @@ export default function AccountPermissionsPage() {
 		}
 	}
 
+	const permissions = [
+		{
+			key: "admin",
+			label: "Administrator access",
+			description: "Access administration pages and manage workspace settings.",
+			ariaLabel: "Allow administrator access",
+			checked: account?.role === "admin",
+			onChange: (checked: boolean) =>
+				account && setAccount({ ...account, role: checked ? "admin" : "user" }),
+		},
+		{
+			key: "mailboxes",
+			label: "Manage mailboxes",
+			description: "Allow this account to add and remove its own inboxes.",
+			ariaLabel: "Allow mailbox management",
+			checked: account?.canManageMailboxes ?? false,
+			onChange: (checked: boolean) =>
+				account && setAccount({ ...account, canManageMailboxes: checked }),
+		},
+	];
+
 	return (
 		<div className="space-y-6">
 			<AdminPageHeader title={account?.name ?? "Account"} />
-			<div className="overflow-hidden rounded-3xl bg-white">
+			<ul className="space-y-2 md:hidden">
+				{permissions.map((permission) => (
+					<li key={permission.key}>
+						<label
+							htmlFor={`permission-${permission.key}-card`}
+							className="flex items-start gap-3 rounded-xl border bg-white p-3.5"
+						>
+							<span className="min-w-0 flex-1">
+								<span className="block text-sm font-semibold text-neutral-900">
+									{permission.label}
+								</span>
+								<span className="mt-1 block text-xs text-neutral-500">
+									{permission.description}
+								</span>
+							</span>
+							<Checkbox
+								id={`permission-${permission.key}-card`}
+								aria-label={permission.ariaLabel}
+								checked={permission.checked}
+								disabled={!account}
+								onChange={(event) => permission.onChange(event.target.checked)}
+								className="mt-0.5 shrink-0"
+							/>
+						</label>
+					</li>
+				))}
+			</ul>
+			<div className="hidden overflow-hidden rounded-3xl bg-white md:block">
 				<table className="w-full text-left">
 					<thead className="border-b border-neutral-100 bg-neutral-50 text-xs font-semibold uppercase tracking-wide text-neutral-500">
 						<tr>

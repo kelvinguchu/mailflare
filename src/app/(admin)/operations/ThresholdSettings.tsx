@@ -84,7 +84,7 @@ export function ThresholdSettings({
 	return (
 		<Collapsible open={open} onOpenChange={setOpen}>
 			<section className="rounded-2xl bg-white" aria-labelledby="thresholds-heading">
-				<CollapsibleTrigger className="flex w-full items-center justify-between gap-4 rounded-2xl px-5 py-4 text-left outline-none hover:bg-neutral-50/70 focus-visible:ring-2 focus-visible:ring-primary/30">
+				<CollapsibleTrigger className="flex w-full items-center justify-between gap-4 rounded-2xl px-5 py-4 max-sm:gap-3 max-sm:px-4 text-left outline-none hover:bg-neutral-50/70 focus-visible:ring-2 focus-visible:ring-primary/30">
 					<span className="min-w-0">
 						<span
 							id="thresholds-heading"
@@ -113,8 +113,8 @@ export function ThresholdSettings({
 						}}
 					>
 						<div className="overflow-x-auto border-t border-neutral-100">
-							<table className="w-full min-w-[36rem] text-sm">
-								<thead>
+							<table className="w-full text-sm max-md:block md:min-w-[36rem]">
+								<thead className="max-md:hidden">
 									<tr className="border-b border-neutral-100 text-left text-xs text-neutral-500">
 										<th scope="col" className="px-5 py-2 font-normal">
 											Metric
@@ -128,12 +128,12 @@ export function ThresholdSettings({
 									</tr>
 								</thead>
 								{GROUPS.map((group) => (
-									<tbody key={group} className="divide-y divide-neutral-100">
-										<tr>
+									<tbody key={group} className="divide-y divide-neutral-100 max-md:block">
+										<tr className="max-md:block">
 											<th
 												colSpan={3}
 												scope="colgroup"
-												className="bg-neutral-50/80 px-5 py-1.5 text-left text-[11px] font-medium tracking-wide text-neutral-500 uppercase"
+												className="bg-neutral-50/80 px-5 py-1.5 text-left text-[11px] font-medium tracking-wide text-neutral-500 uppercase max-md:block max-md:px-4"
 											>
 												{group}
 											</th>
@@ -143,8 +143,14 @@ export function ThresholdSettings({
 											const over = isOverThreshold(field, current, saved[field.field]);
 											const error = errors[field.field];
 											return (
-												<tr key={field.field}>
-													<th scope="row" className="px-5 py-2 text-left font-normal">
+												<tr
+													key={field.field}
+													className="max-md:grid max-md:grid-cols-[minmax(0,1fr)_auto] max-md:items-start max-md:gap-x-3 max-md:gap-y-2 max-md:px-4 max-md:py-3"
+												>
+													<th
+														scope="row"
+														className="px-5 py-2 text-left font-normal max-md:col-span-2 max-md:p-0"
+													>
 														<label
 															htmlFor={`threshold-${field.field}`}
 															className="text-neutral-900"
@@ -157,13 +163,14 @@ export function ThresholdSettings({
 													</th>
 													<td
 														className={cn(
-															"px-5 py-2 text-right whitespace-nowrap tabular-nums",
+															"px-5 py-2 text-right whitespace-nowrap tabular-nums max-md:order-last max-md:self-center max-md:p-0 max-md:text-xs",
 															over ? "font-medium text-red-700" : "text-neutral-600",
 														)}
 													>
+														<span className="md:hidden">Now </span>
 														{formatCurrent(field, current)}
 													</td>
-													<td className="px-5 py-2">
+													<td className="px-5 py-2 max-md:p-0">
 														<div className="flex items-center gap-2">
 															<Input
 																id={`threshold-${field.field}`}
@@ -208,7 +215,7 @@ export function ThresholdSettings({
 						</div>
 
 						{needsIdentity && (
-							<div className="border-t border-neutral-100 bg-neutral-50/70 px-5 py-4">
+							<div className="border-t border-neutral-100 bg-neutral-50/70 px-5 py-4 max-sm:px-4">
 								<p className="flex items-center gap-2 text-sm font-medium text-neutral-900">
 									<ShieldCheck className="size-4 text-primary" aria-hidden="true" />
 									Confirm it’s you to change alert thresholds
@@ -245,7 +252,7 @@ export function ThresholdSettings({
 							</div>
 						)}
 
-						<div className="flex flex-wrap items-center justify-end gap-2 border-t border-neutral-100 px-5 py-3">
+						<div className="flex flex-wrap items-center justify-end gap-2 border-t border-neutral-100 px-5 py-3 max-sm:px-4">
 							{saveError && (
 								<p role="alert" className="mr-auto text-sm text-red-700">
 									{saveError}

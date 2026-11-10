@@ -30,11 +30,11 @@ export function AdminPageHeader({
 	if (!slot || !mounted) return null;
 
 	return createPortal(
-		<div className="flex min-w-0 flex-1 items-center gap-4">
-			<h1 className="min-w-0 flex-1 truncate text-[22px] leading-tight font-normal text-neutral-900">
+		<div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
+			<h1 className="min-w-0 flex-1 truncate text-lg leading-tight font-normal text-neutral-900 sm:text-[22px]">
 				{title}
 			</h1>
-			{actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+			{actions && <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">{actions}</div>}
 		</div>,
 		slot,
 	);

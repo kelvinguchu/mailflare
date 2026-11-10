@@ -83,7 +83,10 @@ export function SessionManagement() {
 				{recentSignIns.map((signIn) => {
 					const location = [signIn.city, signIn.country].filter(Boolean).join(", ");
 					return (
-						<div key={signIn.id} className="rounded-2xl border border-neutral-100 p-4 text-sm">
+						<div
+							key={signIn.id}
+							className="rounded-2xl border border-neutral-100 p-4 text-sm max-sm:p-3.5 max-sm:wrap-anywhere"
+						>
 							<p className="font-medium text-neutral-900">
 								{signIn.device} · {signIn.platform}
 							</p>

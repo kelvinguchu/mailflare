@@ -136,7 +136,7 @@ export default function MailboxesPage() {
 							<DialogTrigger asChild>
 								<Button>
 									<Plus className="h-4 w-4" />
-									New mailbox
+									<span className="max-sm:sr-only">New mailbox</span>
 								</Button>
 							</DialogTrigger>
 							<DialogContent>
@@ -225,7 +225,7 @@ export default function MailboxesPage() {
 													<SelectTrigger
 														aria-label="Domain"
 														size="sm"
-														className="h-7 max-w-56 rounded-sm border-0 bg-transparent px-1.5 font-normal shadow-none hover:bg-muted hover:text-foreground focus-visible:ring-0"
+														className="h-7 max-w-36 rounded-sm border-0 bg-transparent px-1.5 font-normal shadow-none hover:bg-muted hover:text-foreground focus-visible:ring-0 sm:max-w-56"
 													>
 														<SelectValue>
 															{(value) => {
@@ -291,7 +291,7 @@ export default function MailboxesPage() {
 							<Link
 								key={mailbox.id}
 								href={`/mailboxes/${mailbox.id}`}
-								className="group flex items-start gap-4 rounded-3xl bg-white p-5 transition-colors hover:bg-primary/5"
+								className="group flex items-start gap-4 rounded-3xl bg-white p-5 transition-colors hover:bg-primary/5 max-sm:gap-3 max-sm:rounded-2xl max-sm:p-4"
 							>
 								<span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/12 text-sm font-semibold text-primary">
 									{getMailboxName(mailboxWithHostname).trim().charAt(0).toUpperCase() || "?"}

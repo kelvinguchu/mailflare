@@ -128,6 +128,7 @@ function BlockBookingForm({ initialDate, onClose }: { initialDate: Date; onClose
 
 	return (
 		<form
+			className="flex min-h-0 flex-1 flex-col"
 			onSubmit={(event) => {
 				event.preventDefault();
 				block.mutate();

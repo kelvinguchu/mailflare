@@ -26,9 +26,12 @@ export function BulkMessageToolbar({
 }: BulkMessageToolbarProps) {
 	const [folderDialogOpen, setFolderDialogOpen] = useState(false);
 	return (
-		<div className="flex min-w-0 items-center gap-2 text-neutral-600 w-full">
+		<div className="flex min-w-0 items-center gap-1 text-neutral-600 w-full sm:gap-2">
 			{!hideSelectedCount && (
-				<span className="mr-2 text-sm font-medium text-neutral-800">{selectedCount} selected</span>
+				<span className="mr-1 text-sm font-medium whitespace-nowrap text-neutral-800 sm:mr-2">
+					{selectedCount}
+					<span className="max-sm:sr-only"> selected</span>
+				</span>
 			)}
 			<Tooltip label="Archive">
 				<Button

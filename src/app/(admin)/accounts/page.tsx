@@ -213,7 +213,7 @@ export default function AccountsPage() {
 					<>
 						<Button onClick={() => setCreateOpen(true)}>
 							<Plus className="h-4 w-4" />
-							New account
+							<span className="max-sm:sr-only">New account</span>
 						</Button>
 					</>
 				}
@@ -230,7 +230,7 @@ export default function AccountsPage() {
 						<Link
 							key={account.id}
 							href={`/accounts/${account.id}`}
-							className="flex items-center gap-4 rounded-3xl bg-white p-5 transition-colors hover:bg-primary/5"
+							className="flex items-center gap-4 rounded-3xl bg-white p-5 transition-colors hover:bg-primary/5 max-sm:gap-3 max-sm:rounded-2xl max-sm:p-4"
 						>
 							<span className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/12 font-semibold text-primary">
 								{account.name.charAt(0).toUpperCase()}
@@ -245,9 +245,11 @@ export default function AccountsPage() {
 									/>
 								)}
 							</span>
-							<span className="min-w-0">
-								<span className="flex flex-wrap items-center gap-2">
-									<span className="truncate font-semibold text-neutral-900">{account.name}</span>
+							<span className="min-w-0 max-sm:flex-1">
+								<span className="flex flex-wrap items-center gap-2 max-sm:gap-1.5">
+									<span className="truncate font-semibold text-neutral-900 max-sm:w-full">
+										{account.name}
+									</span>
 									<span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium capitalize text-neutral-600">
 										{account.role}
 									</span>
@@ -298,7 +300,7 @@ export default function AccountsPage() {
 												aria-label="Domain"
 												aria-invalid={!!fieldErrors.domainId}
 												size="sm"
-												className="h-7 max-w-56 rounded-sm border-0 bg-transparent px-1.5 font-normal shadow-none hover:bg-muted hover:text-foreground focus-visible:ring-0"
+												className="h-7 max-w-36 rounded-sm border-0 bg-transparent px-1.5 font-normal shadow-none hover:bg-muted hover:text-foreground focus-visible:ring-0 sm:max-w-56"
 											>
 												<SelectValue>
 													{(value) => {

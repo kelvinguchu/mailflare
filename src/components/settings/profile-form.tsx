@@ -117,7 +117,7 @@ export function ProfileForm({
 					placeholder="recovery@example.com"
 				/>
 			</div>
-			<div className="flex items-center gap-3">
+			<div className="flex items-center gap-3 max-sm:flex-wrap">
 				<Button type="submit" disabled={loading || !hasChanges}>
 					{loading ? "Saving..." : "Save"}
 				</Button>

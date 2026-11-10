@@ -59,7 +59,7 @@ export default function SenderPoliciesPage() {
 	return (
 		<div className="space-y-6">
 			<AdminPageHeader title="Sender policies" />
-			<section className="space-y-4 rounded-3xl bg-white p-6">
+			<section className="space-y-4 rounded-3xl bg-white p-6 max-sm:p-4">
 				<div className="grid gap-4 sm:grid-cols-3">
 					<label className="space-y-2">
 						<Label>Match</Label>
@@ -98,7 +98,39 @@ export default function SenderPoliciesPage() {
 				</Button>
 				{error && <p className="text-sm text-red-600">{error}</p>}
 			</section>
-			<section className="space-y-2">
+			<ul className="space-y-2 md:hidden" aria-label="Sender policies">
+				{policies.map((policy) => (
+					<li
+						key={policy.id}
+						className="flex items-start justify-between gap-3 rounded-xl border bg-white p-3.5 text-sm"
+					>
+						<div className="min-w-0 flex-1">
+							<p className="font-medium wrap-anywhere text-neutral-900">{policy.pattern}</p>
+							<div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500">
+								<span
+									className={
+										policy.action === "block"
+											? "font-semibold text-red-700"
+											: "font-semibold text-green-700"
+									}
+								>
+									{policy.action}
+								</span>
+								<span>{policy.patternType}</span>
+							</div>
+						</div>
+						<Button
+							variant="outline"
+							size="sm"
+							className="shrink-0"
+							onClick={() => void remove(policy.id)}
+						>
+							Remove
+						</Button>
+					</li>
+				))}
+			</ul>
+			<section className="hidden space-y-2 md:block">
 				{policies.map((policy) => (
 					<div
 						key={policy.id}

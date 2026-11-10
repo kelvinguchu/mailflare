@@ -51,7 +51,7 @@ export function NotificationsMenu() {
 				</button>
 			</Tooltip>
 			{open && (
-				<div className="absolute top-12 right-0 z-50 flex max-h-[min(560px,calc(100dvh-5rem))] w-[min(400px,calc(100vw-16px))] flex-col overflow-hidden rounded-3xl border border-neutral-200 bg-white pb-1 shadow-2xl shadow-neutral-900/20">
+				<div className="absolute top-12 right-0 z-50 flex max-h-[min(560px,calc(100dvh-5rem))] w-[min(400px,calc(100vw-16px))] flex-col overflow-hidden rounded-3xl border border-neutral-200 bg-white pb-1 shadow-2xl shadow-neutral-900/20 max-sm:fixed max-sm:inset-x-2 max-sm:top-16 max-sm:w-auto">
 					<AccountActivityPanel
 						activity={activity}
 						onNavigate={() => setOpen(false)}
