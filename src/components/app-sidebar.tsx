@@ -1,52 +1,49 @@
 "use client";
 
 import { Menu } from "lucide-react";
-import { useEffect, useRef } from "react";
-import { cn } from "@/lib/utils";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useSidebar } from "./sidebar-state";
 import type { AppSidebarProps } from "./sidebar-state-types";
 
 /**
- * The app's navigation column. From 768px up it is the grid's first column, exactly as before;
- * below that it is a drawer over the content with a dimmed backdrop.
+ * The app's navigation. From 768px up it is the grid's first column, exactly as before; below
+ * that it opens from the header as a left-hand sheet. Only one copy of the navigation is mounted
+ * at a time, so its data loads and its element ids stay unique.
  */
 export function AppSidebar({ label, children }: AppSidebarProps) {
-	const { mobileOpen, closeMobile } = useSidebar();
-	const asideRef = useRef<HTMLElement>(null);
-
-	useEffect(() => {
-		if (mobileOpen) asideRef.current?.focus();
-	}, [mobileOpen]);
+	const { narrow, mobileOpen, closeMobile } = useSidebar();
 
 	return (
 		<>
-			<button
-				type="button"
-				tabIndex={-1}
-				aria-label="Close navigation"
-				onClick={closeMobile}
-				className={cn(
-					"fixed inset-0 z-40 bg-neutral-950/40 transition-opacity duration-200 motion-reduce:transition-none md:hidden",
-					mobileOpen ? "opacity-100" : "pointer-events-none opacity-0",
-				)}
-			/>
 			<aside
-				ref={asideRef}
 				aria-label={label}
-				tabIndex={-1}
-				className={cn(
-					"min-h-0 overflow-y-auto overscroll-contain px-3 py-4 outline-none scrollbar-gutter-stable",
-					"max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:w-72 max-md:max-w-[85vw] max-md:bg-[#f6f8fc] max-md:pb-[calc(1rem+env(safe-area-inset-bottom))] max-md:shadow-xl max-md:transition-[transform,visibility] max-md:duration-200 max-md:motion-reduce:transition-none",
-					!mobileOpen && "max-md:invisible max-md:-translate-x-full",
-				)}
+				className="min-h-0 overflow-y-auto overscroll-contain px-3 py-4 scrollbar-gutter-stable max-md:hidden"
 			>
-				{children}
+				{!narrow && children}
 			</aside>
+			{narrow && (
+				<Sheet
+					open={mobileOpen}
+					onOpenChange={(open) => {
+						if (!open) closeMobile();
+					}}
+				>
+					<SheetContent
+						side="left"
+						showCloseButton={false}
+						aria-label={label}
+						className="gap-0 overflow-y-auto overscroll-contain bg-[#f6f8fc] px-3 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] data-[side=left]:w-72 data-[side=left]:max-w-[85vw]"
+					>
+						<SheetTitle className="sr-only">{label}</SheetTitle>
+						{children}
+					</SheetContent>
+				</Sheet>
+			)}
 		</>
 	);
 }
 
-/** Opens the navigation drawer; only shown below 768px, where the sidebar is hidden. */
+/** Opens the navigation sheet; only shown below 768px, where the sidebar column is hidden. */
 export function MobileNavButton() {
 	const { mobileOpen, toggle } = useSidebar();
 	return (
@@ -55,7 +52,7 @@ export function MobileNavButton() {
 			onClick={toggle}
 			aria-label="Open navigation"
 			aria-expanded={mobileOpen}
-			aria-controls="primary-navigation"
+			aria-haspopup="dialog"
 			className="flex size-10 shrink-0 items-center justify-center rounded-full text-neutral-600 hover:bg-neutral-200 focus-visible:ring-2 focus-visible:ring-primary/40 md:hidden"
 		>
 			<Menu aria-hidden="true" className="size-5" />

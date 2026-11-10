@@ -132,6 +132,8 @@ const APP_FONT_FALLBACK = "var(--font-geist-sans), system-ui, sans-serif";
 export interface SanitizedEmailHtml {
 	html: string | null;
 	blockedRemoteImageCount: number;
+	/** Remote images in the message, whether or not they were allowed to load. */
+	remoteImageCount: number;
 }
 
 export interface SanitizeEmailHtmlOptions {
@@ -195,7 +197,7 @@ function sanitizeStyle(element: HTMLElement): void {
 function sanitizeElement(
 	element: Element,
 	options: SanitizeEmailHtmlOptions,
-	onRemoteImageBlocked: () => void,
+	onRemoteImage: (blocked: boolean) => void,
 ): void {
 	const tag = element.tagName.toLowerCase();
 	if (!ALLOWED_TAGS.has(tag)) {
@@ -229,8 +231,8 @@ function sanitizeElement(
 	if (tag === "img") {
 		const src = element.getAttribute("src");
 		const sourceKind = src ? classifyImageUrl(src, !!options.inspection) : "unsafe";
+		if (sourceKind === "remote") onRemoteImage(!options.allowRemoteImages);
 		if (sourceKind === "remote" && !options.allowRemoteImages) {
-			onRemoteImageBlocked();
 			element.remove();
 			return;
 		}
@@ -247,18 +249,20 @@ export function sanitizeEmailHtml(
 	html: string | null,
 	options: SanitizeEmailHtmlOptions = {},
 ): SanitizedEmailHtml {
-	if (!html) return { html: null, blockedRemoteImageCount: 0 };
+	if (!html) return { html: null, blockedRemoteImageCount: 0, remoteImageCount: 0 };
 
 	// Template contents are inert: parsing untrusted email HTML here does not fetch
 	// image/CSS resources before the sanitizer has removed them.
 	const template = document.createElement("template");
 	template.innerHTML = html;
 	let blockedRemoteImageCount = 0;
+	let remoteImageCount = 0;
 	for (const element of Array.from(template.content.querySelectorAll("*"))) {
 		if (!template.content.contains(element)) continue;
-		sanitizeElement(element, options, () => {
-			blockedRemoteImageCount += 1;
+		sanitizeElement(element, options, (blocked) => {
+			remoteImageCount += 1;
+			if (blocked) blockedRemoteImageCount += 1;
 		});
 	}
-	return { html: template.innerHTML, blockedRemoteImageCount };
+	return { html: template.innerHTML, blockedRemoteImageCount, remoteImageCount };
 }

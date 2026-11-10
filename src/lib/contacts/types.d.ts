@@ -16,6 +16,12 @@ export type BlockContactInput = {
 	address: string;
 };
 
+export type RemoteImagesInput = {
+	userId: string;
+	address: string;
+	allowed: boolean;
+};
+
 export type MessageContactNames = {
 	fromContactName: string | null;
 	toContactName: string | null;

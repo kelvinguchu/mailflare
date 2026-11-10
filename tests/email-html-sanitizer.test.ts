@@ -41,6 +41,7 @@ describe("email HTML sanitizer", () => {
 		);
 
 		expect(result.blockedRemoteImageCount).toBe(2);
+		expect(result.remoteImageCount).toBe(2);
 		expect(parseFragment(result.html).querySelectorAll("img")).toHaveLength(0);
 		await new Promise((resolve) => setTimeout(resolve, 0));
 		expect(resourceLoader.requests).toEqual([]);
@@ -54,6 +55,8 @@ describe("email HTML sanitizer", () => {
 		const image = parseFragment(result.html).querySelector("img");
 
 		expect(result.blockedRemoteImageCount).toBe(0);
+		// Still counted, so the reader can offer to stop trusting the sender.
+		expect(result.remoteImageCount).toBe(1);
 		expect(image?.getAttribute("src")).toBe("https://images.example/news.png");
 		expect(image?.getAttribute("loading")).toBe("lazy");
 		expect(image?.getAttribute("referrerpolicy")).toBe("no-referrer");

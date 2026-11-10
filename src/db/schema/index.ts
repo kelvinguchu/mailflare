@@ -215,6 +215,8 @@ export const contacts = sqliteTable(
 			.notNull()
 			.default("inbound"),
 		blocked: integer("blocked", { mode: "boolean" }).notNull().default(false),
+		/** The owner chose to always load remote images in this sender's mail. */
+		allowRemoteImages: integer("allow_remote_images", { mode: "boolean" }).notNull().default(false),
 		lastSeenAt: integer("last_seen_at", { mode: "timestamp" }),
 		createdAt: integer("created_at", { mode: "timestamp" })
 			.notNull()

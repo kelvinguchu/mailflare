@@ -51,6 +51,7 @@ const MIGRATION_NAMES = [
 	"0049_add_calendar_imports.sql",
 	"0050_add_team_inbox_retention.sql",
 	"0051_add_task_recurrence.sql",
+	"0052_add_contact_remote_images.sql",
 ];
 
 const RETENTION_SCHEMA_STATEMENTS = [
@@ -248,7 +249,7 @@ CREATE TABLE IF NOT EXISTS mailbox_access (id text PRIMARY KEY NOT NULL, mailbox
 CREATE UNIQUE INDEX IF NOT EXISTS mailbox_access_mailbox_user_idx ON mailbox_access(mailbox_id, user_id);
 CREATE INDEX IF NOT EXISTS mailbox_access_user_idx ON mailbox_access(user_id);
 CREATE INDEX IF NOT EXISTS mailbox_access_mailbox_idx ON mailbox_access(mailbox_id);
-CREATE TABLE IF NOT EXISTS contacts (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, email text NOT NULL, display_name text, source text DEFAULT 'inbound' NOT NULL, blocked integer DEFAULT false NOT NULL, last_seen_at integer, created_at integer NOT NULL);
+CREATE TABLE IF NOT EXISTS contacts (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, email text NOT NULL, display_name text, source text DEFAULT 'inbound' NOT NULL, blocked integer DEFAULT false NOT NULL, last_seen_at integer, created_at integer NOT NULL, allow_remote_images integer DEFAULT 0 NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS contacts_user_email_idx ON contacts(user_id, email);
 CREATE INDEX IF NOT EXISTS contacts_user_idx ON contacts(user_id);
 CREATE TABLE IF NOT EXISTS folders (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, mailbox_id text NOT NULL REFERENCES mailboxes(id) ON DELETE cascade, name text NOT NULL, color text DEFAULT '#2563eb' NOT NULL, created_at integer NOT NULL);

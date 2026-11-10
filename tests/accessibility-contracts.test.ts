@@ -104,8 +104,8 @@ describe("accessibility and responsive route contracts", () => {
 		expect(sidebar).toContain("localStorage.setItem(storageKey, String(next))");
 
 		const drawer = source("src/components/app-sidebar.tsx");
-		expect(drawer).toContain('!mobileOpen && "max-md:invisible max-md:-translate-x-full"');
-		expect(drawer).toContain('aria-controls="primary-navigation"');
+		expect(drawer).toContain('<SheetContent\n\t\t\t\t\t\tside="left"');
+		expect(drawer).toContain("{!narrow && children}");
 		for (const layout of [
 			"src/app/(dashboard)/layout.tsx",
 			"src/app/(settings)/layout.tsx",

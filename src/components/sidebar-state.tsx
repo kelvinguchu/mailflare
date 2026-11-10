@@ -13,8 +13,8 @@ const SidebarContext = createContext<SidebarState>({
 });
 
 /**
- * Desktop keeps the collapsible rail. Below 768px the navigation becomes an off-canvas drawer
- * that always shows full labels, opens from the header, and closes on navigation or Escape.
+ * Desktop keeps the collapsible rail. Below 768px the navigation becomes a sheet that always
+ * shows full labels, opens from the header, and closes on navigation (the sheet handles Escape).
  */
 export function SidebarProvider({ children, expandedWidth = 240 }: SidebarProviderProps) {
 	const pathname = usePathname();
@@ -39,15 +39,6 @@ export function SidebarProvider({ children, expandedWidth = 240 }: SidebarProvid
 	useEffect(() => {
 		setNarrowExpanded(false);
 	}, [pathname]);
-
-	useEffect(() => {
-		if (!mobileOpen) return;
-		const onKeyDown = (event: KeyboardEvent) => {
-			if (event.key === "Escape") setNarrowExpanded(false);
-		};
-		window.addEventListener("keydown", onKeyDown);
-		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [mobileOpen]);
 
 	useEffect(() => {
 		void fetch("/api/auth/me", { cache: "no-store" })

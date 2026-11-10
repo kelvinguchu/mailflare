@@ -2,7 +2,12 @@ import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { contacts, routingRules } from "@/db/schema";
 import { normalizeEmailAddress } from "@/lib/email/address";
-import type { BlockContactInput, ContactInput, MessageContactNames } from "@/lib/contacts/types";
+import type {
+	BlockContactInput,
+	ContactInput,
+	MessageContactNames,
+	RemoteImagesInput,
+} from "@/lib/contacts/types";
 import { getContactId, getContactNameFromAddress } from "@/lib/contacts/utils";
 
 export async function upsertContactFromAddress(env: CloudflareEnv, input: ContactInput) {
@@ -172,6 +177,45 @@ export async function blockContact(env: CloudflareEnv, input: BlockContactInput)
 	}
 
 	return { email, blocked: true };
+}
+
+/** Senders whose remote images this account always loads, as normalized addresses. */
+export async function listRemoteImageSenders(env: CloudflareEnv, userId: string) {
+	const rows = await getDb(env)
+		.select({ email: contacts.email })
+		.from(contacts)
+		.where(and(eq(contacts.userId, userId), eq(contacts.allowRemoteImages, true)));
+	return rows.map((row) => row.email);
+}
+
+/** Remembers, per sender, whether remote images load without asking. */
+export async function setRemoteImagesForSender(env: CloudflareEnv, input: RemoteImagesInput) {
+	const email = normalizeEmailAddress(input.address);
+	if (!email) throw new Error("Contact email is required");
+
+	const db = getDb(env);
+	const [existingContact] = await db
+		.select({ id: contacts.id })
+		.from(contacts)
+		.where(and(eq(contacts.userId, input.userId), eq(contacts.email, email)))
+		.limit(1);
+	if (existingContact) {
+		await db
+			.update(contacts)
+			.set({ allowRemoteImages: input.allowed })
+			.where(eq(contacts.id, existingContact.id));
+	} else if (input.allowed) {
+		await db.insert(contacts).values({
+			id: getContactId(input.userId, email),
+			userId: input.userId,
+			email,
+			displayName: getContactNameFromAddress(input.address),
+			source: "inbound",
+			allowRemoteImages: true,
+			lastSeenAt: new Date(),
+		});
+	}
+	return { email, allowed: input.allowed };
 }
 
 function getNextDisplayName(

@@ -19,6 +19,7 @@ import { MessageAttachmentViewer } from "@/components/message-attachment-viewer"
 import { toggleMessageStar } from "@/components/messages/message-list-row-actions-utils";
 import { PreviousMessage } from "@/components/previous-message";
 import { EmailHtmlBody } from "./email-html-body";
+import { useRemoteImageSenders } from "./use-remote-image-senders";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { extractCloudAttachments } from "@/app/(dashboard)/inbox/[messageId]/cloud-attachment-utils";
@@ -146,6 +147,12 @@ export function ExpandedConversationMessage({
 	const [starred, setStarred] = useState(message.starred);
 	const [previewAttachment, setPreviewAttachment] = useState<MessageAttachment | null>(null);
 	const [remoteImagesAllowed, setRemoteImagesAllowed] = useState(false);
+	const [savingImageChoice, setSavingImageChoice] = useState(false);
+	const remoteImageSenders = useRemoteImageSenders(inspection ? null : message.mailboxId);
+	const imagesTrustedBySender =
+		!inspection &&
+		message.direction === "inbound" &&
+		remoteImageSenders.isAllowed(message.fromAddr);
 	const [showDetails, setShowDetails] = useState(false);
 
 	useEffect(() => setStarred(message.starred), [message.starred]);
@@ -201,9 +208,26 @@ export function ExpandedConversationMessage({
 					"/api/team-inboxes/messages/",
 				) ?? null)
 			: resolveInlineAttachmentUrls(bodyDisplay.htmlBody, message.id, attachments),
-		{ allowRemoteImages: !inspection && remoteImagesAllowed, inspection: !!inspection },
+		{
+			allowRemoteImages: !inspection && (remoteImagesAllowed || imagesTrustedBySender),
+			inspection: !!inspection,
+		},
 	);
 	const cloudAttachments = extractCloudAttachments(bodyDisplay.latestContent);
+
+	async function saveImageChoice(allowed: boolean) {
+		setSavingImageChoice(true);
+		// This message follows the click even when the choice can't be saved, for example in a
+		// shared mailbox the account can read but not manage.
+		setRemoteImagesAllowed(allowed);
+		try {
+			await remoteImageSenders.setAllowed(message.fromAddr, allowed);
+		} catch {
+			// The choice still applies to this message; it just isn't remembered.
+		} finally {
+			setSavingImageChoice(false);
+		}
+	}
 	const deliveryLabel =
 		message.direction === "outbound" && message.deliveryStatus
 			? DELIVERY_LABELS[message.deliveryStatus]
@@ -385,23 +409,50 @@ export function ExpandedConversationMessage({
 							{data?.delivery?.error ? ` ${data.delivery.error}` : ""}
 						</div>
 					)}
-				{!inspection && sanitizedHtml.blockedRemoteImageCount > 0 && (
-					<div
-						className="mb-4 flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
-						role="status"
-					>
-						<span className="flex items-center gap-2">
-							<ImageOff className="h-4 w-4 shrink-0" aria-hidden="true" />
-							Remote images are hidden to protect your privacy.
-						</span>
+				{!inspection &&
+					!remoteImageSenders.loading &&
+					sanitizedHtml.blockedRemoteImageCount > 0 && (
+						<div
+							className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
+							role="status"
+						>
+							<span className="flex items-center gap-2">
+								<ImageOff className="h-4 w-4 shrink-0" aria-hidden="true" />
+								Remote images are hidden to protect your privacy.
+							</span>
+							<span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+								<button
+									type="button"
+									className="shrink-0 font-medium text-amber-950 underline underline-offset-2 hover:no-underline"
+									onClick={() => setRemoteImagesAllowed(true)}
+								>
+									Display remote images
+								</button>
+								{message.direction === "inbound" && (
+									<button
+										type="button"
+										disabled={savingImageChoice}
+										className="shrink-0 font-medium text-amber-950 underline underline-offset-2 hover:no-underline disabled:opacity-60"
+										onClick={() => void saveImageChoice(true)}
+									>
+										Always display from this sender
+									</button>
+								)}
+							</span>
+						</div>
+					)}
+				{imagesTrustedBySender && sanitizedHtml.remoteImageCount > 0 && (
+					<p className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-500">
+						<span>Remote images from {fromAddress} are always displayed.</span>
 						<button
 							type="button"
-							className="shrink-0 font-medium text-amber-950 underline underline-offset-2 hover:no-underline"
-							onClick={() => setRemoteImagesAllowed(true)}
+							disabled={savingImageChoice}
+							className="font-medium text-neutral-700 underline underline-offset-2 hover:no-underline disabled:opacity-60"
+							onClick={() => void saveImageChoice(false)}
 						>
-							Display remote images
+							Stop displaying them
 						</button>
-					</div>
+					</p>
 				)}
 				{loadError && !data ? (
 					<p className="text-sm text-red-600">This message couldn’t be loaded.</p>
