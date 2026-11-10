@@ -295,9 +295,9 @@ export function TeamCalendarView({ viewerId }: Readonly<{ viewerId: string }>) {
 					<div
 						className={cn(
 							"h-full min-h-0 flex-1",
-							// Phones fit month and day to the screen; week scrolls sideways inside this section.
+							// Phones fit every view to the screen width instead of scrolling sideways.
 							view === "month" && "min-w-[44rem] max-md:min-w-0",
-							view === "week" && "min-w-[56rem] max-md:min-w-[36rem]",
+							view === "week" && "min-w-[56rem] max-md:min-w-0",
 							view === "day" && "min-w-[28rem] max-md:min-w-0",
 						)}
 					>

@@ -171,13 +171,13 @@ export default function DomainsPage() {
 					<CardContent className="space-y-4 pt-5 text-xs no-font-mono">
 						<div>
 							<p className="font-sans font-medium text-sm mb-2">Email Routing</p>
-							<pre className="overflow-auto bg-neutral-50 dark:bg-neutral-900 p-3 rounded-md">
+							<pre className="overflow-auto bg-neutral-50 dark:bg-neutral-900 p-3 rounded-md max-md:whitespace-pre-wrap max-md:break-all">
 								{JSON.stringify((dnsView.dns as { routing: unknown }).routing, null, 2)}
 							</pre>
 						</div>
 						<div>
 							<p className="font-sans font-medium text-sm mb-2">Email Sending</p>
-							<pre className="overflow-auto bg-neutral-50 dark:bg-neutral-900 p-3 rounded-md">
+							<pre className="overflow-auto bg-neutral-50 dark:bg-neutral-900 p-3 rounded-md max-md:whitespace-pre-wrap max-md:break-all">
 								{JSON.stringify((dnsView.dns as { sending: DnsRecord[] }).sending, null, 2)}
 							</pre>
 						</div>

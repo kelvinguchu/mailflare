@@ -53,14 +53,14 @@ export function InboxModeTabs() {
 	return (
 		<nav
 			aria-label="Inbox mode"
-			className="flex shrink-0 gap-2 overflow-x-auto border-b border-neutral-200 px-4 py-2"
+			className="flex shrink-0 gap-2 overflow-x-auto border-b border-neutral-200 px-4 py-2 max-sm:gap-1 max-sm:px-2"
 		>
 			{TABS.map((tab) => (
 				<Link
 					key={tab.href}
 					href={tab.href}
 					aria-current={active === tab.href ? "page" : undefined}
-					className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold ${active === tab.href ? "bg-primary/10 text-primary" : "text-neutral-600"}`}
+					className={`shrink-0 rounded-lg px-4 py-2 text-sm font-semibold max-sm:px-2.5 ${active === tab.href ? "bg-primary/10 text-primary" : "text-neutral-600"}`}
 				>
 					{tab.label}
 				</Link>

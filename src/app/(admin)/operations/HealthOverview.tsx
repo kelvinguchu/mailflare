@@ -357,7 +357,37 @@ export function ProcessingPanel({
 					title="Queues"
 					description="Live Cloudflare Queue metrics at the time of the last check."
 				/>
-				<div className="overflow-x-auto">
+				<ul className="divide-y divide-neutral-100 border-t border-neutral-100 md:hidden">
+					{health.queues.map((queue) => {
+						const tone = queueTone(queue, thresholds, now);
+						const age = minutesSince(queue.oldestMessageAt, now);
+						let status = "Normal";
+						if (!queue.available) status = "Metrics unavailable";
+						else if (tone === "critical") status = "Delayed";
+						else if (tone === "warning") status = "Backlogged";
+						return (
+							<li key={queue.name} className="px-5 py-3 text-sm">
+								<div className="flex items-start justify-between gap-3">
+									<span className="min-w-0 font-medium break-words text-neutral-900">
+										{QUEUE_LABELS[queue.name] ?? queue.name}
+									</span>
+									<StatusText tone={tone === "good" ? "good" : tone}>{status}</StatusText>
+								</div>
+								<p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500 tabular-nums">
+									<span>
+										Waiting{" "}
+										<span className="text-neutral-900">
+											{queue.available ? formatCount(queue.backlogCount) : "—"}
+										</span>
+									</span>
+									<span>Size {queue.available ? formatBytes(queue.backlogBytes) : "—"}</span>
+									<span>Oldest {age === null ? "—" : formatDuration(age)}</span>
+								</p>
+							</li>
+						);
+					})}
+				</ul>
+				<div className="hidden overflow-x-auto md:block">
 					<table className="w-full min-w-[34rem] text-sm" aria-labelledby="queues-heading">
 						<thead>
 							<tr className="border-y border-neutral-100 text-left">
@@ -483,7 +513,33 @@ export function ProcessingPanel({
 					title="Background work"
 					description="Jobs waiting or retrying now, and failures in the last 24 hours."
 				/>
-				<div className="overflow-x-auto">
+				<ul className="divide-y divide-neutral-100 border-t border-neutral-100 md:hidden">
+					{backgroundRows.map((row) => (
+						<li key={row.label} className="px-5 py-3 text-sm">
+							<span className="inline-flex items-center gap-2 font-medium text-neutral-900">
+								{row.label}
+								{row.tone !== "neutral" && (
+									<StatusText tone={row.tone}>
+										<span className="sr-only">Over threshold</span>
+									</StatusText>
+								)}
+							</span>
+							<p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500 tabular-nums">
+								<span>
+									Waiting <span className="text-neutral-900">{formatCount(row.waiting)}</span>
+								</span>
+								<span>Retrying {formatCount(row.retrying)}</span>
+								<span>
+									Failed · 24 h{" "}
+									<span className={row.failed === null ? "text-neutral-400" : TONE_TEXT[row.tone]}>
+										{formatCount(row.failed)}
+									</span>
+								</span>
+							</p>
+						</li>
+					))}
+				</ul>
+				<div className="hidden overflow-x-auto md:block">
 					<table className="w-full min-w-[30rem] text-sm" aria-labelledby="background-heading">
 						<thead>
 							<tr className="border-y border-neutral-100 text-left">

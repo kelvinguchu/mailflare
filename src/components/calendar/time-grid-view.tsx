@@ -102,7 +102,7 @@ export function TimeGridView({
 					>
 						<span
 							className={cn(
-								"text-[11px] font-medium tracking-wide uppercase",
+								"text-[11px] font-medium tracking-wide uppercase max-sm:text-[10px] max-sm:tracking-normal",
 								keys[index] === today ? "text-primary" : "text-neutral-500",
 							)}
 						>
@@ -110,7 +110,7 @@ export function TimeGridView({
 						</span>
 						<span
 							className={cn(
-								"flex size-9 items-center justify-center rounded-full text-lg",
+								"flex size-9 items-center justify-center rounded-full text-lg max-sm:size-7 max-sm:text-base",
 								keys[index] === today ? "bg-primary text-primary-foreground" : "text-neutral-800",
 							)}
 						>
@@ -309,7 +309,7 @@ function GridBlock({
 				onClick={() => onSelectEvent(event)}
 				title={owner ? `${owner.name}: ${event.title}, ${time}` : undefined}
 				className={cn(
-					"absolute overflow-hidden rounded-md border border-white px-1.5 py-0.5 text-left text-xs focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-primary/60",
+					"absolute overflow-hidden rounded-md border border-white px-1.5 py-0.5 text-left text-xs focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-primary/60 max-sm:px-0.5 max-sm:text-[10px]",
 					owner
 						? "text-neutral-900 hover:z-10 hover:brightness-95"
 						: "bg-primary/12 text-primary shadow-[inset_3px_0_0_var(--color-primary)] hover:bg-primary/20",

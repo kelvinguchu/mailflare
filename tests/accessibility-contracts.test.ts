@@ -90,10 +90,9 @@ describe("accessibility and responsive route contracts", () => {
 		expect(settingsNav).toContain("overflow-x-auto");
 		expect(settingsNav).toContain("lg:w-64");
 		expect(calendar).toContain("aria-busy=");
-		// Desktop keeps its minimum grid widths; phones fit month and day to the screen and let
-		// week scroll inside its own section.
+		// Desktop keeps its minimum grid widths; phones fit every view to the screen width.
 		expect(calendar).toContain('view === "month" && "min-w-[44rem] max-md:min-w-0"');
-		expect(calendar).toContain('view === "week" && "min-w-[56rem] max-md:min-w-[36rem]"');
+		expect(calendar).toContain('view === "week" && "min-w-[56rem] max-md:min-w-0"');
 		expect(calendar).toContain('view === "day" && "min-w-[28rem] max-md:min-w-0"');
 	});
 
