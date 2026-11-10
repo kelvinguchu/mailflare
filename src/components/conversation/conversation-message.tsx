@@ -18,6 +18,7 @@ import { MessageAttachmentCard } from "@/components/message-attachment-card";
 import { MessageAttachmentViewer } from "@/components/message-attachment-viewer";
 import { toggleMessageStar } from "@/components/messages/message-list-row-actions-utils";
 import { PreviousMessage } from "@/components/previous-message";
+import { EmailHtmlBody } from "./email-html-body";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { extractCloudAttachments } from "@/app/(dashboard)/inbox/[messageId]/cloud-attachment-utils";
@@ -407,12 +408,7 @@ export function ExpandedConversationMessage({
 				) : (
 					<div className="prose max-w-none text-neutral-900 max-md:min-w-0 max-md:[overflow-wrap:anywhere]">
 						{sanitizedHtml.html ? (
-							// On phones, fixed-width newsletter layouts scroll inside the body instead of
-							// widening the whole reading pane, and images shrink to fit.
-							<div
-								className="max-md:overflow-x-auto max-md:[&_img]:h-auto max-md:[&_img]:max-w-full"
-								dangerouslySetInnerHTML={{ __html: sanitizedHtml.html }}
-							/>
+							<EmailHtmlBody html={sanitizedHtml.html} />
 						) : (
 							<pre className="font-sans text-sm whitespace-pre-wrap">
 								{data ? cloudAttachments.content : message.snippet}

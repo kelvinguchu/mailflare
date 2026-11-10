@@ -164,6 +164,38 @@ body {
 	touch-action: manipulation;
 }
 
+/*
+ * Received HTML email on phones. Most mail is built for a ~600px desktop column, so below 768px
+ * fixed widths give way to the screen: tables, images and blocks are capped at the reading
+ * column and long words or links wrap. The sanitizer drops <style> blocks and !important from
+ * inline styles, so these rules win. Layouts that still can't fit are scaled by EmailHtmlBody.
+ */
+@media (max-width: 767px) {
+	.email-html {
+		overflow-wrap: anywhere;
+	}
+
+	.email-html
+		:where(table, div, p, blockquote, center, section, article, header, footer, pre, ul, ol) {
+		max-width: 100% !important;
+		min-width: 0 !important;
+		box-sizing: border-box;
+	}
+
+	.email-html :where(td, th) {
+		min-width: 0 !important;
+	}
+
+	.email-html :where(img, video) {
+		max-width: 100% !important;
+		height: auto !important;
+	}
+
+	.email-html pre {
+		white-space: pre-wrap;
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
 	html:focus-within {
 		scroll-behavior: auto;
