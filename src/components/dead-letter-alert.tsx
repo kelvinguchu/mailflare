@@ -23,14 +23,14 @@ export function DeadLetterAlert() {
 	return (
 		<Link
 			href="/delivery-failures"
-			className="mb-6 flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 transition-colors hover:bg-red-100"
+			className="mb-6 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 transition-colors hover:bg-red-100"
 		>
 			<AlertTriangle className="h-5 w-5 shrink-0 text-red-700" />
-			<span className="font-medium">
+			<span className="min-w-0 font-medium">
 				{count.data} mail {count.data === 1 ? "delivery has" : "deliveries have"} exhausted
 				automatic retries
 			</span>
-			<ArrowRight className="ml-auto h-4 w-4" />
+			<ArrowRight className="mt-0.5 ml-auto h-4 w-4 shrink-0" />
 		</Link>
 	);
 }

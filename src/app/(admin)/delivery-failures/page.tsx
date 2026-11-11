@@ -49,8 +49,8 @@ export default function DeliveryFailuresPage() {
 
 			{(failures.data?.unresolvedCount ?? 0) > 0 ? (
 				<Card className="rounded-3xl border border-red-200 bg-red-50 p-6 max-sm:px-0 max-sm:py-4">
-					<CardHeader className="flex-row items-center gap-3 space-y-0 py-0">
-						<AlertTriangle className="h-5 w-5 shrink-0 text-red-700" />
+					<CardHeader className="flex-row items-start gap-3 space-y-0 py-0">
+						<AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-700" />
 						<CardTitle className="text-base text-red-950">
 							{failures.data?.unresolvedCount} unresolved queue{" "}
 							{failures.data?.unresolvedCount === 1 ? "failure" : "failures"}
@@ -59,8 +59,8 @@ export default function DeliveryFailuresPage() {
 				</Card>
 			) : failures.data ? (
 				<Card className="rounded-3xl border border-green-200 bg-green-50 p-6 max-sm:px-0 max-sm:py-4">
-					<CardHeader className="flex-row items-center gap-3 space-y-0 py-0">
-						<CheckCircle2 className="h-5 w-5 shrink-0 text-green-700" />
+					<CardHeader className="flex-row items-start gap-3 space-y-0 py-0">
+						<CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-green-700" />
 						<CardTitle className="text-base text-green-950">No unresolved queue failures</CardTitle>
 					</CardHeader>
 				</Card>

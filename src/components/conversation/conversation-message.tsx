@@ -215,15 +215,15 @@ export function ExpandedConversationMessage({
 	);
 	const cloudAttachments = extractCloudAttachments(bodyDisplay.latestContent);
 
-	async function saveImageChoice(allowed: boolean) {
+	async function alwaysShowImages() {
 		setSavingImageChoice(true);
-		// This message follows the click even when the choice can't be saved, for example in a
+		// This message shows its images even when the choice can't be saved, for example in a
 		// shared mailbox the account can read but not manage.
-		setRemoteImagesAllowed(allowed);
+		setRemoteImagesAllowed(true);
 		try {
-			await remoteImageSenders.setAllowed(message.fromAddr, allowed);
+			await remoteImageSenders.setAllowed(message.fromAddr, true);
 		} catch {
-			// The choice still applies to this message; it just isn't remembered.
+			// The images still show here; the choice just isn't remembered.
 		} finally {
 			setSavingImageChoice(false);
 		}
@@ -389,11 +389,11 @@ export function ExpandedConversationMessage({
 			<div className="mt-4 sm:pl-13">
 				{message.securityStatus === "quarantined" && (
 					<div
-						className="mb-4 flex gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-950"
+						className="mb-4 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-950"
 						role="alert"
 					>
-						<AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
-						<span>
+						<AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-700" aria-hidden="true" />
+						<span className="min-w-0">
 							This message is quarantined. Its body and attachments are unavailable.{" "}
 							{message.securityReason}
 						</span>
@@ -402,58 +402,56 @@ export function ExpandedConversationMessage({
 				{message.direction === "outbound" &&
 					(message.deliveryStatus === "failed" || message.deliveryStatus === "suppressed") && (
 						<div
-							className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900"
+							className="mb-4 flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-900"
 							role="status"
 						>
-							This message wasn’t delivered. {message.deliveryDetail}
-							{data?.delivery?.error ? ` ${data.delivery.error}` : ""}
+							<AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-700" aria-hidden="true" />
+							<span className="min-w-0 [overflow-wrap:anywhere]">
+								This message wasn’t delivered. {message.deliveryDetail}
+								{data?.delivery?.error ? ` ${data.delivery.error}` : ""}
+							</span>
 						</div>
 					)}
 				{!inspection &&
 					!remoteImageSenders.loading &&
 					sanitizedHtml.blockedRemoteImageCount > 0 && (
 						<div
-							className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950"
+							className="mb-4 flex flex-col gap-3 rounded-xl border border-neutral-200 bg-neutral-50 p-3 sm:flex-row sm:items-center sm:justify-between"
 							role="status"
 						>
-							<span className="flex items-center gap-2">
-								<ImageOff className="h-4 w-4 shrink-0" aria-hidden="true" />
-								Remote images are hidden to protect your privacy.
-							</span>
-							<span className="flex flex-wrap items-center gap-x-4 gap-y-1">
-								<button
+							<div className="flex min-w-0 items-start gap-2.5">
+								<ImageOff className="mt-0.5 size-4 shrink-0 text-neutral-500" aria-hidden="true" />
+								<div className="min-w-0">
+									<p className="text-sm font-medium text-neutral-900">Images are hidden</p>
+									<p className="text-xs text-neutral-500">
+										Loading them can tell the sender you opened this email.
+									</p>
+								</div>
+							</div>
+							<div className="flex gap-2 sm:shrink-0">
+								<Button
 									type="button"
-									className="shrink-0 font-medium text-amber-950 underline underline-offset-2 hover:no-underline"
+									variant="outline"
+									size="sm"
+									className="flex-1 sm:flex-none"
 									onClick={() => setRemoteImagesAllowed(true)}
 								>
-									Display remote images
-								</button>
+									Show images
+								</Button>
 								{message.direction === "inbound" && (
-									<button
+									<Button
 										type="button"
+										size="sm"
+										className="flex-1 sm:flex-none"
 										disabled={savingImageChoice}
-										className="shrink-0 font-medium text-amber-950 underline underline-offset-2 hover:no-underline disabled:opacity-60"
-										onClick={() => void saveImageChoice(true)}
+										onClick={() => void alwaysShowImages()}
 									>
-										Always display from this sender
-									</button>
+										Always show from sender
+									</Button>
 								)}
-							</span>
+							</div>
 						</div>
 					)}
-				{imagesTrustedBySender && sanitizedHtml.remoteImageCount > 0 && (
-					<p className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-500">
-						<span>Remote images from {fromAddress} are always displayed.</span>
-						<button
-							type="button"
-							disabled={savingImageChoice}
-							className="font-medium text-neutral-700 underline underline-offset-2 hover:no-underline disabled:opacity-60"
-							onClick={() => void saveImageChoice(false)}
-						>
-							Stop displaying them
-						</button>
-					</p>
-				)}
 				{loadError && !data ? (
 					<p className="text-sm text-red-600">This message couldn’t be loaded.</p>
 				) : (

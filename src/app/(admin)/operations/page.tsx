@@ -90,9 +90,9 @@ export default function OperationsPage() {
 			{health.isError && data && (
 				<div
 					role="status"
-					className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl bg-amber-50 px-4 py-2.5 text-sm text-amber-900"
+					className="flex items-start gap-x-3 rounded-xl bg-amber-50 px-4 py-2.5 text-sm text-amber-900"
 				>
-					<AlertTriangle className="size-4 shrink-0 text-amber-600" aria-hidden="true" />
+					<AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" aria-hidden="true" />
 					<span className="min-w-0 flex-1">
 						{describeOperationsError(health.error, "refresh operational health")} Showing results
 						from {formatDateTime(data.generatedAt)}.
