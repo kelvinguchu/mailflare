@@ -804,6 +804,26 @@ export const webhookDeliveries = sqliteTable(
 	],
 );
 
+/**
+ * One-time codes that sign a Mailflare user in to CaliberCode Drive. Only hashes are stored, each
+ * code is bound to the drive's `state`, lives 60 seconds and works once (src/lib/drive/sso.ts).
+ * Deliberately not backed up: they are useless a minute after they are made.
+ */
+export const driveSsoCodes = sqliteTable(
+	"drive_sso_codes",
+	{
+		codeHash: text("code_hash").primaryKey(),
+		stateHash: text("state_hash").notNull(),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		expiresAt: integer("expires_at", { mode: "timestamp" }).notNull(),
+		usedAt: integer("used_at", { mode: "timestamp" }),
+		createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+	},
+	(table) => [index("drive_sso_codes_expires_idx").on(table.expiresAt)],
+);
+
 export const sessions = sqliteTable(
 	"sessions",
 	{

@@ -12,7 +12,8 @@ import { OneTimeCodeInput } from "@/components/auth/one-time-code-input";
 import { TurnstileField } from "@/components/auth/turnstile";
 import { submitLogin, submitMfaChallenge } from "./utils";
 
-export function LoginClient() {
+/** `next`: an already-checked return path (see safeDriveNext), or null for the inbox. */
+export function LoginClient({ next = null }: { next?: string | null }) {
 	const router = useRouter();
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
@@ -52,6 +53,11 @@ export function LoginClient() {
 			if (data.mfaRequired && data.challengeToken) {
 				setChallengeToken(data.challengeToken);
 				setError(null);
+				return;
+			}
+			if (next && data.redirect !== "/enroll-mfa") {
+				// /sso/drive is a route handler, not a page, so it needs a full navigation.
+				window.location.assign(next);
 				return;
 			}
 			router.replace(data.redirect ?? "/inbox");

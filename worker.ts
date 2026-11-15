@@ -27,6 +27,7 @@ import {
 import { getDeadLetterSource } from "./src/lib/queues/dead-letter-policy";
 import { processWebhookQueue, WebhookRetryError } from "./src/lib/email/webhooks";
 import { deleteExpiredAccountRecoveryTokens } from "./src/lib/auth/recovery";
+import { deleteExpiredDriveSsoCodes } from "./src/lib/drive/sso";
 import { deleteExpiredSessions } from "./src/lib/auth/session";
 import { dispatchDueCalendarReminders } from "./src/lib/calendar/reminders";
 import { runStorageLifecycleMaintenance } from "./src/lib/storage/lifecycle";
@@ -34,6 +35,7 @@ import { captureOperationalSnapshot } from "./src/lib/operations/health";
 export { RealtimeHub } from "./src/lib/realtime/hub";
 export { DatabaseBackupWorkflow } from "./src/lib/backups/workflow";
 export { CalendarSyncService } from "./src/lib/calendar/calibercode-sync";
+export { DriveAuthService } from "./src/lib/drive/drive-auth-service";
 
 export default {
 	async fetch(request: Request, env: CloudflareEnv, ctx: ExecutionContext) {
@@ -119,6 +121,16 @@ export default {
 			console.error(
 				JSON.stringify({
 					event: "storage_lifecycle_failed",
+					error: error instanceof Error ? error.message : "Unknown cleanup error",
+				}),
+			);
+		}
+		try {
+			await deleteExpiredDriveSsoCodes(env, scheduledAt);
+		} catch (error) {
+			console.error(
+				JSON.stringify({
+					event: "drive_sso_code_cleanup_failed",
 					error: error instanceof Error ? error.message : "Unknown cleanup error",
 				}),
 			);

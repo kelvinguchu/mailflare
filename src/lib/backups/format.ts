@@ -100,7 +100,15 @@ export const DATABASE_SYSTEM_TABLES = [
 	"sqlite_stat1",
 ] as const;
 
-const CLASSIFIED_DATABASE_TABLES = new Set<string>([...BACKUP_TABLES, ...DATABASE_SYSTEM_TABLES]);
+// Short-lived credentials that are useless after a restore, so they are deliberately left out of
+// backups. drive_sso_codes live 60 seconds (src/lib/drive/sso.ts).
+export const EPHEMERAL_TABLES = ["drive_sso_codes"] as const;
+
+const CLASSIFIED_DATABASE_TABLES = new Set<string>([
+	...BACKUP_TABLES,
+	...DATABASE_SYSTEM_TABLES,
+	...EPHEMERAL_TABLES,
+]);
 
 export function getUnclassifiedDatabaseTables(tableNames: readonly string[]): string[] {
 	return tableNames.filter((table) => !CLASSIFIED_DATABASE_TABLES.has(table)).sort();

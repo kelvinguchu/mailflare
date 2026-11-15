@@ -6,22 +6,29 @@ import { getUserFromSession, SESSION_COOKIE } from "@/lib/auth/session";
 import { getEnv } from "@/lib/cloudflare";
 import { LoginClient } from "./login-client";
 import { evaluateUserMfaPolicy } from "@/lib/auth/mfa-policy";
+import { safeDriveNext } from "@/lib/drive/sso";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
+export default async function LoginPage({
+	searchParams,
+}: {
+	searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
 	const env = getEnv();
+	// Only a CaliberCode Drive sign-in may ask to come back somewhere other than the inbox.
+	const next = env.DRIVE_ORIGIN ? safeDriveNext((await searchParams).next) : null;
 	if (!(await hasAdminAccount(env))) redirect("/setup");
 	const cookieStore = await cookies();
 	const user = await getUserFromSession(env, cookieStore.get(SESSION_COOKIE)?.value);
 	if (user && !user.disabled) {
 		const policy = await evaluateUserMfaPolicy(env, user);
-		redirect(policy.state === "restricted" ? "/enroll-mfa" : "/inbox");
+		redirect(policy.state === "restricted" ? "/enroll-mfa" : (next ?? "/inbox"));
 	}
 
 	return (
 		<AuthGuard mode="public">
-			<LoginClient />
+			<LoginClient next={next} />
 		</AuthGuard>
 	);
 }

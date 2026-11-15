@@ -52,6 +52,7 @@ const MIGRATION_NAMES = [
 	"0050_add_team_inbox_retention.sql",
 	"0051_add_task_recurrence.sql",
 	"0052_add_contact_remote_images.sql",
+	"0053_add_drive_sso_codes.sql",
 ];
 
 const RETENTION_SCHEMA_STATEMENTS = [
@@ -327,6 +328,8 @@ CREATE TABLE IF NOT EXISTS sessions (id text PRIMARY KEY NOT NULL, user_id text 
 CREATE INDEX IF NOT EXISTS sessions_user_expires_idx ON sessions(user_id, expires_at);
 CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS sessions_kind_expires_idx ON sessions(kind, expires_at);
+CREATE TABLE IF NOT EXISTS drive_sso_codes (code_hash text PRIMARY KEY NOT NULL, state_hash text NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, expires_at integer NOT NULL, used_at integer, created_at integer NOT NULL);
+CREATE INDEX IF NOT EXISTS drive_sso_codes_expires_idx ON drive_sso_codes(expires_at);
 CREATE TABLE IF NOT EXISTS account_recovery_tokens (id text PRIMARY KEY NOT NULL, user_id text NOT NULL REFERENCES users(id) ON DELETE cascade, purpose text NOT NULL, token_hash text NOT NULL, email text NOT NULL, expires_at integer NOT NULL, used_at integer, created_at integer NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS account_recovery_tokens_hash_idx ON account_recovery_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS account_recovery_tokens_user_purpose_idx ON account_recovery_tokens(user_id, purpose, created_at);
