@@ -39,7 +39,7 @@ const ICON_GAP = 8;
 const CONTACT_LINES: Array<{ label: string; value: string; href: string }> = [
 	{ label: "Phone", value: "+254 733 313 314", href: "tel:+254733313314" },
 	{ label: "Mobile", value: "+254 753 033 333", href: "tel:+254753033333" },
-	{ label: "WhatsApp", value: "+254780 333 331", href: "https://wa.me/254780333331" },
+	{ label: "WhatsApp", value: "+254 780 333 331", href: "https://wa.me/254780333331" },
 	{ label: "Email", value: "contact@calibercode.io", href: "mailto:contact@calibercode.io" },
 ];
 
