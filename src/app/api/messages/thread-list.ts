@@ -8,6 +8,7 @@ import { getEmailAddress, getEmailDisplayName, normalizeEmailAddress } from "@/l
 import { buildSnippet } from "@/lib/email/parse";
 import type { listAccessibleMailboxes } from "@/lib/mailboxes/access";
 import { encodeMessagePageCursor } from "@/lib/messages/pagination";
+import { listedAttachmentCondition } from "./search-utils";
 
 export async function listMessageThreads(input: {
 	env: CloudflareEnv;
@@ -94,9 +95,12 @@ export async function listMessageThreads(input: {
 		.select({ messageId: messageAttachments.messageId })
 		.from(messageAttachments)
 		.where(
-			inArray(
-				messageAttachments.messageId,
-				rows.map((row) => row.id),
+			and(
+				inArray(
+					messageAttachments.messageId,
+					rows.map((row) => row.id),
+				),
+				listedAttachmentCondition,
 			),
 		)
 		.groupBy(messageAttachments.messageId);

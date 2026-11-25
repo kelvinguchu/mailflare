@@ -548,3 +548,89 @@ describe("repeating calendar tasks", () => {
 		expect((await setCalendarTaskCompleted(env, owner, nextTask!.id, true)).nextTask).toBeNull();
 	});
 });
+
+describe("calendar task history", () => {
+	it("records one entry listing every field a save changed", async () => {
+		const env = createMailEnv();
+		const owner = sessionUser(fixtureIds.owner);
+		const task = await createCalendarTask(env, owner, {
+			title: "Draft quote",
+			dueAt: "2026-11-12T10:00:00+03:00",
+			timezone: "Africa/Nairobi",
+			priority: "low",
+		});
+
+		await updateCalendarTask(env, owner, task.id, {
+			title: "Send quote",
+			description: "Use the November rates",
+			dueAt: "2026-11-14T09:00:00+03:00",
+			timezone: "Africa/Nairobi",
+			priority: "high",
+			recurrenceRule: "FREQ=WEEKLY",
+			assigneeUserId: fixtureIds.delegate,
+		});
+
+		const activity = await listCalendarTaskActivity(env, owner, task.id);
+		expect(activity.map((item) => item.action)).toEqual(["reassigned", "created"]);
+		expect(activity[0]).toMatchObject({ actorUserId: fixtureIds.owner, actorName: "Owner" });
+		expect(activity[0]?.details).toEqual({
+			changes: [
+				{ field: "title", from: "Draft quote", to: "Send quote" },
+				{
+					field: "assignee",
+					from: { id: fixtureIds.owner, name: "Owner" },
+					to: { id: fixtureIds.delegate, name: "Delegate" },
+				},
+				{
+					field: "due",
+					from: { at: "2026-11-12T07:00:00.000Z", allDay: false, timezone: "Africa/Nairobi" },
+					to: { at: "2026-11-14T06:00:00.000Z", allDay: false, timezone: "Africa/Nairobi" },
+				},
+				// Stored in canonical form: weekly on the due date's weekday.
+				{ field: "repeat", from: null, to: "FREQ=WEEKLY;BYDAY=SA" },
+				{ field: "priority", from: "low", to: "high" },
+				{ field: "description", change: "added" },
+			],
+		});
+		// The assignee sees the same single entry.
+		const seenByDelegate = await listCalendarTaskActivity(
+			env,
+			sessionUser(fixtureIds.delegate),
+			task.id,
+		);
+		expect(seenByDelegate[0]?.id).toBe(activity[0]?.id);
+	});
+
+	it("records reminders and skips saves that change nothing", async () => {
+		const env = createMailEnv();
+		const owner = sessionUser(fixtureIds.owner);
+		const task = await createCalendarTask(env, owner, {
+			title: "Call the client",
+			assigneeUserId: fixtureIds.delegate,
+			dueAt: "2026-11-14T09:00:00+03:00",
+			timezone: "Africa/Nairobi",
+		});
+		await updateCalendarTask(env, owner, task.id, { title: "Call the client" });
+		const reminder = await createCalendarReminder(env, owner, {
+			taskId: task.id,
+			remindAt: "2026-11-14T08:30:00+03:00",
+			timezone: "Africa/Nairobi",
+		});
+		await updateCalendarReminder(env, owner, reminder.id, {
+			remindAt: "2026-11-14T08:45:00+03:00",
+		});
+		await cancelCalendarReminder(env, fixtureIds.owner, reminder.id);
+		await cancelCalendarReminder(env, fixtureIds.owner, reminder.id);
+
+		const activity = await listCalendarTaskActivity(env, owner, task.id);
+		const reminderChange = (from: string | null, to: string | null) => ({
+			changes: [{ field: "reminder", from, to, timezone: "Africa/Nairobi", channel: "in_app" }],
+		});
+		expect(activity.map((item) => [item.action, item.details])).toEqual([
+			["updated", reminderChange("2026-11-14T05:45:00.000Z", null)],
+			["updated", reminderChange("2026-11-14T05:30:00.000Z", "2026-11-14T05:45:00.000Z")],
+			["updated", reminderChange(null, "2026-11-14T05:30:00.000Z")],
+			["created", { assignee: { id: fixtureIds.delegate, name: "Delegate" } }],
+		]);
+	});
+});

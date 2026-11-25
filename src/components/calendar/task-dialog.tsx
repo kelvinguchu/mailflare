@@ -30,16 +30,10 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { useCurrentAccount, type CurrentAccount } from "@/hooks/use-current-account";
-import {
-	calendarKeys,
-	getCalendarTask,
-	listCalendarTaskActivity,
-	listCalendarTaskAssignees,
-} from "@/lib/calendar/client";
+import { calendarKeys, getCalendarTask, listCalendarTaskAssignees } from "@/lib/calendar/client";
 import type {
 	CalendarPriority,
 	CalendarTaskAssignee,
@@ -56,11 +50,11 @@ import { FormError, TimezoneSelect } from "./calendar-fields";
 import type { ReminderTarget, TaskDialogState } from "./calendar-types";
 import { PRIORITY_OPTIONS, PRIORITY_STYLES, errorMessage } from "./calendar-utils";
 import { ItemReminders } from "./item-reminders";
+import { TaskActivityList } from "./task-activity-list";
 import { TaskRepeatField } from "./task-repeat-field";
 import {
 	buildTaskCreateInput,
 	buildTaskPatch,
-	describeTaskActivity,
 	getPersonLabel,
 	getTaskFormValues,
 	getTaskPermissions,
@@ -709,81 +703,5 @@ function DueField({
 				</p>
 			)}
 		</>
-	);
-}
-
-const ACTIVITY_PREVIEW = 5;
-
-function TaskActivityList({
-	taskId,
-	accountId,
-}: Readonly<{ taskId: string; accountId: string | undefined }>) {
-	const [expanded, setExpanded] = useState(false);
-	const activity = useQuery({
-		queryKey: calendarKeys.activity(taskId),
-		queryFn: () => listCalendarTaskActivity(taskId),
-	});
-	const items = activity.data ?? [];
-	const visible = expanded ? items : items.slice(0, ACTIVITY_PREVIEW);
-
-	return (
-		<section aria-labelledby="task-activity-heading" className="space-y-2">
-			<h3
-				id="task-activity-heading"
-				className="text-xs font-medium tracking-wide text-neutral-500 uppercase"
-			>
-				Activity
-			</h3>
-			{activity.isPending && (
-				<div className="space-y-2" role="status" aria-label="Loading activity">
-					<Skeleton className="h-3.5 w-2/3" />
-					<Skeleton className="h-3.5 w-1/2" />
-				</div>
-			)}
-			{activity.isError && (
-				<p className="text-sm text-neutral-500">
-					Activity couldn’t be loaded.{" "}
-					<button
-						type="button"
-						className="font-medium text-primary hover:underline"
-						onClick={() => void activity.refetch()}
-					>
-						Try again
-					</button>
-				</p>
-			)}
-			{activity.isSuccess && items.length === 0 && (
-				<p className="text-sm text-neutral-500">No activity recorded yet.</p>
-			)}
-			{visible.length > 0 && (
-				<ol className="space-y-1.5">
-					{visible.map((item) => {
-						const { actor, text } = describeTaskActivity(item, accountId);
-						return (
-							<li
-								key={item.id}
-								className="flex items-baseline gap-3 text-sm max-sm:flex-col max-sm:gap-0"
-							>
-								<span className="min-w-0 flex-1 wrap-break-word text-neutral-700">
-									<span className="font-medium text-neutral-900">{actor}</span> {text}
-								</span>
-								<time dateTime={item.createdAt} className="shrink-0 text-xs text-neutral-400">
-									{formatDateTime(item.createdAt)}
-								</time>
-							</li>
-						);
-					})}
-				</ol>
-			)}
-			{items.length > ACTIVITY_PREVIEW && (
-				<button
-					type="button"
-					className="text-xs font-medium text-primary hover:underline"
-					onClick={() => setExpanded((current) => !current)}
-				>
-					{expanded ? "Show less" : `Show all ${items.length}`}
-				</button>
-			)}
-		</section>
 	);
 }

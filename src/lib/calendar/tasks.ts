@@ -29,7 +29,17 @@ import { notifyUsersOfTaskChange } from "@/lib/realtime/utils";
 import type { TaskChangeNotification } from "@/lib/realtime/types";
 import { requireCalendarMailboxAccess } from "./access";
 import { nextTaskOccurrence, parseRecurrenceRule } from "./recurrence";
+import {
+	collectTaskChanges,
+	parseTaskActivityAction,
+	readTaskActivityDetails,
+	taskActivityPersonIds,
+	taskActivityRow,
+	withCurrentNames,
+	type TaskActivityState,
+} from "./task-activity";
 import type {
+	CalendarTaskActivity,
 	CalendarTaskInput,
 	CalendarTaskPatchInput,
 	CalendarTaskScope,
@@ -190,8 +200,13 @@ export async function createCalendarTask(
 	await db.batch([
 		db.insert(calendarTasks).values(task),
 		db.insert(auditLogs).values(
-			taskAudit(user.id, assignee.id, "calendar.task_created", task.id, {
-				assigneeUserId: assignee.id,
+			taskActivityRow({
+				actorUserId: user.id,
+				targetUserId: assignee.id,
+				action: "calendar.task_created",
+				taskId: task.id,
+				metadata: { assigneeUserId: assignee.id },
+				details: assignee.id === user.id ? null : { assignee },
 			}),
 		),
 	]);
@@ -239,25 +254,52 @@ export async function updateCalendarTask(
 		throw new CalendarInputError("Stop repeating this task before removing its due date");
 	}
 
-	let action = "calendar.task_updated";
-	let targetUserId = existing.assigneeUserId;
+	let reassigned = false;
+	let assignee = { id: existing.assigneeUserId, name: existing.assigneeName };
 	if (input.assigneeUserId !== undefined && input.assigneeUserId !== existing.assigneeUserId) {
 		if (existing.creatorUserId !== user.id) {
 			throw new CalendarInputError("Only the task creator can reassign it", 403);
 		}
-		const assignee = await requireAssignableUser(env, input.assigneeUserId);
+		assignee = await requireAssignableUser(env, input.assigneeUserId);
 		changes.assigneeUserId = assignee.id;
 		changes.assignedAt = new Date();
-		targetUserId = assignee.id;
-		action = "calendar.task_reassigned";
+		reassigned = true;
 	}
+	const before = taskActivityState(existing);
+	const activity = collectTaskChanges(before, {
+		title: changes.title ?? before.title,
+		description: changes.description ?? before.description,
+		dueAt,
+		allDay,
+		timezone: changes.timezone ?? before.timezone,
+		priority: changes.priority ?? before.priority,
+		recurrenceRule:
+			changes.recurrenceRule === undefined ? before.recurrenceRule : changes.recurrenceRule,
+		mailboxId: changes.mailboxId === undefined ? before.mailboxId : changes.mailboxId,
+		assignee,
+	});
+	const targetUserId = assignee.id;
 	const db = getDb(env);
+	const update = db.update(calendarTasks).set(changes).where(eq(calendarTasks.id, taskId));
+	if (activity.length === 0) {
+		// Nothing anyone would notice changed, so there is nothing to record or announce.
+		await update;
+		return requireAccessibleTask(env, user, taskId);
+	}
+	// One save is one history entry, listing every field it changed.
 	await db.batch([
-		db.update(calendarTasks).set(changes).where(eq(calendarTasks.id, taskId)),
+		update,
 		db.insert(auditLogs).values(
-			taskAudit(user.id, targetUserId, action, taskId, {
-				previousAssigneeUserId: existing.assigneeUserId,
-				assigneeUserId: targetUserId,
+			taskActivityRow({
+				actorUserId: user.id,
+				targetUserId,
+				action: reassigned ? "calendar.task_reassigned" : "calendar.task_updated",
+				taskId,
+				metadata: {
+					previousAssigneeUserId: existing.assigneeUserId,
+					assigneeUserId: targetUserId,
+				},
+				details: { changes: activity },
 			}),
 		),
 	]);
@@ -267,7 +309,7 @@ export async function updateCalendarTask(
 		user,
 		taskId,
 		changes.title ?? existing.title,
-		action === "calendar.task_reassigned" ? "reassigned" : "updated",
+		reassigned ? "reassigned" : "updated",
 	);
 	return requireAccessibleTask(env, user, taskId);
 }
@@ -283,9 +325,15 @@ export async function deleteCalendarTask(
 	}
 	const db = getDb(env);
 	await db.batch([
-		db
-			.insert(auditLogs)
-			.values(taskAudit(user.id, existing.assigneeUserId, "calendar.task_deleted", taskId)),
+		db.insert(auditLogs).values(
+			taskActivityRow({
+				actorUserId: user.id,
+				targetUserId: existing.assigneeUserId,
+				action: "calendar.task_deleted",
+				taskId,
+				details: { title: existing.title },
+			}),
+		),
 		db.delete(calendarTasks).where(eq(calendarTasks.id, taskId)),
 	]);
 	await notifyTaskParticipants(
@@ -317,16 +365,14 @@ export async function setCalendarTaskCompleted(
 			updatedAt: now,
 		})
 		.where(eq(calendarTasks.id, taskId));
-	const activity = db
-		.insert(auditLogs)
-		.values(
-			taskAudit(
-				user.id,
-				existing.assigneeUserId,
-				completed ? "calendar.task_completed" : "calendar.task_reopened",
-				taskId,
-			),
-		);
+	const activity = db.insert(auditLogs).values(
+		taskActivityRow({
+			actorUserId: user.id,
+			targetUserId: existing.assigneeUserId,
+			action: completed ? "calendar.task_completed" : "calendar.task_reopened",
+			taskId,
+		}),
+	);
 	if (completed) {
 		const reminderJobIds = db
 			.select({ id: calendarReminderDeliveries.outboundJobId })
@@ -467,9 +513,13 @@ async function nextOccurrenceStatements(
 		db
 			.insert(auditLogs)
 			.values({
-				...taskAudit(actorUserId, existing.assigneeUserId, "calendar.task_created", taskId, {
-					previousTaskId: existing.id,
-					recurrenceSeriesId: seriesId,
+				...taskActivityRow({
+					actorUserId,
+					targetUserId: existing.assigneeUserId,
+					action: "calendar.task_created",
+					taskId,
+					metadata: { previousTaskId: existing.id, recurrenceSeriesId: seriesId },
+					details: { nextOccurrence: true },
 				}),
 				id: await derivedId("aud", "created", taskId),
 			})
@@ -547,14 +597,16 @@ export async function listCalendarTaskActivity(
 	taskId: string,
 ) {
 	await requireAccessibleTask(env, user, taskId);
+	// Timestamps are whole seconds and IDs are random, so insertion order (rowid) breaks ties
+	// between changes made in the same second.
 	const result = await env.DB.prepare(
-		`SELECT a.id, a.action, a.actor_user_id, a.created_at, u.name AS actor_name,
+		`SELECT a.id, a.action, a.actor_user_id, a.created_at, a.metadata, u.name AS actor_name,
 			u.email AS actor_email
 		 FROM audit_logs AS a
 		 LEFT JOIN users AS u ON u.id = a.actor_user_id
 		 WHERE a.action LIKE 'calendar.task_%'
 		   AND json_extract(a.metadata, '$.taskId') = ?
-		 ORDER BY a.created_at DESC, a.id DESC
+		 ORDER BY a.created_at DESC, a.rowid DESC
 		 LIMIT 50`,
 	)
 		.bind(taskId)
@@ -565,14 +617,31 @@ export async function listCalendarTaskActivity(
 			actor_name: string | null;
 			actor_email: string | null;
 			created_at: number;
+			metadata: string | null;
 		}>();
-	return result.results.map((row) => ({
+	const entries = result.results.flatMap((row) => {
+		const action = parseTaskActivityAction(row.action);
+		if (!action) return [];
+		const details = readTaskActivityDetails(row.metadata, action, row.actor_user_id);
+		return [{ row, action, details }];
+	});
+	const personIds = [...new Set(entries.flatMap((entry) => taskActivityPersonIds(entry.details)))];
+	const people =
+		personIds.length === 0
+			? []
+			: await getDb(env)
+					.select({ id: users.id, name: users.name })
+					.from(users)
+					.where(inArray(users.id, personIds));
+	const names = new Map(people.map((person) => [person.id, person.name]));
+	return entries.map(({ row, action, details }): CalendarTaskActivity => ({
 		id: row.id,
-		action: row.action.replace("calendar.task_", ""),
+		action,
 		actorUserId: row.actor_user_id,
 		actorName: row.actor_name,
 		actorEmail: row.actor_email,
 		createdAt: new Date(row.created_at * 1_000).toISOString(),
+		details: withCurrentNames(details, names),
 	}));
 }
 
@@ -584,7 +653,7 @@ function taskScopeCondition(userId: string, scope: CalendarTaskScope) {
 
 async function requireAssignableUser(env: CloudflareEnv, userId: string) {
 	const [assignee] = await getDb(env)
-		.select({ id: users.id })
+		.select({ id: users.id, name: users.name })
 		.from(users)
 		.where(
 			and(eq(users.id, userId), eq(users.activationStatus, "active"), eq(users.disabled, false)),
@@ -603,19 +672,18 @@ function normalizeTaskPeople(task: SelectedTask) {
 	};
 }
 
-function taskAudit(
-	actorUserId: string,
-	targetUserId: string,
-	action: string,
-	taskId: string,
-	metadata: Record<string, string> = {},
-) {
+/** The fields history compares, as the task stands. */
+function taskActivityState(task: ReturnType<typeof normalizeTaskPeople>): TaskActivityState {
 	return {
-		id: newId("aud"),
-		actorUserId,
-		targetUserId,
-		action,
-		metadata: JSON.stringify({ taskId, ...metadata }),
+		title: task.title,
+		description: task.description,
+		dueAt: task.dueAt,
+		allDay: task.allDay,
+		timezone: task.timezone,
+		priority: task.priority,
+		recurrenceRule: task.recurrenceRule,
+		mailboxId: task.mailboxId,
+		assignee: { id: task.assigneeUserId, name: task.assigneeName },
 	};
 }
 

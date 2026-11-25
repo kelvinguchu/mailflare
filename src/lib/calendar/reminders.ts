@@ -1,6 +1,7 @@
 import { and, asc, eq, gte, inArray, lt, lte, or } from "drizzle-orm";
 import { getDb } from "@/db";
 import {
+	auditLogs,
 	calendarEvents,
 	calendarReminderDeliveries,
 	calendarReminders,
@@ -15,6 +16,7 @@ import {
 	requireCalendarMailboxAccess,
 	requireCalendarSender,
 } from "./access";
+import { reminderActivityRow } from "./task-activity";
 import type {
 	CalendarReminderInput,
 	CalendarReminderPatchInput,
@@ -117,7 +119,25 @@ export async function createCalendarReminder(
 		remindAt,
 		timezone,
 	};
-	await getDb(env).insert(calendarReminders).values(reminder);
+	const db = getDb(env);
+	const insert = db.insert(calendarReminders).values(reminder);
+	if (reminder.taskId) {
+		await db.batch([
+			insert,
+			db.insert(auditLogs).values(
+				reminderActivityRow({
+					actorUserId: user.id,
+					taskId: reminder.taskId,
+					from: null,
+					to: remindAt,
+					timezone,
+					channel,
+				}),
+			),
+		]);
+	} else {
+		await insert;
+	}
 	return reminder;
 }
 
@@ -150,7 +170,10 @@ export async function updateCalendarReminder(
 		if (!parsed) throw new CalendarInputError("Enter a reminder time");
 		remindAt = parsed;
 	}
-	await getDb(env)
+	const timezone =
+		input.timezone === undefined ? existing.timezone : calendarTimezone(input.timezone);
+	const db = getDb(env);
+	const update = db
 		.update(calendarReminders)
 		.set({
 			title:
@@ -161,7 +184,7 @@ export async function updateCalendarReminder(
 			recipient: delivery.recipient,
 			fromAddr: delivery.fromAddr,
 			remindAt,
-			timezone: input.timezone === undefined ? existing.timezone : calendarTimezone(input.timezone),
+			timezone,
 			status: "scheduled",
 			snoozedUntil: null,
 			claimedAt: null,
@@ -172,6 +195,23 @@ export async function updateCalendarReminder(
 			updatedAt: new Date(),
 		})
 		.where(and(eq(calendarReminders.id, reminderId), eq(calendarReminders.userId, user.id)));
+	if (existing.taskId && remindAt.getTime() !== existing.remindAt.getTime()) {
+		await db.batch([
+			update,
+			db.insert(auditLogs).values(
+				reminderActivityRow({
+					actorUserId: user.id,
+					taskId: existing.taskId,
+					from: existing.remindAt,
+					to: remindAt,
+					timezone,
+					channel,
+				}),
+			),
+		]);
+	} else {
+		await update;
+	}
 	return requireOwnedReminder(env, user.id, reminderId);
 }
 
@@ -180,11 +220,29 @@ export async function cancelCalendarReminder(
 	userId: string,
 	reminderId: string,
 ) {
-	await requireOwnedReminder(env, userId, reminderId);
-	await getDb(env)
+	const existing = await requireOwnedReminder(env, userId, reminderId);
+	const db = getDb(env);
+	const cancel = db
 		.update(calendarReminders)
 		.set({ status: "cancelled", claimedAt: null, updatedAt: new Date() })
 		.where(and(eq(calendarReminders.id, reminderId), eq(calendarReminders.userId, userId)));
+	if (existing.taskId && existing.status !== "cancelled") {
+		await db.batch([
+			cancel,
+			db.insert(auditLogs).values(
+				reminderActivityRow({
+					actorUserId: userId,
+					taskId: existing.taskId,
+					from: existing.remindAt,
+					to: null,
+					timezone: existing.timezone,
+					channel: existing.channel,
+				}),
+			),
+		]);
+	} else {
+		await cancel;
+	}
 	return requireOwnedReminder(env, userId, reminderId);
 }
 

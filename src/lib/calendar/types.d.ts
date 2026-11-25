@@ -167,13 +167,55 @@ export type CalendarTaskAssignee = {
 	hasAvatar: boolean;
 };
 
+export type CalendarTaskActivityAction =
+	"created" | "updated" | "reassigned" | "completed" | "reopened" | "deleted";
+
+/** Someone a change names. `name` is null when the account no longer exists. */
+export type TaskActivityPerson = { id: string; name: string | null };
+
+/** A due date as it was: all-day values are UTC midnight, timed ones read in `timezone`. */
+export type TaskActivityDue = { at: string; allDay: boolean; timezone: string };
+
+/** One field of a task as it changed. A null side means the field was empty. */
+export type TaskActivityChange =
+	| { field: "title"; from: string; to: string }
+	| { field: "description"; change: "added" | "edited" | "removed" }
+	| { field: "due"; from: TaskActivityDue | null; to: TaskActivityDue | null }
+	| { field: "priority"; from: CalendarPriority; to: CalendarPriority }
+	| { field: "assignee"; from: TaskActivityPerson | null; to: TaskActivityPerson }
+	/** Canonical repeat rules. */
+	| { field: "repeat"; from: string | null; to: string | null }
+	/** A reminder added (no `from`), removed (no `to`), or moved to another time. */
+	| {
+			field: "reminder";
+			from: string | null;
+			to: string | null;
+			timezone: string;
+			channel: CalendarReminderChannel;
+	  }
+	| { field: "mailbox" };
+
+/** What an activity entry records beyond its action. */
+export type TaskActivityDetails = {
+	/** Every field one save changed, in display order. */
+	changes?: TaskActivityChange[];
+	/** On creation: who the task was assigned to. */
+	assignee?: TaskActivityPerson;
+	/** On creation: the task is the next occurrence of a repeating task. */
+	nextOccurrence?: boolean;
+	/** On deletion: the title the task had. */
+	title?: string;
+};
+
 export type CalendarTaskActivity = {
 	id: string;
-	action: "created" | "updated" | "reassigned" | "completed" | "reopened" | "deleted";
+	action: CalendarTaskActivityAction;
 	actorUserId: string | null;
 	actorName: string | null;
 	actorEmail: string | null;
 	createdAt: string;
+	/** Null for entries recorded before changes were stored. */
+	details: TaskActivityDetails | null;
 };
 
 export type CalendarReminderListParams = {

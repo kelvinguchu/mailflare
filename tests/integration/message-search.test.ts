@@ -145,6 +145,46 @@ describe("indexed message search", () => {
 		).toEqual(["msg_new_invoice"]);
 	});
 
+	it("does not count inline images the body draws as attachments", async () => {
+		for (const [id, createdAt] of [
+			["msg_signature_only", baseCreatedAt],
+			["msg_signature_and_file", baseCreatedAt + 1],
+		] as const) {
+			await insertMessage({
+				id,
+				mailboxId: fixtureIds.sharedMailbox,
+				from: "staff@calibercode.test",
+				to: "support@primary.test",
+				subject: "Signed note",
+				textBody: "Signed with the house signature.",
+				createdAt,
+			});
+			await integrationEnv.DB.prepare(
+				`INSERT INTO message_attachments
+				(id, message_id, filename, content_type, size, disposition, content_id, security_status, r2_key, created_at)
+				VALUES (?, ?, 'calibercode-logo.png', 'image/png', 10, 'inline', 'sig.default-logo@ccmail.local', 'safe', ?, ?)`,
+			)
+				.bind(`att_logo_${id}`, id, `attachments/${id}/logo.png`, createdAt)
+				.run();
+		}
+		await integrationEnv.DB.prepare(
+			`INSERT INTO message_attachments
+			(id, message_id, filename, content_type, size, disposition, content_id, security_status, r2_key, created_at)
+			VALUES ('att_real_file', 'msg_signature_and_file', 'quote.pdf', 'application/pdf', 10, 'attachment', NULL, 'safe', 'attachments/quote.pdf', ?)`,
+		)
+			.bind(baseCreatedAt)
+			.run();
+
+		const withFiles = await searchAsDelegate(
+			new URLSearchParams({ q: "signed", hasAttachments: "true" }),
+		);
+		expect(withFiles.map((row) => row.id)).toEqual(["msg_signature_and_file"]);
+		const withoutFiles = await searchAsDelegate(
+			new URLSearchParams({ q: "signed", hasAttachments: "false" }),
+		);
+		expect(withoutFiles.map((row) => row.id)).toEqual(["msg_signature_only"]);
+	});
+
 	it("keeps deterministic newest-first ordering", async () => {
 		for (const [id, createdAt] of [
 			["msg_first", baseCreatedAt],

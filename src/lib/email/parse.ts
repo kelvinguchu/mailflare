@@ -3,6 +3,7 @@ import { formatPostalAddress, formatPostalAddressList } from "@/lib/email/addres
 import { normalizeAttachmentContent } from "@/lib/email/attachments";
 import { getMessagePreviewText, htmlToReadableText } from "@/lib/email/reply-content-utils";
 import type { AttachmentContent } from "@/lib/email/attachment-types";
+import { classifyPartDisposition } from "@/lib/email/inline-parts";
 import { normalizeProviderMessageId, parseMessageReferences } from "@/lib/email/threading";
 
 export type ParsedEmail = {
@@ -37,7 +38,9 @@ export async function parseRawMime(raw: ArrayBuffer): Promise<ParsedEmail> {
 			filename: attachment.filename ?? `attachment-${index + 1}`,
 			type: attachment.mimeType || "application/octet-stream",
 			content: normalizeAttachmentContent(attachment.content, attachment.encoding),
-			disposition: attachment.disposition === "inline" ? "inline" : "attachment",
+			// Senders often leave out Content-Disposition or file names on inline images, so what
+			// counts is whether the HTML draws the part.
+			disposition: classifyPartDisposition(attachment, email.html),
 			contentId: attachment.contentId ?? null,
 		})),
 	};

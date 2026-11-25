@@ -134,23 +134,28 @@ describe("task permissions and people", () => {
 	});
 
 	it("attributes activity to you or the named actor", () => {
-		const base = { id: "a1", createdAt: "2026-09-14T10:00:00.000Z", actorEmail: null };
+		const base = {
+			id: "a1",
+			createdAt: "2026-09-14T10:00:00.000Z",
+			actorEmail: null,
+			details: null,
+		};
 		expect(
 			describeTaskActivity(
 				{ ...base, action: "reassigned", actorUserId: "usr_owner", actorName: "Maya Chen" },
-				"usr_me",
+				{ accountId: "usr_me" },
 			),
-		).toEqual({ actor: "Maya Chen", text: "changed the assignee" });
+		).toEqual({ actor: "Maya Chen", text: "changed the assignee", changes: [] });
 		expect(
 			describeTaskActivity(
 				{ ...base, action: "completed", actorUserId: "usr_me", actorName: "Sam" },
-				"usr_me",
+				{ accountId: "usr_me" },
 			),
-		).toEqual({ actor: "You", text: "marked it complete" });
+		).toEqual({ actor: "You", text: "marked this complete", changes: [] });
 		expect(
 			describeTaskActivity(
 				{ ...base, action: "created", actorUserId: null, actorName: null },
-				"usr_me",
+				{ accountId: "usr_me" },
 			).actor,
 		).toBe("A removed account");
 	});

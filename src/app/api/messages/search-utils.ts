@@ -25,10 +25,19 @@ export function getMessageRecipientSearchCondition(recipient: string): SQL {
 	return getFtsCondition(buildScopedFtsPhrase("recipients", recipient));
 }
 
+/**
+ * Rows that count as attachments for "has attachments": everything except inline parts with a
+ * Content-ID, which are images the body draws, such as a signature logo.
+ */
+export const listedAttachmentCondition: SQL = sql`NOT (
+	${messageAttachments.disposition} = 'inline' AND ${messageAttachments.contentId} IS NOT NULL
+)`;
+
 export function getMessageAttachmentCondition(hasAttachments: boolean): SQL {
 	const existsQuery = sql`EXISTS (
 		SELECT 1 FROM ${messageAttachments}
 		WHERE ${messageAttachments.messageId} = ${messages.id}
+			AND ${listedAttachmentCondition}
 	)`;
 	return hasAttachments ? existsQuery : sql`NOT ${existsQuery}`;
 }

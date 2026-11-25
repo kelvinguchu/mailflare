@@ -37,6 +37,7 @@ import {
 	resolveInlineAttachmentUrls,
 } from "@/app/(dashboard)/inbox/[messageId]/utils";
 import type { Message } from "@/hooks/types";
+import { getListedAttachments } from "@/lib/email/inline-parts";
 import { getMessagePreviewText } from "@/lib/email/reply-content-utils";
 import { cn } from "@/lib/utils";
 import {
@@ -186,6 +187,8 @@ export function ExpandedConversationMessage({
 
 	const detailMessage = data?.message ?? message;
 	const attachments = data?.attachments ?? [];
+	// Inline images the body draws (a signature logo, say) are part of the message, not files.
+	const listedAttachments = getListedAttachments(attachments, data?.body?.htmlBody);
 	const { fromName, fromAddress, toName } = getMessageHeaderParties(
 		detailMessage,
 		currentAccountName,
@@ -500,13 +503,13 @@ export function ExpandedConversationMessage({
 						</div>
 					</section>
 				)}
-				{attachments.length > 0 && (
+				{listedAttachments.length > 0 && (
 					<section className="mt-6 border-t border-neutral-100 pt-4">
 						<h3 className="mb-3 text-sm font-semibold text-neutral-900">
-							Attachments ({attachments.length})
+							Attachments ({listedAttachments.length})
 						</h3>
 						<div className="grid gap-2 sm:grid-cols-2">
-							{attachments.map((attachment) => (
+							{listedAttachments.map((attachment) => (
 								<MessageAttachmentCard
 									inspection={!!inspection}
 									key={attachment.id}

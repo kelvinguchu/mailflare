@@ -1,6 +1,5 @@
 import type {
 	CalendarPriority,
-	CalendarTaskActivity,
 	CalendarTaskInput,
 	CalendarTaskListParams,
 	CalendarTaskPatchInput,
@@ -180,25 +179,7 @@ export function getPersonLabel(
 	return userId === accountId ? "You" : name;
 }
 
-const ACTIVITY_TEXT: Record<CalendarTaskActivity["action"], string> = {
-	created: "created this task",
-	updated: "edited the details",
-	reassigned: "changed the assignee",
-	completed: "marked it complete",
-	reopened: "reopened it",
-	deleted: "deleted this task",
-};
-
-export function describeTaskActivity(
-	item: CalendarTaskActivity,
-	accountId: string | undefined,
-): { actor: string; text: string } {
-	const actor =
-		item.actorUserId && item.actorUserId === accountId
-			? "You"
-			: (item.actorName ?? item.actorEmail ?? "A removed account");
-	return { actor, text: ACTIVITY_TEXT[item.action] ?? "changed this task" };
-}
+export { describeTaskActivity } from "./task-activity-utils";
 
 /** Whether a task belongs in a list query, used to place optimistic changes. */
 export function taskMatchesListParams(

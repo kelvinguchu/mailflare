@@ -35,6 +35,7 @@ import { claimOutboundDelivery } from "@/lib/email/outbound-claim";
 import { buildOutboundThreading, normalizeProviderMessageId } from "@/lib/email/threading";
 import { renderForwardedContent, type ForwardSource } from "@/lib/email/forward";
 import { renderMailboxSignatureForSend } from "@/lib/email/signatures";
+import { toEmailServiceAttachment } from "@/lib/email/provider-attachment";
 import { normalizeRecipients, type NormalizedRecipient } from "@/lib/email/recipients";
 import { validateMessageBudget } from "./limits";
 
@@ -734,23 +735,6 @@ async function loadOutboundAttachments(
 			};
 		}),
 	);
-}
-
-function toEmailServiceAttachment(attachment: AttachmentContent) {
-	return attachment.disposition === "inline" && attachment.contentId
-		? {
-				filename: attachment.filename,
-				type: attachment.type,
-				content: attachment.content,
-				disposition: "inline" as const,
-				contentId: attachment.contentId,
-			}
-		: {
-				filename: attachment.filename,
-				type: attachment.type,
-				content: attachment.content,
-				disposition: "attachment" as const,
-			};
 }
 
 function toEmailServiceRecipient(recipient: NormalizedRecipient) {

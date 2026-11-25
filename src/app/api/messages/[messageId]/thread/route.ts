@@ -9,6 +9,7 @@ import { getContactDisplayNameMap } from "@/lib/contacts/service";
 import { normalizeEmailAddress } from "@/lib/email/address";
 import { buildSnippet } from "@/lib/email/parse";
 import { getMailboxAccessLevel } from "@/lib/mailboxes/access";
+import { listedAttachmentCondition } from "../../search-utils";
 import type { MessageThreadRouteParams } from "./types";
 
 export async function GET(request: Request, { params }: MessageThreadRouteParams) {
@@ -50,9 +51,12 @@ export async function GET(request: Request, { params }: MessageThreadRouteParams
 					.select({ messageId: messageAttachments.messageId })
 					.from(messageAttachments)
 					.where(
-						inArray(
-							messageAttachments.messageId,
-							rows.map((row) => row.id),
+						and(
+							inArray(
+								messageAttachments.messageId,
+								rows.map((row) => row.id),
+							),
+							listedAttachmentCondition,
 						),
 					)
 					.groupBy(messageAttachments.messageId);
