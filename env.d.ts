@@ -19,8 +19,11 @@ interface CloudflareEnv {
 	AUTH_EMAIL_DELIVERY_MODE?: "disabled" | "enabled";
 	AUTH_EMAIL_FROM: string;
 	PUBLIC_APP_ORIGIN: string;
-	/** CaliberCode Drive's origin. When unset, /sso/drive is turned off. */
-	DRIVE_ORIGIN?: string;
+	/**
+	 * CaliberCode Drive origins allowed to receive sign-in codes, comma-separated. When unset,
+	 * /sso/drive is turned off.
+	 */
+	DRIVE_ORIGINS?: string;
 	CF_TOKEN?: string;
 	CF_API_KEY?: string;
 	CF_EMAIL?: string;

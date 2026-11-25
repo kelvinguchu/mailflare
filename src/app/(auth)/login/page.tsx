@@ -6,7 +6,7 @@ import { getUserFromSession, SESSION_COOKIE } from "@/lib/auth/session";
 import { getEnv } from "@/lib/cloudflare";
 import { LoginClient } from "./login-client";
 import { evaluateUserMfaPolicy } from "@/lib/auth/mfa-policy";
-import { safeDriveNext } from "@/lib/drive/sso";
+import { allowedDriveOrigins, safeDriveNext } from "@/lib/drive/sso";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,7 @@ export default async function LoginPage({
 }) {
 	const env = getEnv();
 	// Only a CaliberCode Drive sign-in may ask to come back somewhere other than the inbox.
-	const next = env.DRIVE_ORIGIN ? safeDriveNext((await searchParams).next) : null;
+	const next = safeDriveNext((await searchParams).next, allowedDriveOrigins(env.DRIVE_ORIGINS));
 	if (!(await hasAdminAccount(env))) redirect("/setup");
 	const cookieStore = await cookies();
 	const user = await getUserFromSession(env, cookieStore.get(SESSION_COOKIE)?.value);

@@ -26,11 +26,56 @@ export function isValidDriveState(state: unknown): state is string {
 	return typeof state === "string" && STATE_PATTERN.test(state);
 }
 
-/** The only return path the login page accepts: back to /sso/drive with a valid state. */
-export function safeDriveNext(next: unknown): string | null {
-	if (typeof next !== "string") return null;
-	const match = /^\/sso\/drive\?state=([A-Za-z0-9_-]+)$/.exec(next);
-	return match && isValidDriveState(match[1]) ? next : null;
+/**
+ * The drive origins Mailflare may send sign-in codes to, from DRIVE_ORIGINS (comma-separated,
+ * for example the production and staging drives). Anything that isn't a bare https origin is
+ * ignored.
+ */
+export function allowedDriveOrigins(value: string | undefined): string[] {
+	const origins: string[] = [];
+	for (const entry of (value ?? "").split(",")) {
+		const candidate = entry.trim();
+		if (!candidate) continue;
+		try {
+			const url = new URL(candidate);
+			if (url.protocol === "https:" && url.origin === candidate) origins.push(url.origin);
+		} catch {
+			// Not a URL: ignored.
+		}
+	}
+	return origins;
+}
+
+/** The requested drive origin, only when it is exactly one of the allowed ones. */
+export function pickDriveOrigin(requested: unknown, allowed: readonly string[]): string | null {
+	return typeof requested === "string" && allowed.includes(requested) ? requested : null;
+}
+
+/** The /sso/drive path the login page returns to. */
+export function driveSsoPath(state: string, driveOrigin: string): string {
+	return `/sso/drive?${new URLSearchParams({ state, drive: driveOrigin }).toString()}`;
+}
+
+/**
+ * The only return path the login page accepts: back to /sso/drive with a valid state and an
+ * allowed drive, and nothing else, so `next` can't be used as an open redirect.
+ */
+export function safeDriveNext(next: unknown, allowed: readonly string[]): string | null {
+	if (typeof next !== "string" || !next.startsWith("/sso/drive?")) return null;
+	const base = "https://mailflare.invalid";
+	let url: URL;
+	try {
+		url = new URL(next, base);
+	} catch {
+		return null;
+	}
+	if (url.origin !== base || url.pathname !== "/sso/drive") return null;
+	const keys = [...url.searchParams.keys()].sort();
+	if (keys.length !== 2 || keys[0] !== "drive" || keys[1] !== "state") return null;
+	const state = url.searchParams.get("state");
+	const driveOrigin = pickDriveOrigin(url.searchParams.get("drive"), allowed);
+	if (!isValidDriveState(state) || !driveOrigin) return null;
+	return driveSsoPath(state, driveOrigin);
 }
 
 function base64Url(bytes: Uint8Array): string {
